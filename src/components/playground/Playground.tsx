@@ -59,15 +59,24 @@ export default function Playground({
 
   useEffect(() => {
     if (roomState === ConnectionState.Connected) {
-      localParticipant.setCameraEnabled(config.settings.inputs.camera);
+      localParticipant.setCameraEnabled(true);
       localParticipant.setMicrophoneEnabled(config.settings.inputs.mic);
+
+      // Create and publish screen tracks
+      localParticipant.createScreenTracks().then((screenTracks) => {
+        screenTracks.forEach((track) => {
+          localParticipant.publishTrack(track);
+        });
+      }).catch((error) => {
+        console.error("Error creating screen tracks:", error);
+      });
     }
   }, [config, localParticipant, roomState]);
 
-  const agentVideoTrack = tracks.find(
+  const screenVideoTrack = tracks.find(
     (trackRef) =>
       trackRef.publication.kind === Track.Kind.Video &&
-      trackRef.participant.isAgent
+      trackRef.source === Track.Source.ScreenShare
   );
 
   const localTracks = tracks.filter(
@@ -124,7 +133,7 @@ export default function Playground({
 
     const videoContent = (
       <VideoTrack
-        trackRef={agentVideoTrack}
+        trackRef={screenVideoTrack}
         className={`absolute top-1/2 -translate-y-1/2 ${videoFitClassName} object-position-center w-full h-full`}
       />
     );
@@ -132,7 +141,7 @@ export default function Playground({
     let content = null;
     if (roomState === ConnectionState.Disconnected) {
       content = disconnectedContent;
-    } else if (agentVideoTrack) {
+    } else if (screenVideoTrack) {
       content = videoContent;
     } else {
       content = loadingContent;
@@ -143,7 +152,7 @@ export default function Playground({
         {content}
       </div>
     );
-  }, [agentVideoTrack, config, roomState]);
+  }, [screenVideoTrack, config, roomState]);
 
   useEffect(() => {
     document.body.style.setProperty(
@@ -404,11 +413,10 @@ export default function Playground({
           />
         </div>
         <div
-          className={`flex-col grow basis-1/2 gap-4 h-full hidden lg:${
-            !config.settings.outputs.audio && !config.settings.outputs.video
-              ? "hidden"
-              : "flex"
-          }`}
+          className={`flex-col grow basis-1/2 gap-4 h-full hidden lg:${!config.settings.outputs.audio && !config.settings.outputs.video
+            ? "hidden"
+            : "flex"
+            }`}
         >
           {config.settings.outputs.video && (
             <PlaygroundTile
