@@ -1,7 +1,7 @@
 "use client";
 
 import { LoadingSVG } from "@/components/button/LoadingSVG";
-import { ChatMessageType } from "@/components/chat/ChatTile";
+import { ChatMessageType, ChatTile } from "@/components/chat/ChatTile";
 import { ColorPicker } from "@/components/colorPicker/ColorPicker";
 import { AudioInputTile } from "@/components/config/AudioInputTile";
 import { ConfigurationPanelItem } from "@/components/config/ConfigurationPanelItem";
@@ -16,23 +16,17 @@ import { useConfig } from "@/hooks/useConfig";
 import { TranscriptionTile } from "@/transcriptions/TranscriptionTile";
 import {
   BarVisualizer,
-  VideoTrack,
   useConnectionState,
   useDataChannel,
   useLocalParticipant,
   useRoomInfo,
-  useTracks,
   useVoiceAssistant,
 } from "@livekit/components-react";
 import { ConnectionState, LocalParticipant, Track } from "livekit-client";
 import { QRCodeSVG } from "qrcode.react";
 import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from 'next/navigation';
 import tailwindTheme from "../../lib/tailwindTheme.preval";
-
-export interface PlaygroundMeta {
-  name: string;
-  value: string;
-}
 
 export interface PlaygroundProps {
   logo?: ReactNode;
@@ -47,47 +41,125 @@ export default function Playground({
   themeColors,
   onConnect,
 }: PlaygroundProps) {
+  // State to store URL parameters
+  const [params, setParams] = useState({
+    brdgeId: null as string | null,
+    numSlides: 0,
+    apiBaseUrl: null as string | null,
+    currentSlide: 1
+  });
+
+  // Initialize parameters on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const newParams = {
+        brdgeId: urlParams.get('brdgeId'),
+        numSlides: parseInt(urlParams.get('numSlides') || '0'),
+        apiBaseUrl: urlParams.get('apiBaseUrl'),
+        currentSlide: 1
+      };
+
+      console.log('Setting initial params:', newParams);
+      setParams(newParams);
+    }
+  }, []);
+
   const { config, setUserSettings } = useConfig();
   const { name } = useRoomInfo();
   const [transcripts, setTranscripts] = useState<ChatMessageType[]>([]);
   const { localParticipant } = useLocalParticipant();
-
   const voiceAssistant = useVoiceAssistant();
-
   const roomState = useConnectionState();
-  const tracks = useTracks();
 
-  useEffect(() => {
-    if (roomState === ConnectionState.Connected) {
-      localParticipant.setCameraEnabled(true);
-      localParticipant.setMicrophoneEnabled(config.settings.inputs.mic);
-
-      // Create and publish screen tracks
-      localParticipant.createScreenTracks().then((screenTracks) => {
-        screenTracks.forEach((track) => {
-          localParticipant.publishTrack(track);
-        });
-      }).catch((error) => {
-        console.error("Error creating screen tracks:", error);
-      });
+  // Handle slide navigation
+  const handlePrevSlide = () => {
+    if (params.currentSlide > 1) {
+      setParams(prev => ({ ...prev, currentSlide: prev.currentSlide - 1 }));
     }
-  }, [config, localParticipant, roomState]);
+  };
 
-  const screenVideoTrack = tracks.find(
-    (trackRef) =>
-      trackRef.publication.kind === Track.Kind.Video &&
-      trackRef.source === Track.Source.ScreenShare
-  );
+  const handleNextSlide = () => {
+    if (params.currentSlide < params.numSlides) {
+      setParams(prev => ({ ...prev, currentSlide: prev.currentSlide + 1 }));
+    }
+  };
 
-  const localTracks = tracks.filter(
-    ({ participant }) => participant instanceof LocalParticipant
-  );
-  const localVideoTrack = localTracks.find(
-    ({ source }) => source === Track.Source.Camera
-  );
-  const localMicTrack = localTracks.find(
-    ({ source }) => source === Track.Source.Microphone
-  );
+  // Validate required parameters
+  const hasRequiredParams = useMemo(() => {
+    const valid = Boolean(params.brdgeId && params.numSlides > 0 && params.apiBaseUrl);
+    if (!valid) {
+      console.error('Missing required parameters:', params);
+    }
+    return valid;
+  }, [params]);
+
+  // Simplified slide content
+  const slideTileContent = useMemo(() => {
+    if (!hasRequiredParams) {
+      return (
+        <div className="flex items-center justify-center text-gray-700 text-center w-full h-full">
+          <div className="flex flex-col items-center gap-4">
+            <div>Missing required parameters to display slides</div>
+            <div className="text-sm text-gray-500">
+              brdgeId: {params.brdgeId || 'missing'}<br />
+              numSlides: {params.numSlides || 'missing'}<br />
+              apiBaseUrl: {params.apiBaseUrl || 'missing'}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (roomState === ConnectionState.Disconnected) {
+      return (
+        <div className="flex items-center justify-center text-gray-700 text-center w-full h-full">
+          Connect to start the session
+        </div>
+      );
+    }
+
+    const slideUrl = `${params.apiBaseUrl}/brdges/${params.brdgeId}/slides/${params.currentSlide}`;
+    console.log('Loading slide:', slideUrl);
+
+    return (
+      <div className="flex flex-col w-full h-full">
+        <div className="flex-1 relative bg-gray-900 flex items-center justify-center">
+          <img
+            key={slideUrl}
+            src={slideUrl}
+            alt={`Slide ${params.currentSlide}`}
+            className="max-w-full max-h-full object-contain"
+            onError={(e) => {
+              console.error('Error loading slide image:', slideUrl);
+              const target = e.target as HTMLImageElement;
+              target.onerror = null;
+              target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="50%" y="50%" text-anchor="middle" fill="gray">Error loading slide</text></svg>';
+            }}
+          />
+        </div>
+        <div className="flex justify-center items-center gap-4 p-4 bg-gray-800">
+          <button
+            onClick={handlePrevSlide}
+            disabled={params.currentSlide === 1}
+            className="px-4 py-2 bg-blue-500 text-white rounded disabled:opacity-50"
+          >
+            Previous
+          </button>
+          <span className="text-white">
+            Slide {params.currentSlide} of {params.numSlides}
+          </span>
+          <button
+            onClick={handleNextSlide}
+            disabled={params.currentSlide === params.numSlides}
+            className="px-4 py-2 bg-blue-500 text-white rounded disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    );
+  }, [params, roomState, hasRequiredParams]);
 
   const onDataReceived = useCallback(
     (msg: any) => {
@@ -114,45 +186,6 @@ export default function Playground({
   );
 
   useDataChannel(onDataReceived);
-
-  const videoTileContent = useMemo(() => {
-    const videoFitClassName = `object-${config.video_fit || "cover"}`;
-
-    const disconnectedContent = (
-      <div className="flex items-center justify-center text-gray-700 text-center w-full h-full">
-        No video track. Connect to get started.
-      </div>
-    );
-
-    const loadingContent = (
-      <div className="flex flex-col items-center justify-center gap-2 text-gray-700 text-center h-full w-full">
-        <LoadingSVG />
-        Waiting for video track
-      </div>
-    );
-
-    const videoContent = (
-      <VideoTrack
-        trackRef={screenVideoTrack}
-        className={`absolute top-1/2 -translate-y-1/2 ${videoFitClassName} object-position-center w-full h-full`}
-      />
-    );
-
-    let content = null;
-    if (roomState === ConnectionState.Disconnected) {
-      content = disconnectedContent;
-    } else if (screenVideoTrack) {
-      content = videoContent;
-    } else {
-      content = loadingContent;
-    }
-
-    return (
-      <div className="flex flex-col w-full grow text-gray-950 bg-black rounded-sm border border-gray-800 relative">
-        {content}
-      </div>
-    );
-  }, [screenVideoTrack, config, roomState]);
 
   useEffect(() => {
     document.body.style.setProperty(
@@ -281,27 +314,6 @@ export default function Playground({
             />
           </div>
         </ConfigurationPanelItem>
-        {localVideoTrack && (
-          <ConfigurationPanelItem
-            title="Camera"
-            deviceSelectorKind="videoinput"
-          >
-            <div className="relative">
-              <VideoTrack
-                className="rounded-sm border border-gray-800 opacity-70 w-full"
-                trackRef={localVideoTrack}
-              />
-            </div>
-          </ConfigurationPanelItem>
-        )}
-        {localMicTrack && (
-          <ConfigurationPanelItem
-            title="Microphone"
-            deviceSelectorKind="audioinput"
-          >
-            <AudioInputTile trackRef={localMicTrack} />
-          </ConfigurationPanelItem>
-        )}
         <div className="w-full">
           <ConfigurationPanelItem title="Color">
             <ColorPicker
@@ -315,43 +327,33 @@ export default function Playground({
             />
           </ConfigurationPanelItem>
         </div>
-        {config.show_qr && (
-          <div className="w-full">
-            <ConfigurationPanelItem title="QR Code">
-              <QRCodeSVG value={window.location.href} width="128" />
-            </ConfigurationPanelItem>
-          </div>
-        )}
       </div>
     );
   }, [
     config.description,
     config.settings,
-    config.show_qr,
     localParticipant,
     name,
     roomState,
-    localVideoTrack,
-    localMicTrack,
     themeColors,
     setUserSettings,
     voiceAssistant.agent,
   ]);
 
   let mobileTabs: PlaygroundTab[] = [];
-  if (config.settings.outputs.video) {
-    mobileTabs.push({
-      title: "Video",
-      content: (
-        <PlaygroundTile
-          className="w-full h-full grow"
-          childrenClassName="justify-center"
-        >
-          {videoTileContent}
-        </PlaygroundTile>
-      ),
-    });
-  }
+
+  // Slides tab
+  mobileTabs.push({
+    title: "Slides",
+    content: (
+      <PlaygroundTile
+        className="w-full h-full grow"
+        childrenClassName="justify-center"
+      >
+        {slideTileContent}
+      </PlaygroundTile>
+    ),
+  });
 
   if (config.settings.outputs.audio) {
     mobileTabs.push({
@@ -391,7 +393,7 @@ export default function Playground({
   return (
     <>
       <PlaygroundHeader
-        title={config.title}
+        title={config.title || "Brdge AI"}
         logo={logo}
         githubLink={config.github_link}
         height={headerHeight}
@@ -405,55 +407,36 @@ export default function Playground({
         className={`flex gap-4 py-4 grow w-full selection:bg-${config.settings.theme_color}-900`}
         style={{ height: `calc(100% - ${headerHeight}px)` }}
       >
-        <div className="flex flex-col grow basis-1/2 gap-4 h-full lg:hidden">
-          <PlaygroundTabbedTile
-            className="h-full"
-            tabs={mobileTabs}
-            initialTab={mobileTabs.length - 1}
-          />
-        </div>
-        <div
-          className={`flex-col grow basis-1/2 gap-4 h-full hidden lg:${!config.settings.outputs.audio && !config.settings.outputs.video
-            ? "hidden"
-            : "flex"
-            }`}
-        >
-          {config.settings.outputs.video && (
-            <PlaygroundTile
-              title="Video"
-              className="w-full h-full grow"
-              childrenClassName="justify-center"
-            >
-              {videoTileContent}
-            </PlaygroundTile>
-          )}
-          {config.settings.outputs.audio && (
-            <PlaygroundTile
-              title="Audio"
-              className="w-full h-full grow"
-              childrenClassName="justify-center"
-            >
-              {audioTileContent}
-            </PlaygroundTile>
-          )}
+        {/* Main content area */}
+        <div className="flex-col grow basis-3/4 gap-4 h-full flex">
+          <PlaygroundTile
+            title="Slides"
+            className="w-full h-full grow"
+            childrenClassName="justify-center p-0"
+          >
+            {slideTileContent}
+          </PlaygroundTile>
         </div>
 
-        {config.settings.chat && (
+        {/* Right sidebar */}
+        <div className="flex flex-col basis-1/4 gap-4 h-full">
+          {config.settings.chat && (
+            <PlaygroundTile
+              title="Chat"
+              className="h-1/2"
+            >
+              {chatTileContent}
+            </PlaygroundTile>
+          )}
           <PlaygroundTile
-            title="Chat"
-            className="h-full grow basis-1/4 hidden lg:flex"
+            padding={false}
+            backgroundColor="gray-950"
+            className="h-1/2 items-start overflow-y-auto"
+            childrenClassName="h-full grow items-start"
           >
-            {chatTileContent}
+            {settingsTileContent}
           </PlaygroundTile>
-        )}
-        <PlaygroundTile
-          padding={false}
-          backgroundColor="gray-950"
-          className="h-full w-full basis-1/4 items-start overflow-y-auto hidden max-w-[480px] lg:flex"
-          childrenClassName="h-full grow items-start"
-        >
-          {settingsTileContent}
-        </PlaygroundTile>
+        </div>
       </div>
     </>
   );
