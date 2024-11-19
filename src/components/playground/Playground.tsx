@@ -583,7 +583,13 @@ export default function Playground({
           {localParticipant && (
             <div className="p-4 border-b border-gray-800">
               <button
-                onClick={() => localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled)}
+                onClick={() => {
+                  if (roomState === ConnectionState.Connected) {
+                    localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
+                  } else {
+                    alert("Connect to share your insights");
+                  }
+                }}
                 className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-md transition-colors
                   ${localParticipant.isMicrophoneEnabled
                     ? 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
