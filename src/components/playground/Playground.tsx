@@ -22,7 +22,7 @@ import {
   useRoomInfo,
   useVoiceAssistant,
 } from "@livekit/components-react";
-import { ConnectionState, LocalParticipant, Track } from "livekit-client";
+import { ConnectionState, LocalParticipant, Track, DataPacket_Kind } from "livekit-client";
 import { QRCodeSVG } from "qrcode.react";
 import { ReactNode, useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useSearchParams } from 'next/navigation';
@@ -49,7 +49,49 @@ export default function Playground({
     currentSlide: 1
   });
 
-  // Initialize parameters on mount
+  // Add this at the top with other state declarations
+  const sentInitialUpdate = useRef(false);
+  const lastSentSlide = useRef<number | null>(null);
+  const { send } = useDataChannel("slide_updates", (message) => {
+    console.log("Received message on slide_updates channel:", message);
+  });
+  const roomState = useConnectionState();
+
+  // Function to send slide update
+  const sendSlideUpdate = useCallback(() => {
+    if (!params.brdgeId || roomState !== ConnectionState.Connected) {
+      console.log("Cannot send slide update:", {
+        hasBrdgeId: !!params.brdgeId,
+        connectionState: roomState
+      });
+      return;
+    }
+
+    const message = {
+      type: "SLIDE_UPDATE",
+      brdgeId: params.brdgeId,
+      numSlides: params.numSlides,
+      apiBaseUrl: params.apiBaseUrl,
+      currentSlide: params.currentSlide,
+    };
+
+    try {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(JSON.stringify(message));
+      send(data);
+      lastSentSlide.current = params.currentSlide;
+      console.log("Successfully sent SLIDE_UPDATE:", {
+        message,
+        timestamp: new Date().toISOString(),
+        dataLength: data.length,
+        lastSent: lastSentSlide.current
+      });
+    } catch (e) {
+      console.error("Error sending slide update:", e);
+    }
+  }, [params, roomState, send]);
+
+  // Handle initial params setup
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
@@ -65,12 +107,46 @@ export default function Playground({
     }
   }, []);
 
+  // Send initial update IMMEDIATELY after connection
+  useEffect(() => {
+    if (roomState === ConnectionState.Connected && params.brdgeId) {
+      console.log("Connection established, sending immediate slide update:", {
+        currentSlide: params.currentSlide,
+        params,
+        roomState
+      });
+      // Force send by resetting lastSentSlide
+      lastSentSlide.current = null;
+      sendSlideUpdate();
+    }
+  }, [roomState, params.brdgeId, sendSlideUpdate]);
+
+  // Handle slide changes separately
+  useEffect(() => {
+    if (roomState === ConnectionState.Connected &&
+      lastSentSlide.current !== null &&
+      params.currentSlide !== lastSentSlide.current) {
+      console.log("Sending slide change update:", {
+        currentSlide: params.currentSlide,
+        lastSent: lastSentSlide.current
+      });
+      sendSlideUpdate();
+    }
+  }, [params.currentSlide, roomState, sendSlideUpdate]);
+
+  // Reset tracking when disconnecting
+  useEffect(() => {
+    if (roomState !== ConnectionState.Connected) {
+      console.log("Connection state changed, resetting lastSentSlide:", roomState);
+      lastSentSlide.current = null;
+    }
+  }, [roomState]);
+
   const { config, setUserSettings } = useConfig();
   const { name } = useRoomInfo();
   const [transcripts, setTranscripts] = useState<ChatMessageType[]>([]);
   const { localParticipant } = useLocalParticipant();
   const voiceAssistant = useVoiceAssistant();
-  const roomState = useConnectionState();
 
   // Handle slide navigation
   const handlePrevSlide = () => {
@@ -389,86 +465,6 @@ export default function Playground({
       </PlaygroundTile>
     ),
   });
-
-  // Add this at the top with other state declarations
-  const sentInitialUpdate = useRef(false);
-
-  // Add the data channel hook with a specific topic
-  const { send } = useDataChannel("slide_updates", (message) => {
-    console.log("Received message on slide_updates channel:", message);
-  });
-
-  // Add a ref to track the last sent slide number
-  const lastSentSlide = useRef<number | null>(null);
-
-  // Function to send SLIDE_UPDATE messages using the data channel
-  const sendSlideUpdate = useCallback(() => {
-    // Don't send if same slide or not connected
-    if (!hasRequiredParams ||
-      roomState !== ConnectionState.Connected ||
-      lastSentSlide.current === params.currentSlide) {
-      console.log("Skipping slide update:", {
-        hasRequiredParams,
-        connectionState: roomState,
-        currentSlide: params.currentSlide,
-        lastSentSlide: lastSentSlide.current
-      });
-      return;
-    }
-
-    const message = {
-      type: "SLIDE_UPDATE",
-      brdgeId: params.brdgeId,
-      numSlides: params.numSlides,
-      apiBaseUrl: params.apiBaseUrl,
-      currentSlide: params.currentSlide,
-    };
-
-    try {
-      const encoder = new TextEncoder();
-      const data = encoder.encode(JSON.stringify(message));
-      send(data, { topic: "slide_updates" });
-      lastSentSlide.current = params.currentSlide;
-      console.log("Successfully sent SLIDE_UPDATE message:", {
-        message,
-        dataLength: data.length,
-        timestamp: new Date().toISOString()
-      });
-    } catch (e) {
-      console.error("Error sending slide update:", e);
-    }
-  }, [hasRequiredParams, params, roomState, send]);
-
-  // Send initial slide data only once when all required data is available
-  useEffect(() => {
-    const shouldSendUpdate =
-      params.brdgeId &&
-      roomState === ConnectionState.Connected &&
-      !sentInitialUpdate.current;
-
-    if (shouldSendUpdate) {
-      console.log("Connection ready, sending initial slide update");
-      sendSlideUpdate();
-      sentInitialUpdate.current = true;
-    }
-  }, [params.brdgeId, roomState, sendSlideUpdate]);
-
-  // Add effect to send updates ONLY on actual slide changes
-  useEffect(() => {
-    if (sentInitialUpdate.current &&
-      params.currentSlide !== lastSentSlide.current) {
-      console.log("Slide changed, sending update");
-      sendSlideUpdate();
-    }
-  }, [params.currentSlide, sendSlideUpdate]);
-
-  // Reset tracking when disconnecting
-  useEffect(() => {
-    if (roomState !== ConnectionState.Connected) {
-      sentInitialUpdate.current = false;
-      lastSentSlide.current = null;
-    }
-  }, [roomState]);
 
   return (
     <>
