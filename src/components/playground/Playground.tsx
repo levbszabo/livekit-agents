@@ -493,50 +493,135 @@ export default function Playground({
     ),
   });
 
+  // Add constant for theme
+  const THEME = {
+    primary: 'cyan',
+    bgDark: 'gray-900',
+    bgLight: 'gray-50',
+    text: 'gray-100',
+  };
+
+  // Enable microphone by default when connecting
+  useEffect(() => {
+    if (roomState === ConnectionState.Connected && localParticipant) {
+      localParticipant.setMicrophoneEnabled(true);
+    }
+  }, [roomState, localParticipant]);
+
+  // Add a function to construct the slide URL
+  const getSlideUrl = useCallback(() => {
+    if (!params.apiBaseUrl || !params.brdgeId || !params.currentSlide) {
+      return null;
+    }
+    return `${params.apiBaseUrl}/brdges/${params.brdgeId}/slides/${params.currentSlide}`;
+  }, [params.apiBaseUrl, params.brdgeId, params.currentSlide]);
+
+  // Update the presentation side JSX
   return (
-    <>
+    <div className="h-screen flex flex-col bg-[#121212]">
       <PlaygroundHeader
-        title={config.title || "Brdge AI"}
-        logo={logo}
-        githubLink={config.github_link}
+        title="AI Assistant"
         height={headerHeight}
-        accentColor={config.settings.theme_color}
+        accentColor={THEME.primary}
         connectionState={roomState}
         onConnectClicked={!isConnecting ? handleConnect : undefined}
       />
-      <div
-        className={`flex gap-4 py-4 grow w-full selection:bg-${config.settings.theme_color}-900`}
-        style={{ height: `calc(100% - ${headerHeight}px)` }}
-      >
-        {/* Main content area */}
-        <div className="flex-col grow basis-3/4 gap-4 h-full flex">
-          <PlaygroundTile
-            title="Slides"
-            className="w-full h-full grow"
-            childrenClassName="justify-center p-0"
-          >
-            {slideTileContent}
-          </PlaygroundTile>
+
+      <div className="flex-1 flex overflow-hidden">
+        {/* Presentation Side with improved scroll handling */}
+        <div className="flex-1 p-6 overflow-y-auto">
+          <div className="min-h-full flex flex-col">
+            <div className="w-full bg-black rounded-2xl overflow-hidden">
+              {/* Slide content with natural dimensions */}
+              <div className="relative w-full">
+                {getSlideUrl() ? (
+                  <img
+                    key={getSlideUrl()}
+                    src={getSlideUrl()}
+                    alt={`Slide ${params.currentSlide}`}
+                    className="w-full h-auto"
+                    onError={(e) => {
+                      console.error('Error loading slide image:', getSlideUrl());
+                      const target = e.target as HTMLImageElement;
+                      target.onerror = null;
+                      target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="50%" y="50%" text-anchor="middle" fill="gray">Error loading slide</text></svg>';
+                    }}
+                  />
+                ) : (
+                  <div className="w-full aspect-[4/3] flex items-center justify-center bg-gray-900 text-gray-500">
+                    No slide available
+                  </div>
+                )}
+
+                {/* Navigation overlay */}
+                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
+                  <div className="flex justify-center items-center gap-4">
+                    <button
+                      onClick={handlePrevSlide}
+                      disabled={params.currentSlide === 1}
+                      className="px-4 py-2 bg-gray-800/80 text-white rounded-md hover:bg-gray-700/80 disabled:opacity-50 transition-colors"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={handleNextSlide}
+                      disabled={params.currentSlide === params.numSlides}
+                      className="px-4 py-2 bg-gray-800/80 text-white rounded-md hover:bg-gray-700/80 disabled:opacity-50 transition-colors"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Right sidebar with fixed proportions */}
-        <div className="flex flex-col basis-1/4 gap-4 h-full min-w-[300px] max-w-[400px]">
-          <PlaygroundTile
-            title="Chat & Voice Input"
-            className="flex-grow min-h-0 h-2/3"
-          >
-            {chatTileContent}
-          </PlaygroundTile>
-          <PlaygroundTile
-            padding={false}
-            backgroundColor="gray-950"
-            className="h-1/3 min-h-[200px] overflow-y-auto"
-            childrenClassName="h-full grow items-start"
-          >
-            {settingsTileContent}
-          </PlaygroundTile>
+        {/* Right Side Panel */}
+        <div className="w-[420px] border-l border-gray-800 flex flex-col bg-gray-900">
+          {/* Mic Toggle Only */}
+          {localParticipant && (
+            <div className="p-4 border-b border-gray-800">
+              <button
+                onClick={() => localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled)}
+                className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-md transition-colors
+                  ${localParticipant.isMicrophoneEnabled
+                    ? 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
+                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+              >
+                <span className={`w-2 h-2 rounded-full ${localParticipant.isMicrophoneEnabled ? 'bg-cyan-500 animate-pulse' : 'bg-gray-600'}`} />
+                <span className="text-sm font-medium">
+                  {localParticipant.isMicrophoneEnabled ? 'Microphone Active' : 'Microphone Off'}
+                </span>
+              </button>
+            </div>
+          )}
+
+          {/* Chat Messages */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="p-4">
+              {voiceAssistant.audioTrack && (
+                <TranscriptionTile
+                  agentAudioTrack={voiceAssistant.audioTrack}
+                  accentColor={THEME.primary}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Minimal Status Bar */}
+          {roomState === ConnectionState.Connected && (
+            <div className="p-3 bg-gray-900 border-t border-gray-800">
+              <div className="flex items-center justify-end text-sm text-gray-400">
+                <span className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
+                  AI Assistant Active
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
-    </>
+    </div>
   );
 }
