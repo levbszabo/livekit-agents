@@ -41,7 +41,16 @@ export default function Playground({
   themeColors,
   onConnect,
 }: PlaygroundProps) {
-  // State to store URL parameters
+  // State declarations
+  const { config, setUserSettings } = useConfig();
+  const { name } = useRoomInfo();
+  const { localParticipant } = useLocalParticipant();
+  const voiceAssistant = useVoiceAssistant();
+  const roomState = useConnectionState();
+  const [transcripts, setTranscripts] = useState<ChatMessageType[]>([]);
+  const [isConnecting, setIsConnecting] = useState(false);
+
+  // URL parameters state
   const [params, setParams] = useState({
     brdgeId: null as string | null,
     numSlides: 0,
@@ -49,21 +58,33 @@ export default function Playground({
     currentSlide: 1
   });
 
-  // Add this at the top with other state declarations
-  const sentInitialUpdate = useRef(false);
+  // Refs
   const lastSentSlide = useRef<number | null>(null);
+
+  // Data channel setup with DataPacket_Kind
   const { send } = useDataChannel("slide_updates", (message) => {
     console.log("Received message on slide_updates channel:", message);
   });
-  const roomState = useConnectionState();
 
-  // Function to send slide update
+  // Connection handler with connection state management
+  const handleConnect = useCallback(async () => {
+    try {
+      setIsConnecting(true);
+      if (roomState === ConnectionState.Disconnected) {
+        await onConnect(true);
+      } else {
+        await onConnect(false);
+      }
+    } catch (error) {
+      console.error('Connection error:', error);
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [roomState, onConnect]);
+
+  // Send function with proper DataPacket_Kind
   const sendSlideUpdate = useCallback(() => {
     if (!params.brdgeId || roomState !== ConnectionState.Connected) {
-      console.log("Cannot send slide update:", {
-        hasBrdgeId: !!params.brdgeId,
-        connectionState: roomState
-      });
       return;
     }
 
@@ -78,13 +99,11 @@ export default function Playground({
     try {
       const encoder = new TextEncoder();
       const data = encoder.encode(JSON.stringify(message));
-      send(data);
+      send(data, DataPacket_Kind.RELIABLE);  // Add RELIABLE kind
       lastSentSlide.current = params.currentSlide;
       console.log("Successfully sent SLIDE_UPDATE:", {
         message,
         timestamp: new Date().toISOString(),
-        dataLength: data.length,
-        lastSent: lastSentSlide.current
       });
     } catch (e) {
       console.error("Error sending slide update:", e);
@@ -142,11 +161,29 @@ export default function Playground({
     }
   }, [roomState]);
 
-  const { config, setUserSettings } = useConfig();
-  const { name } = useRoomInfo();
-  const [transcripts, setTranscripts] = useState<ChatMessageType[]>([]);
-  const { localParticipant } = useLocalParticipant();
-  const voiceAssistant = useVoiceAssistant();
+  // Handle transcription data
+  const onDataReceived = useCallback(
+    (msg: any) => {
+      if (msg.topic === "transcription") {
+        const decoded = JSON.parse(
+          new TextDecoder("utf-8").decode(msg.payload)
+        );
+        let timestamp = new Date().getTime();
+        if ("timestamp" in decoded && decoded.timestamp > 0) {
+          timestamp = decoded.timestamp;
+        }
+        setTranscripts(prev => [...prev, {
+          name: "You",
+          message: decoded.text,
+          timestamp: timestamp,
+          isSelf: true,
+        }]);
+      }
+    },
+    []
+  );
+
+  useDataChannel(onDataReceived);
 
   // Handle slide navigation
   const handlePrevSlide = () => {
@@ -237,32 +274,6 @@ export default function Playground({
     );
   }, [params, roomState, hasRequiredParams]);
 
-  const onDataReceived = useCallback(
-    (msg: any) => {
-      if (msg.topic === "transcription") {
-        const decoded = JSON.parse(
-          new TextDecoder("utf-8").decode(msg.payload)
-        );
-        let timestamp = new Date().getTime();
-        if ("timestamp" in decoded && decoded.timestamp > 0) {
-          timestamp = decoded.timestamp;
-        }
-        setTranscripts([
-          ...transcripts,
-          {
-            name: "You",
-            message: decoded.text,
-            timestamp: timestamp,
-            isSelf: true,
-          },
-        ]);
-      }
-    },
-    [transcripts]
-  );
-
-  useDataChannel(onDataReceived);
-
   useEffect(() => {
     document.body.style.setProperty(
       "--lk-theme-color",
@@ -318,18 +329,43 @@ export default function Playground({
     voiceAssistant.state,
   ]);
 
+  // Update the chatTileContent to include proper sizing and scrolling
   const chatTileContent = useMemo(() => {
-    if (voiceAssistant.audioTrack) {
-      return (
-        <TranscriptionTile
-          agentAudioTrack={voiceAssistant.audioTrack}
-          accentColor={config.settings.theme_color}
-        />
-      );
-    }
-    return <></>;
-  }, [config.settings.theme_color, voiceAssistant.audioTrack]);
+    return (
+      <div className="flex flex-col h-full max-h-full overflow-hidden">
+        {/* Transcription area with fixed height and scrolling */}
+        <div className="flex-grow overflow-y-auto min-h-0">
+          {voiceAssistant.audioTrack && (
+            <TranscriptionTile
+              agentAudioTrack={voiceAssistant.audioTrack}
+              accentColor={config.settings.theme_color}
+            />
+          )}
+        </div>
 
+        {/* Microphone controls with fixed height */}
+        {localParticipant && (
+          <div className="border-t border-gray-700 p-4 flex-shrink-0">
+            <ConfigurationPanelItem
+              title="Voice Input"
+              deviceSelectorKind="audioinput"
+            >
+              <AudioInputTile
+                participant={localParticipant}
+                trackSource={Track.Source.Microphone}
+              />
+            </ConfigurationPanelItem>
+          </div>
+        )}
+      </div>
+    );
+  }, [
+    voiceAssistant.audioTrack,
+    config.settings.theme_color,
+    localParticipant
+  ]);
+
+  // Settings content with microphone status
   const settingsTileContent = useMemo(() => {
     return (
       <div className="flex flex-col gap-4 h-full w-full items-start overflow-y-auto">
@@ -372,18 +408,10 @@ export default function Playground({
               }
             />
             <NameValueRow
-              name="Agent connected"
-              value={
-                voiceAssistant.agent ? (
-                  "TRUE"
-                ) : roomState === ConnectionState.Connected ? (
-                  <LoadingSVG diameter={12} strokeWidth={2} />
-                ) : (
-                  "FALSE"
-                )
-              }
+              name="Microphone"
+              value={localParticipant?.isMicrophoneEnabled ? "ENABLED" : "DISABLED"}
               valueColor={
-                voiceAssistant.agent
+                localParticipant?.isMicrophoneEnabled
                   ? `${config.settings.theme_color}-500`
                   : "gray-500"
               }
@@ -407,13 +435,12 @@ export default function Playground({
     );
   }, [
     config.description,
-    config.settings,
+    config.settings.theme_color,
     localParticipant,
     name,
     roomState,
     themeColors,
     setUserSettings,
-    voiceAssistant.agent,
   ]);
 
   let mobileTabs: PlaygroundTab[] = [];
@@ -475,9 +502,7 @@ export default function Playground({
         height={headerHeight}
         accentColor={config.settings.theme_color}
         connectionState={roomState}
-        onConnectClicked={() =>
-          onConnect(roomState === ConnectionState.Disconnected)
-        }
+        onConnectClicked={!isConnecting ? handleConnect : undefined}
       />
       <div
         className={`flex gap-4 py-4 grow w-full selection:bg-${config.settings.theme_color}-900`}
@@ -494,20 +519,18 @@ export default function Playground({
           </PlaygroundTile>
         </div>
 
-        {/* Right sidebar */}
-        <div className="flex flex-col basis-1/4 gap-4 h-full">
-          {config.settings.chat && (
-            <PlaygroundTile
-              title="Chat"
-              className="h-1/2"
-            >
-              {chatTileContent}
-            </PlaygroundTile>
-          )}
+        {/* Right sidebar with fixed proportions */}
+        <div className="flex flex-col basis-1/4 gap-4 h-full min-w-[300px] max-w-[400px]">
+          <PlaygroundTile
+            title="Chat & Voice Input"
+            className="flex-grow min-h-0 h-2/3"
+          >
+            {chatTileContent}
+          </PlaygroundTile>
           <PlaygroundTile
             padding={false}
             backgroundColor="gray-950"
-            className="h-1/2 items-start overflow-y-auto"
+            className="h-1/3 min-h-[200px] overflow-y-auto"
             childrenClassName="h-full grow items-start"
           >
             {settingsTileContent}
