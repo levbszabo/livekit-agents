@@ -59,6 +59,7 @@ export default function Playground({
   });
 
   // Refs
+  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSentSlide = useRef<number | null>(null);
 
   // Data channel setup with DataPacket_Kind
@@ -82,33 +83,60 @@ export default function Playground({
     }
   }, [roomState, onConnect]);
 
-  // Send function with proper DataPacket_Kind
+  // Modify the send function to use debounce
   const sendSlideUpdate = useCallback(() => {
     if (!params.brdgeId || roomState !== ConnectionState.Connected) {
       return;
     }
 
-    const message = {
-      type: "SLIDE_UPDATE",
-      brdgeId: params.brdgeId,
-      numSlides: params.numSlides,
-      apiBaseUrl: params.apiBaseUrl,
-      currentSlide: params.currentSlide,
-    };
+    // Clear any pending timeout
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
 
-    try {
-      const encoder = new TextEncoder();
-      const data = encoder.encode(JSON.stringify(message));
-      send(data, DataPacket_Kind.RELIABLE);  // Add RELIABLE kind
-      lastSentSlide.current = params.currentSlide;
-      console.log("Successfully sent SLIDE_UPDATE:", {
-        message,
-        timestamp: new Date().toISOString(),
-      });
-    } catch (e) {
-      console.error("Error sending slide update:", e);
+    // Only send if the slide has changed or hasn't been sent yet
+    if (lastSentSlide.current !== params.currentSlide) {
+      updateTimeoutRef.current = setTimeout(() => {
+        const slideUrl = `${params.apiBaseUrl}/brdges/${params.brdgeId}/slides/${params.currentSlide}`;
+        const message = {
+          type: "SLIDE_UPDATE",
+          brdgeId: params.brdgeId,
+          numSlides: params.numSlides,
+          apiBaseUrl: params.apiBaseUrl,
+          currentSlide: params.currentSlide,
+          slideUrl: slideUrl
+        };
+
+        try {
+          const encoder = new TextEncoder();
+          const data = encoder.encode(JSON.stringify(message));
+          send(data, { reliable: true });
+          lastSentSlide.current = params.currentSlide;
+          console.log("Sent slide update:", message);
+        } catch (e) {
+          console.error("Error sending slide update:", e);
+        }
+      }, 300);
     }
   }, [params, roomState, send]);
+
+  // Simplify the connection effect
+  useEffect(() => {
+    if (roomState === ConnectionState.Connected && params.brdgeId) {
+      // Reset lastSentSlide to force an initial update
+      lastSentSlide.current = null;
+      sendSlideUpdate();
+    }
+  }, [roomState, params.brdgeId, sendSlideUpdate]);
+
+  // Clean up timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Handle initial params setup
   useEffect(() => {
@@ -125,41 +153,6 @@ export default function Playground({
       setParams(newParams);
     }
   }, []);
-
-  // Send initial update IMMEDIATELY after connection
-  useEffect(() => {
-    if (roomState === ConnectionState.Connected && params.brdgeId) {
-      console.log("Connection established, sending immediate slide update:", {
-        currentSlide: params.currentSlide,
-        params,
-        roomState
-      });
-      // Force send by resetting lastSentSlide
-      lastSentSlide.current = null;
-      sendSlideUpdate();
-    }
-  }, [roomState, params.brdgeId, sendSlideUpdate]);
-
-  // Handle slide changes separately
-  useEffect(() => {
-    if (roomState === ConnectionState.Connected &&
-      lastSentSlide.current !== null &&
-      params.currentSlide !== lastSentSlide.current) {
-      console.log("Sending slide change update:", {
-        currentSlide: params.currentSlide,
-        lastSent: lastSentSlide.current
-      });
-      sendSlideUpdate();
-    }
-  }, [params.currentSlide, roomState, sendSlideUpdate]);
-
-  // Reset tracking when disconnecting
-  useEffect(() => {
-    if (roomState !== ConnectionState.Connected) {
-      console.log("Connection state changed, resetting lastSentSlide:", roomState);
-      lastSentSlide.current = null;
-    }
-  }, [roomState]);
 
   // Handle transcription data
   const onDataReceived = useCallback(
@@ -509,9 +502,9 @@ export default function Playground({
   }, [roomState, localParticipant]);
 
   // Add a function to construct the slide URL
-  const getSlideUrl = useCallback(() => {
+  const getSlideUrl = useCallback((): string => {
     if (!params.apiBaseUrl || !params.brdgeId || !params.currentSlide) {
-      return null;
+      return '';
     }
     return `${params.apiBaseUrl}/brdges/${params.brdgeId}/slides/${params.currentSlide}`;
   }, [params.apiBaseUrl, params.brdgeId, params.currentSlide]);
