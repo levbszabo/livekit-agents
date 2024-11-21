@@ -83,7 +83,7 @@ export default function Playground({
     }
   }, [roomState, onConnect]);
 
-  // Modify the send function to use debounce
+  // Modify the send function to use debounce and check connection state
   const sendSlideUpdate = useCallback(() => {
     if (!params.brdgeId || roomState !== ConnectionState.Connected) {
       return;
@@ -97,22 +97,27 @@ export default function Playground({
     // Only send if the slide has changed or hasn't been sent yet
     if (lastSentSlide.current !== params.currentSlide) {
       updateTimeoutRef.current = setTimeout(() => {
-        const slideUrl = `${params.apiBaseUrl}/brdges/${params.brdgeId}/slides/${params.currentSlide}`;
-        const message = {
-          type: "SLIDE_UPDATE",
-          brdgeId: params.brdgeId,
-          numSlides: params.numSlides,
-          apiBaseUrl: params.apiBaseUrl,
-          currentSlide: params.currentSlide,
-          slideUrl: slideUrl
-        };
-
         try {
-          const encoder = new TextEncoder();
-          const data = encoder.encode(JSON.stringify(message));
-          send(data, { reliable: true });
-          lastSentSlide.current = params.currentSlide;
-          console.log("Sent slide update:", message);
+          // Check connection state again before sending
+          if (roomState === ConnectionState.Connected) {
+            const slideUrl = `${params.apiBaseUrl}/brdges/${params.brdgeId}/slides/${params.currentSlide}`;
+            const message = {
+              type: "SLIDE_UPDATE",
+              brdgeId: params.brdgeId,
+              numSlides: params.numSlides,
+              apiBaseUrl: params.apiBaseUrl,
+              currentSlide: params.currentSlide,
+              slideUrl: slideUrl
+            };
+
+            const encoder = new TextEncoder();
+            const data = encoder.encode(JSON.stringify(message));
+            send(data, { reliable: true });
+            lastSentSlide.current = params.currentSlide;
+            console.log("Sent slide update:", message);
+          } else {
+            console.log("Not sending slide update - room not connected");
+          }
         } catch (e) {
           console.error("Error sending slide update:", e);
         }
@@ -129,14 +134,16 @@ export default function Playground({
     }
   }, [roomState, params.brdgeId, sendSlideUpdate]);
 
-  // Clean up timeouts on unmount
+  // Clean up timeouts on unmount or disconnect
   useEffect(() => {
     return () => {
       if (updateTimeoutRef.current) {
         clearTimeout(updateTimeoutRef.current);
       }
+      // Reset the last sent slide
+      lastSentSlide.current = null;
     };
-  }, []);
+  }, [roomState]);
 
   // Handle initial params setup
   useEffect(() => {
