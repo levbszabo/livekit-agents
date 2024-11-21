@@ -27,6 +27,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { ReactNode, useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useSearchParams } from 'next/navigation';
 import tailwindTheme from "../../lib/tailwindTheme.preval";
+import { InfoPanel } from "./InfoPanel";
 
 export interface PlaygroundProps {
   logo?: ReactNode;
@@ -80,16 +81,29 @@ export default function Playground({
   // Add brdgeMetadata state
   const [brdgeMetadata, setBrdgeMetadata] = useState<BrdgeMetadata | null>(null);
 
+  // Add state for info visibility
+  const [showInfo, setShowInfo] = useState(true);
+
+  // Hide info when walkthrough starts
+  useEffect(() => {
+    if (roomState === ConnectionState.Connected) {
+      setShowInfo(false);
+    } else {
+      setShowInfo(true);
+    }
+  }, [roomState]);
+
   // Modify handleConnect to handle walkthrough
   const handleWalkthroughClick = useCallback(async () => {
     try {
       setIsConnecting(true);
       if (roomState === ConnectionState.Disconnected) {
         await onConnect(true);
-        // Don't increment count yet - wait for completion
+        setRightPanelView('chat');
       } else {
         await onConnect(false);
         setWalkthroughCount(prev => prev + 1);
+        setRightPanelView('info');
       }
     } catch (error) {
       console.error('Connection error:', error);
@@ -567,9 +581,38 @@ export default function Playground({
     fetchBrdgeMetadata();
   }, [params.brdgeId, params.apiBaseUrl, params.numSlides]);
 
+  // Add state for panel view with auto-switch effect
+  const [rightPanelView, setRightPanelView] = useState<'chat' | 'info'>('info');
+
+  // Update the renderRightPanelContent function
+  const renderRightPanelContent = () => {
+    return (
+      <div className="flex-1 overflow-hidden">
+        {/* Chat Interface - Always mounted, conditionally visible */}
+        <div className={`h-full flex flex-col ${rightPanelView === 'chat' ? 'block' : 'hidden'}`}>
+          <div className="flex-1 overflow-y-auto">
+            <div className="p-4">
+              {voiceAssistant?.audioTrack && (
+                <TranscriptionTile
+                  agentAudioTrack={voiceAssistant.audioTrack}
+                  accentColor="cyan"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Info Panel */}
+        <div className={`h-full ${rightPanelView === 'info' ? 'block' : 'hidden'}`}>
+          <InfoPanel walkthroughCount={walkthroughCount} />
+        </div>
+      </div>
+    );
+  };
+
   // Update the presentation side JSX
   return (
-    <div className="h-screen flex flex-col bg-[#121212]">
+    <div className="h-screen flex flex-col bg-[#121212] relative">
       <PlaygroundHeader
         title={brdgeMetadata?.name || params.brdgeId || 'Loading...'}
         height={headerHeight}
@@ -636,53 +679,71 @@ export default function Playground({
 
         {/* Right Side Panel */}
         <div className="w-[420px] border-l border-gray-800 flex flex-col bg-gray-900">
-          {/* Mic Toggle Only */}
-          {localParticipant && (
-            <div className="p-4 border-b border-gray-800">
-              <button
-                onClick={() => {
-                  if (roomState === ConnectionState.Connected) {
-                    localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
-                  } else {
-                    alert("Connect to share your insights");
-                  }
-                }}
-                className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-md transition-colors
-                  ${localParticipant.isMicrophoneEnabled
-                    ? 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
-              >
-                <span className={`w-2 h-2 rounded-full ${localParticipant.isMicrophoneEnabled ? 'bg-cyan-500 animate-pulse' : 'bg-gray-600'}`} />
-                <span className="text-sm font-medium">
-                  {localParticipant.isMicrophoneEnabled ? 'Microphone Active' : 'Microphone Off'}
-                </span>
-              </button>
-            </div>
-          )}
+          {/* Combined Header with Mic Toggle and Tabs */}
+          <div className="p-4 border-b border-gray-800 flex items-center gap-4">
+            {/* Mic Toggle */}
+            <button
+              onClick={() => {
+                if (roomState === ConnectionState.Connected) {
+                  localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
+                }
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors flex-shrink-0
+                ${localParticipant.isMicrophoneEnabled
+                  ? 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
+                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+            >
+              <span className={`w-2 h-2 rounded-full ${localParticipant.isMicrophoneEnabled ? 'bg-cyan-500 animate-pulse' : 'bg-gray-600'
+                }`} />
+              <span className="text-sm font-medium">
+                {localParticipant.isMicrophoneEnabled ? 'Mic On' : 'Mic Off'}
+              </span>
+            </button>
 
-          {/* Chat Messages */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="p-4">
-              {voiceAssistant.audioTrack && (
-                <TranscriptionTile
-                  agentAudioTrack={voiceAssistant.audioTrack}
-                  accentColor={THEME.primary}
-                />
-              )}
-            </div>
+            {/* Tab Toggle - Only show when connected */}
+            {roomState === ConnectionState.Connected && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setRightPanelView('chat')}
+                  className={`px-3 py-2 text-sm rounded-md transition-colors ${rightPanelView === 'chat'
+                    ? 'bg-cyan-500/20 text-cyan-400'
+                    : 'text-gray-400 hover:text-gray-300'
+                    }`}
+                >
+                  Chat
+                </button>
+                <button
+                  onClick={() => setRightPanelView('info')}
+                  className={`px-3 py-2 text-sm rounded-md transition-colors ${rightPanelView === 'info'
+                    ? 'bg-cyan-500/20 text-cyan-400'
+                    : 'text-gray-400 hover:text-gray-300'
+                    }`}
+                >
+                  Info
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Minimal Status Bar */}
-          {roomState === ConnectionState.Connected && (
-            <div className="p-3 bg-gray-900 border-t border-gray-800">
-              <div className="flex items-center justify-end text-sm text-gray-400">
-                <span className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
-                  AI Assistant Active
-                </span>
-              </div>
+          {/* Content Area */}
+          {renderRightPanelContent()}
+
+          {/* Status Bar */}
+          <div className="p-3 bg-gray-900 border-t border-gray-800">
+            <div className="flex items-center justify-between text-sm text-gray-400">
+              <span>
+                {walkthroughCount > 0 && `Walkthrough #${walkthroughCount}`}
+              </span>
+              <span className="flex items-center gap-2">
+                {roomState === ConnectionState.Connected && (
+                  <>
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
+                    Walkthrough in Progress
+                  </>
+                )}
+              </span>
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>

@@ -22,6 +22,7 @@ export const PlaygroundHeader = ({
 }: PlaygroundHeaderProps) => {
   const isConnecting = connectionState === ConnectionState.Connecting;
   const isConnected = connectionState === ConnectionState.Connected;
+  const canGenerate = walkthroughCount > 0;
 
   return (
     <div
@@ -33,14 +34,16 @@ export const PlaygroundHeader = ({
       </div>
 
       <div className="flex items-center gap-3">
-        <Button
-          accentColor="cyan"
-          disabled={isConnecting}
+        <button
           onClick={onWalkthroughClick}
-          className={`px-6 py-2.5 text-sm font-medium ${isConnected
-              ? 'bg-cyan-500 hover:bg-cyan-600 text-white shadow-lg shadow-cyan-500/20'
-              : 'bg-cyan-500 hover:bg-cyan-600 text-white shadow-lg shadow-cyan-500/20 animate-pulse'
-            }`}
+          disabled={isConnecting}
+          className={`
+            px-6 py-2 rounded-md transition-all duration-200
+            ${isConnected
+              ? 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
+              : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 shadow-[0_0_15px_rgba(34,211,238,0.25)] animate-pulse'
+            }
+          `}
         >
           {isConnecting ? (
             <LoadingSVG />
@@ -49,19 +52,21 @@ export const PlaygroundHeader = ({
           ) : (
             "Start Walkthrough"
           )}
-        </Button>
+        </button>
 
-        <Button
-          accentColor="emerald"
-          disabled={walkthroughCount === 0}
+        <button
           onClick={onGenerateClick}
-          className={`px-6 py-2.5 text-sm font-medium ${walkthroughCount > 0
-              ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
+          disabled={!canGenerate}
+          className={`
+            px-6 py-2 rounded-md transition-all duration-200
+            ${canGenerate
+              ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.25)] animate-pulse'
               : 'bg-gray-800/50 text-gray-500 cursor-not-allowed'
-            }`}
+            }
+          `}
         >
           Generate Brdge
-        </Button>
+        </button>
       </div>
     </div>
   );
