@@ -36,6 +36,13 @@ export interface PlaygroundProps {
 
 const headerHeight = 56;
 
+// Add interface for metadata
+interface BrdgeMetadata {
+  id: string;
+  name: string;
+  numSlides: number;
+}
+
 export default function Playground({
   logo,
   themeColors,
@@ -67,14 +74,22 @@ export default function Playground({
     console.log("Received message on slide_updates channel:", message);
   });
 
-  // Connection handler with connection state management
-  const handleConnect = useCallback(async () => {
+  // Add walkthrough count state
+  const [walkthroughCount, setWalkthroughCount] = useState(0);
+
+  // Add brdgeMetadata state
+  const [brdgeMetadata, setBrdgeMetadata] = useState<BrdgeMetadata | null>(null);
+
+  // Modify handleConnect to handle walkthrough
+  const handleWalkthroughClick = useCallback(async () => {
     try {
       setIsConnecting(true);
       if (roomState === ConnectionState.Disconnected) {
         await onConnect(true);
+        // Don't increment count yet - wait for completion
       } else {
         await onConnect(false);
+        setWalkthroughCount(prev => prev + 1);
       }
     } catch (error) {
       console.error('Connection error:', error);
@@ -82,6 +97,13 @@ export default function Playground({
       setIsConnecting(false);
     }
   }, [roomState, onConnect]);
+
+  // Add generate handler
+  const handleGenerateClick = useCallback(() => {
+    if (walkthroughCount === 0) return;
+    // To be implemented: handle generation
+    console.log('Generate clicked');
+  }, [walkthroughCount]);
 
   // Modify the send function to use debounce and check connection state
   const sendSlideUpdate = useCallback(() => {
@@ -516,22 +538,52 @@ export default function Playground({
     return `${params.apiBaseUrl}/brdges/${params.brdgeId}/slides/${params.currentSlide}`;
   }, [params.apiBaseUrl, params.brdgeId, params.currentSlide]);
 
+  // Add effect to fetch brdge metadata
+  useEffect(() => {
+    const fetchBrdgeMetadata = async () => {
+      if (!params.brdgeId || !params.apiBaseUrl) return;
+
+      try {
+        const response = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}`);
+        if (!response.ok) throw new Error('Failed to fetch Brdge metadata');
+
+        const data = await response.json();
+        setBrdgeMetadata({
+          id: params.brdgeId,
+          name: data.name || params.brdgeId, // Fallback to ID if name not available
+          numSlides: params.numSlides
+        });
+      } catch (error) {
+        console.error('Error fetching Brdge metadata:', error);
+        // Set fallback metadata using brdgeId as name
+        setBrdgeMetadata({
+          id: params.brdgeId!,
+          name: params.brdgeId!,
+          numSlides: params.numSlides
+        });
+      }
+    };
+
+    fetchBrdgeMetadata();
+  }, [params.brdgeId, params.apiBaseUrl, params.numSlides]);
+
   // Update the presentation side JSX
   return (
     <div className="h-screen flex flex-col bg-[#121212]">
       <PlaygroundHeader
-        title="AI Assistant"
+        title={brdgeMetadata?.name || params.brdgeId || 'Loading...'}
         height={headerHeight}
-        accentColor={THEME.primary}
         connectionState={roomState}
-        onConnectClicked={!isConnecting ? handleConnect : undefined}
+        walkthroughCount={walkthroughCount}
+        onWalkthroughClick={handleWalkthroughClick}
+        onGenerateClick={handleGenerateClick}
       />
 
       <div className="flex-1 flex overflow-hidden">
         {/* Presentation Side with improved scroll handling */}
         <div className="flex-1 p-6 overflow-y-auto">
           <div className="min-h-full flex flex-col">
-            <div className="w-full bg-black rounded-2xl overflow-hidden">
+            <div className="w-full bg-black rounded-2xl overflow-hidden flex flex-col">
               {/* Slide content with natural dimensions */}
               <div className="relative w-full">
                 {getSlideUrl() ? (
@@ -552,21 +604,26 @@ export default function Playground({
                     No slide available
                   </div>
                 )}
+              </div>
 
-                {/* Navigation overlay */}
-                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
-                  <div className="flex justify-center items-center gap-4">
+              {/* Navigation Controls - Now below the slide */}
+              <div className="p-4 bg-gray-900 border-t border-gray-800">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400 text-sm">
+                    Slide {params.currentSlide} of {params.numSlides}
+                  </span>
+                  <div className="flex gap-3">
                     <button
                       onClick={handlePrevSlide}
                       disabled={params.currentSlide === 1}
-                      className="px-4 py-2 bg-gray-800/80 text-white rounded-md hover:bg-gray-700/80 disabled:opacity-50 transition-colors"
+                      className="px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       Previous
                     </button>
                     <button
                       onClick={handleNextSlide}
                       disabled={params.currentSlide === params.numSlides}
-                      className="px-4 py-2 bg-gray-800/80 text-white rounded-md hover:bg-gray-700/80 disabled:opacity-50 transition-colors"
+                      className="px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       Next
                     </button>

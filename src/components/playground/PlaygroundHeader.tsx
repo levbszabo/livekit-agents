@@ -1,58 +1,66 @@
 import { Button } from "@/components/button/Button";
 import { LoadingSVG } from "@/components/button/LoadingSVG";
-import { SettingsDropdown } from "@/components/playground/SettingsDropdown";
-import { useConfig } from "@/hooks/useConfig";
 import { ConnectionState } from "livekit-client";
 import { ReactNode } from "react";
 
-type PlaygroundHeader = {
-  logo?: ReactNode;
+type PlaygroundHeaderProps = {
   title?: ReactNode;
-  githubLink?: string;
   height: number;
-  accentColor: string;
   connectionState: ConnectionState;
-  onConnectClicked: () => void;
+  walkthroughCount: number;
+  onWalkthroughClick: () => void;
+  onGenerateClick: () => void;
 };
 
 export const PlaygroundHeader = ({
   title,
-  accentColor,
   height,
-  onConnectClicked,
   connectionState,
-}: PlaygroundHeader) => {
-  const { config } = useConfig();
+  walkthroughCount,
+  onWalkthroughClick,
+  onGenerateClick,
+}: PlaygroundHeaderProps) => {
+  const isConnecting = connectionState === ConnectionState.Connecting;
+  const isConnected = connectionState === ConnectionState.Connected;
+
   return (
     <div
-      className={`flex gap-4 pt-4 text-${accentColor}-500 justify-between items-center shrink-0`}
-      style={{
-        height: height + "px",
-      }}
+      className="flex gap-4 px-6 items-center justify-between shrink-0 bg-[#121212] border-b border-gray-800"
+      style={{ height: height + "px" }}
     >
-      <div className="flex items-center gap-3 basis-2/3">
-        <div className="lg:basis-1/2 lg:text-center text-xs lg:text-base lg:font-semibold text-white">
-          {title}
-        </div>
+      <div className="text-xl font-medium tracking-tight text-white">
+        {title}
       </div>
-      <div className="flex basis-1/3 justify-end items-center gap-2">
-        {config.settings.editable && <SettingsDropdown />}
+
+      <div className="flex items-center gap-3">
         <Button
-          accentColor={
-            connectionState === ConnectionState.Connected ? "red" : accentColor
-          }
-          disabled={connectionState === ConnectionState.Connecting}
-          onClick={() => {
-            onConnectClicked();
-          }}
+          accentColor="cyan"
+          disabled={isConnecting}
+          onClick={onWalkthroughClick}
+          className={`px-6 py-2.5 text-sm font-medium ${isConnected
+              ? 'bg-cyan-500 hover:bg-cyan-600 text-white shadow-lg shadow-cyan-500/20'
+              : 'bg-cyan-500 hover:bg-cyan-600 text-white shadow-lg shadow-cyan-500/20 animate-pulse'
+            }`}
         >
-          {connectionState === ConnectionState.Connecting ? (
+          {isConnecting ? (
             <LoadingSVG />
-          ) : connectionState === ConnectionState.Connected ? (
-            "Disconnect"
+          ) : isConnected ? (
+            "Complete Walkthrough"
           ) : (
-            "Connect"
+            "Start Walkthrough"
           )}
+        </Button>
+
+        <Button
+          accentColor="emerald"
+          disabled={walkthroughCount === 0}
+          onClick={onGenerateClick}
+          className={`px-6 py-2.5 text-sm font-medium ${walkthroughCount > 0
+              ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
+              : 'bg-gray-800/50 text-gray-500 cursor-not-allowed'
+            }`}
+        >
+          Generate Brdge
         </Button>
       </div>
     </div>
