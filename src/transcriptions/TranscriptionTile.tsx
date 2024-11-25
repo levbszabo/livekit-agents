@@ -92,7 +92,15 @@ export function TranscriptionTile({
   ]);
 
   return (
-    <ChatTile messages={messages} accentColor={accentColor} onSend={sendChat} />
+    <div className="flex flex-col h-full">
+      <div className="flex-1 overflow-y-auto">
+        <ChatTile
+          messages={messages}
+          accentColor={accentColor}
+          onSend={sendChat}
+        />
+      </div>
+    </div>
   );
 }
 

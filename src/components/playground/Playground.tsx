@@ -387,8 +387,10 @@ export default function Playground({
               deviceSelectorKind="audioinput"
             >
               <AudioInputTile
-                participant={localParticipant}
-                trackSource={Track.Source.Microphone}
+                trackRef={{
+                  source: Track.Source.Microphone,
+                  participant: localParticipant
+                }}
               />
             </ConfigurationPanelItem>
           </div>
