@@ -30,6 +30,7 @@ import tailwindTheme from "../../lib/tailwindTheme.preval";
 import { InfoPanel } from "./InfoPanel";
 import { API_BASE_URL } from '@/config';
 import { api } from '@/api';
+import { SlideScriptPanel } from './SlideScriptPanel';
 
 export interface PlaygroundProps {
   logo?: ReactNode;
@@ -143,10 +144,16 @@ export default function Playground({
         walkthrough_id: selectedWalkthrough
       });
 
-      setScripts(response.data.scripts);
-      setEditedScripts(response.data.scripts);
+      if (response.data.slide_scripts) {
+        setScripts(response.data.slide_scripts);
+        setEditedScripts(response.data.slide_scripts);
+        console.log('Generated scripts:', response.data.slide_scripts);
+      } else {
+        throw new Error('No scripts in response');
+      }
     } catch (error) {
       console.error('Error generating scripts:', error);
+      // Optionally show an error message to the user
     } finally {
       setIsGenerating(false);
     }
@@ -326,28 +333,38 @@ export default function Playground({
             }}
           />
         </div>
-        <div className="flex justify-center items-center gap-4 p-4 bg-gray-800">
-          <button
-            onClick={handlePrevSlide}
-            disabled={params.currentSlide === 1}
-            className="px-4 py-2 bg-blue-500 text-white rounded disabled:opacity-50"
-          >
-            Previous
-          </button>
-          <span className="text-white">
-            Slide {params.currentSlide} of {params.numSlides}
-          </span>
-          <button
-            onClick={handleNextSlide}
-            disabled={params.currentSlide === params.numSlides}
-            className="px-4 py-2 bg-blue-500 text-white rounded disabled:opacity-50"
-          >
-            Next
-          </button>
+        <div className="p-4 bg-gray-900 border-t border-gray-800">
+          <div className="flex justify-between items-center">
+            <span className="text-gray-400 text-sm">
+              Slide {params.currentSlide} of {params.numSlides}
+            </span>
+            <div className="flex gap-3">
+              <button
+                onClick={handlePrevSlide}
+                disabled={params.currentSlide === 1}
+                className="px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Previous
+              </button>
+              <button
+                onClick={handleNextSlide}
+                disabled={params.currentSlide === params.numSlides}
+                className="px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
+
+        <SlideScriptPanel
+          currentSlide={params.currentSlide}
+          scripts={scripts}
+          isGenerating={isGenerating}
+        />
       </div>
     );
-  }, [params, roomState, hasRequiredParams]);
+  }, [params, roomState, hasRequiredParams, scripts, isGenerating]);
 
   useEffect(() => {
     document.body.style.setProperty(
@@ -718,6 +735,13 @@ export default function Playground({
                   </div>
                 </div>
               </div>
+
+              {/* Add SlideScriptPanel here */}
+              <SlideScriptPanel
+                currentSlide={params.currentSlide}
+                scripts={scripts}
+                isGenerating={isGenerating}
+              />
             </div>
           </div>
         </div>
