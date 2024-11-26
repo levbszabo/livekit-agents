@@ -44,6 +44,17 @@ interface BrdgeMetadata {
   numSlides: number;
 }
 
+// Add interface for scripts
+interface SlideScripts {
+  [key: string]: string;
+}
+
+interface ScriptData {
+  slide_scripts: SlideScripts;
+  generated_at: string;
+  source_walkthrough_id: string;
+}
+
 export default function Playground({
   logo,
   themeColors,
@@ -112,12 +123,56 @@ export default function Playground({
     }
   }, [roomState, onConnect]);
 
+  // Add new state for scripts
+  const [scripts, setScripts] = useState<SlideScripts | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [editingSlide, setEditingSlide] = useState<string | null>(null);
+  const [editedScripts, setEditedScripts] = useState<SlideScripts>({});
+
   // Add generate handler
-  const handleGenerateClick = useCallback(() => {
-    if (walkthroughCount === 0) return;
-    // To be implemented: handle generation
-    console.log('Generate clicked');
-  }, [walkthroughCount]);
+  const handleGenerateClick = useCallback(async () => {
+    if (!params.brdgeId || !params.apiBaseUrl) return;
+
+    setIsGenerating(true);
+    try {
+      const response = await fetch(
+        `${params.apiBaseUrl}/brdges/${params.brdgeId}/generate-slide-scripts`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            // Add any auth headers if needed
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to generate scripts');
+      }
+
+      const data = await response.json();
+      setScripts(data.scripts);
+      setEditedScripts(data.scripts); // Initialize edited scripts with generated ones
+
+    } catch (error) {
+      console.error('Error generating scripts:', error);
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [params.brdgeId, params.apiBaseUrl]);
+
+  // Add script editing handlers
+  const handleScriptEdit = useCallback((slideNumber: string, newText: string) => {
+    setEditedScripts(prev => ({
+      ...prev,
+      [slideNumber]: newText
+    }));
+  }, []);
+
+  const handleSaveScript = useCallback((slideNumber: string) => {
+    setEditingSlide(null);
+    // Here you could add an API call to save the edited scripts
+  }, []);
 
   // Modify the send function to use debounce and check connection state
   const sendSlideUpdate = useCallback(() => {
