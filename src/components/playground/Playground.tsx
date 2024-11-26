@@ -28,6 +28,8 @@ import { ReactNode, useCallback, useEffect, useMemo, useState, useRef } from "re
 import { useSearchParams } from 'next/navigation';
 import tailwindTheme from "../../lib/tailwindTheme.preval";
 import { InfoPanel } from "./InfoPanel";
+import { API_BASE_URL } from '@/config';
+import { api } from '@/api';
 
 export interface PlaygroundProps {
   logo?: ReactNode;
@@ -69,11 +71,12 @@ export default function Playground({
   const [transcripts, setTranscripts] = useState<ChatMessageType[]>([]);
   const [isConnecting, setIsConnecting] = useState(false);
 
-  // URL parameters state
+  // URL parameters state - modify to separate LiveKit and core backend URLs
   const [params, setParams] = useState({
     brdgeId: null as string | null,
     numSlides: 0,
-    apiBaseUrl: null as string | null,
+    apiBaseUrl: null as string | null,  // This will be LiveKit URL
+    coreApiUrl: API_BASE_URL,  // Use the imported API_BASE_URL
     currentSlide: 1
   });
 
@@ -123,55 +126,35 @@ export default function Playground({
     }
   }, [roomState, onConnect]);
 
-  // Add new state for scripts
+  // Move state declarations to the top
+  const [selectedWalkthrough, setSelectedWalkthrough] = useState<number | null>(null);
   const [scripts, setScripts] = useState<SlideScripts | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [editingSlide, setEditingSlide] = useState<string | null>(null);
   const [editedScripts, setEditedScripts] = useState<SlideScripts>({});
 
-  // Add generate handler
+  // Remove the first handleGenerateClick declaration and keep only this one
   const handleGenerateClick = useCallback(async () => {
-    if (!params.brdgeId || !params.apiBaseUrl) return;
+    if (!params.brdgeId || !selectedWalkthrough) return;
 
     setIsGenerating(true);
     try {
-      const response = await fetch(
-        `${params.apiBaseUrl}/brdges/${params.brdgeId}/generate-slide-scripts`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            // Add any auth headers if needed
-          }
-        }
-      );
+      const response = await api.post(`/api/brdges/${params.brdgeId}/generate-slide-scripts`, {
+        walkthrough_id: selectedWalkthrough
+      });
 
-      if (!response.ok) {
-        throw new Error('Failed to generate scripts');
-      }
-
-      const data = await response.json();
-      setScripts(data.scripts);
-      setEditedScripts(data.scripts); // Initialize edited scripts with generated ones
-
+      setScripts(response.data.scripts);
+      setEditedScripts(response.data.scripts);
     } catch (error) {
       console.error('Error generating scripts:', error);
     } finally {
       setIsGenerating(false);
     }
-  }, [params.brdgeId, params.apiBaseUrl]);
+  }, [params.brdgeId, selectedWalkthrough]);
 
-  // Add script editing handlers
-  const handleScriptEdit = useCallback((slideNumber: string, newText: string) => {
-    setEditedScripts(prev => ({
-      ...prev,
-      [slideNumber]: newText
-    }));
-  }, []);
-
-  const handleSaveScript = useCallback((slideNumber: string) => {
-    setEditingSlide(null);
-    // Here you could add an API call to save the edited scripts
+  // Add the handler function
+  const handleWalkthroughSelect = useCallback((walkthroughId: number) => {
+    setSelectedWalkthrough(walkthroughId);
   }, []);
 
   // Modify the send function to use debounce and check connection state
@@ -244,6 +227,7 @@ export default function Playground({
         brdgeId: urlParams.get('brdgeId'),
         numSlides: parseInt(urlParams.get('numSlides') || '0'),
         apiBaseUrl: urlParams.get('apiBaseUrl'),
+        coreApiUrl: API_BASE_URL,
         currentSlide: 1
       };
 
@@ -667,7 +651,7 @@ export default function Playground({
     );
   };
 
-  // Update the presentation side JSX
+  // Update the PlaygroundHeader render to use coreApiUrl
   return (
     <div className="h-screen flex flex-col bg-[#121212] relative">
       <PlaygroundHeader
@@ -675,8 +659,12 @@ export default function Playground({
         height={headerHeight}
         connectionState={roomState}
         walkthroughCount={walkthroughCount}
+        brdgeId={params.brdgeId}
+        apiBaseUrl={params.coreApiUrl}
+        selectedWalkthrough={selectedWalkthrough}
         onWalkthroughClick={handleWalkthroughClick}
         onGenerateClick={handleGenerateClick}
+        onWalkthroughSelect={handleWalkthroughSelect}
       />
 
       <div className="flex-1 flex overflow-hidden">

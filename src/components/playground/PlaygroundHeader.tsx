@@ -2,14 +2,19 @@ import { Button } from "@/components/button/Button";
 import { LoadingSVG } from "@/components/button/LoadingSVG";
 import { ConnectionState } from "livekit-client";
 import { ReactNode } from "react";
+import { WalkthroughSelector } from "./WalkthroughSelector";
 
 type PlaygroundHeaderProps = {
   title?: ReactNode;
   height: number;
   connectionState: ConnectionState;
   walkthroughCount: number;
+  brdgeId: string | null;
+  apiBaseUrl: string | null;
+  selectedWalkthrough: number | null;
   onWalkthroughClick: () => void;
   onGenerateClick: () => void;
+  onWalkthroughSelect: (walkthroughId: number) => void;
 };
 
 export const PlaygroundHeader = ({
@@ -17,8 +22,12 @@ export const PlaygroundHeader = ({
   height,
   connectionState,
   walkthroughCount,
+  brdgeId,
+  apiBaseUrl,
+  selectedWalkthrough,
   onWalkthroughClick,
   onGenerateClick,
+  onWalkthroughSelect,
 }: PlaygroundHeaderProps) => {
   const isConnecting = connectionState === ConnectionState.Connecting;
   const isConnected = connectionState === ConnectionState.Connected;
@@ -34,6 +43,13 @@ export const PlaygroundHeader = ({
       </div>
 
       <div className="flex items-center gap-3">
+        <WalkthroughSelector
+          brdgeId={brdgeId}
+          apiBaseUrl={apiBaseUrl}
+          selectedWalkthrough={selectedWalkthrough}
+          onWalkthroughSelect={onWalkthroughSelect}
+        />
+
         <button
           onClick={onWalkthroughClick}
           disabled={isConnecting}
@@ -56,10 +72,10 @@ export const PlaygroundHeader = ({
 
         <button
           onClick={onGenerateClick}
-          disabled={!canGenerate}
+          disabled={!canGenerate || !selectedWalkthrough}
           className={`
             px-6 py-2 rounded-md transition-all duration-200
-            ${canGenerate
+            ${canGenerate && selectedWalkthrough
               ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.25)] animate-pulse'
               : 'bg-gray-800/50 text-gray-500 cursor-not-allowed'
             }
