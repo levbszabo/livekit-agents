@@ -639,6 +639,49 @@ export default function Playground({
     fetchBrdgeMetadata();
   }, [params.brdgeId, params.apiBaseUrl, params.numSlides]);
 
+  // Add this to debug the params
+  useEffect(() => {
+    console.log('Current params:', params);
+  }, [params]);
+
+  // Update the checkExistingScripts effect
+  useEffect(() => {
+    const checkExistingScripts = async () => {
+      if (!params.brdgeId) {
+        console.log('No brdgeId available');
+        return;
+      }
+
+      try {
+        // Log the URL we're trying to access
+        console.log('Fetching scripts from:', `/api/brdges/${params.brdgeId}/scripts`);
+
+        const response = await api.get(`/api/brdges/${params.brdgeId}/scripts`);
+
+        if (response.data.has_scripts) {
+          console.log('Found existing scripts:', response.data.scripts);
+          setScripts(response.data.scripts);
+          setEditedScripts(response.data.scripts);
+
+          // If there are existing scripts, also select the walkthrough that generated them
+          const walkthrough_id = parseInt(response.data.metadata.source_walkthrough_id);
+          if (walkthrough_id) {
+            setSelectedWalkthrough(walkthrough_id);
+          }
+        } else {
+          console.log('No existing scripts found');
+        }
+      } catch (error) {
+        console.error('Error checking for existing scripts:', error, {
+          brdgeId: params.brdgeId,
+          url: `/api/brdges/${params.brdgeId}/scripts`
+        });
+      }
+    };
+
+    checkExistingScripts();
+  }, [params.brdgeId]);
+
   // Add state for panel view with auto-switch effect
   const [rightPanelView, setRightPanelView] = useState<'chat' | 'info'>('info');
 
