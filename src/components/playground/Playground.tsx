@@ -31,6 +31,7 @@ import { InfoPanel } from "./InfoPanel";
 import { API_BASE_URL } from '@/config';
 import { api } from '@/api';
 import { SlideScriptPanel } from './SlideScriptPanel';
+import { ViewerHeader } from './ViewerHeader';
 
 export interface PlaygroundProps {
   logo?: ReactNode;
@@ -114,6 +115,18 @@ export default function Playground({
   // Add state to track current agent type
   const [currentAgentType, setCurrentAgentType] = useState<AgentType>('edit');
 
+  // Add useEffect to handle URL parameters
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const agentType = urlParams.get('agentType') as AgentType;
+      if (agentType && (agentType === 'edit' || agentType === 'view')) {
+        setCurrentAgentType(agentType);
+        console.log('Setting agent type:', agentType);
+      }
+    }
+  }, []);
+
   // Update handleWalkthroughClick to store the agent type
   const handleWalkthroughClick = useCallback(async (agentType: AgentType = 'edit') => {
     try {
@@ -195,7 +208,7 @@ export default function Playground({
               apiBaseUrl: params.apiBaseUrl,
               currentSlide: params.currentSlide,
               slideUrl: slideUrl,
-              agentType: currentAgentType // Use the stored agent type
+              agentType: currentAgentType // Include the agent type in the message
             };
 
             const encoder = new TextEncoder();
@@ -344,8 +357,8 @@ export default function Playground({
               Slide {params.currentSlide} of {params.numSlides}
             </span>
             <div className="flex gap-3">
-              {/* Add Play button if scripts are loaded */}
-              {scripts && roomState === ConnectionState.Disconnected && (
+              {/* Only show Play button in edit mode */}
+              {currentAgentType === 'edit' && scripts && roomState === ConnectionState.Disconnected && (
                 <button
                   onClick={() => handleWalkthroughClick('view')}
                   className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center gap-2"
@@ -382,10 +395,11 @@ export default function Playground({
           currentSlide={params.currentSlide}
           scripts={scripts}
           isGenerating={isGenerating}
+          readOnly={currentAgentType === 'view'}
         />
       </div>
     );
-  }, [params, roomState, hasRequiredParams, scripts, isGenerating]);
+  }, [params, roomState, hasRequiredParams, scripts, isGenerating, currentAgentType]);
 
   useEffect(() => {
     document.body.style.setProperty(
@@ -735,25 +749,36 @@ export default function Playground({
   // Update the PlaygroundHeader render to use coreApiUrl
   return (
     <div className="h-screen flex flex-col bg-[#121212] relative">
-      <PlaygroundHeader
-        title={brdgeMetadata?.name || params.brdgeId || 'Loading...'}
-        height={headerHeight}
-        connectionState={roomState}
-        walkthroughCount={walkthroughCount}
-        brdgeId={params.brdgeId}
-        apiBaseUrl={params.coreApiUrl}
-        selectedWalkthrough={selectedWalkthrough}
-        onWalkthroughClick={(agentType) => handleWalkthroughClick(agentType)}
-        onGenerateClick={handleGenerateClick}
-        onWalkthroughSelect={handleWalkthroughSelect}
-      />
+      {currentAgentType === 'edit' ? (
+        <PlaygroundHeader
+          title={brdgeMetadata?.name || params.brdgeId || 'Loading...'}
+          height={headerHeight}
+          connectionState={roomState}
+          walkthroughCount={walkthroughCount}
+          brdgeId={params.brdgeId}
+          apiBaseUrl={params.coreApiUrl}
+          selectedWalkthrough={selectedWalkthrough}
+          onWalkthroughClick={handleWalkthroughClick}
+          onGenerateClick={handleGenerateClick}
+          onWalkthroughSelect={handleWalkthroughSelect}
+          showEditControls={true}
+        />
+      ) : (
+        <ViewerHeader
+          title={brdgeMetadata?.name || params.brdgeId || 'Loading...'}
+          height={headerHeight}
+          currentSlide={params.currentSlide}
+          totalSlides={params.numSlides}
+          connectionState={roomState}
+        />
+      )}
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Presentation Side with improved scroll handling */}
-        <div className="flex-1 p-6 overflow-y-auto">
+        {/* Left Side - Slides */}
+        <div className={`flex-1 p-6 overflow-y-auto ${currentAgentType === 'view' ? 'w-full' : ''}`}>
           <div className="min-h-full flex flex-col">
             <div className="w-full bg-black rounded-2xl overflow-hidden flex flex-col">
-              {/* Slide content with natural dimensions */}
+              {/* Slide Image */}
               <div className="relative w-full">
                 {getSlideUrl() ? (
                   <img
@@ -775,29 +800,27 @@ export default function Playground({
                 )}
               </div>
 
-              {/* Navigation Controls - Now below the slide */}
+              {/* Navigation Controls */}
               <div className="p-4 bg-gray-900 border-t border-gray-800">
                 <div className="flex justify-between items-center">
                   <span className="text-gray-400 text-sm">
                     Slide {params.currentSlide} of {params.numSlides}
                   </span>
                   <div className="flex gap-3">
-                    {/* Add Play button if scripts are loaded */}
-                    {scripts && roomState === ConnectionState.Disconnected && (
+                    {/* Play button - only in edit mode */}
+                    {currentAgentType === 'edit' && scripts && roomState === ConnectionState.Disconnected && (
                       <button
                         onClick={() => handleWalkthroughClick('view')}
                         className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center gap-2"
                       >
-                        <svg
-                          className="w-4 h-4"
-                          viewBox="0 0 24 24"
-                          fill="currentColor"
-                        >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M8 5v14l11-7z" />
                         </svg>
                         Play
                       </button>
                     )}
+
+                    {/* Navigation buttons */}
                     <button
                       onClick={handlePrevSlide}
                       disabled={params.currentSlide === 1}
@@ -816,21 +839,30 @@ export default function Playground({
                 </div>
               </div>
 
-              {/* Add SlideScriptPanel here */}
-              <SlideScriptPanel
-                currentSlide={params.currentSlide}
-                scripts={scripts}
-                isGenerating={isGenerating}
-              />
+              {/* Scripts Panel - Simplified in view mode */}
+              {currentAgentType === 'view' ? (
+                <div className="p-4 bg-gray-900 border-t border-gray-800">
+                  <div className="text-gray-300 text-sm">
+                    {scripts?.[params.currentSlide.toString()] || 'No script available for this slide'}
+                  </div>
+                </div>
+              ) : (
+                <SlideScriptPanel
+                  currentSlide={params.currentSlide}
+                  scripts={scripts}
+                  isGenerating={isGenerating}
+                  readOnly={false}
+                />
+              )}
             </div>
           </div>
         </div>
 
-        {/* Right Side Panel */}
+        {/* Right Side Panel - Show in both modes but with different content */}
         <div className="w-[420px] border-l border-gray-800 flex flex-col bg-gray-900">
           {/* Combined Header with Mic Toggle and Tabs */}
           <div className="p-4 border-b border-gray-800 flex items-center gap-4">
-            {/* Mic Toggle */}
+            {/* Mic Toggle - Show in both modes */}
             <button
               onClick={() => {
                 if (roomState === ConnectionState.Connected) {
@@ -842,22 +874,20 @@ export default function Playground({
                   ? 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
                   : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
             >
-              <span className={`w-2 h-2 rounded-full ${localParticipant.isMicrophoneEnabled ? 'bg-cyan-500 animate-pulse' : 'bg-gray-600'
-                }`} />
+              <span className={`w-2 h-2 rounded-full ${localParticipant.isMicrophoneEnabled ? 'bg-cyan-500 animate-pulse' : 'bg-gray-600'}`} />
               <span className="text-sm font-medium">
                 {localParticipant.isMicrophoneEnabled ? 'Mic On' : 'Mic Off'}
               </span>
             </button>
 
-            {/* Tab Toggle - Only show when connected */}
+            {/* Tab Toggle - Show in both modes */}
             {roomState === ConnectionState.Connected && (
               <div className="flex gap-2">
                 <button
                   onClick={() => setRightPanelView('chat')}
                   className={`px-3 py-2 text-sm rounded-md transition-colors ${rightPanelView === 'chat'
                     ? 'bg-cyan-500/20 text-cyan-400'
-                    : 'text-gray-400 hover:text-gray-300'
-                    }`}
+                    : 'text-gray-400 hover:text-gray-300'}`}
                 >
                   Chat
                 </button>
@@ -865,8 +895,7 @@ export default function Playground({
                   onClick={() => setRightPanelView('info')}
                   className={`px-3 py-2 text-sm rounded-md transition-colors ${rightPanelView === 'info'
                     ? 'bg-cyan-500/20 text-cyan-400'
-                    : 'text-gray-400 hover:text-gray-300'
-                    }`}
+                    : 'text-gray-400 hover:text-gray-300'}`}
                 >
                   Info
                 </button>
@@ -875,19 +904,39 @@ export default function Playground({
           </div>
 
           {/* Content Area */}
-          {renderRightPanelContent()}
+          <div className="flex-1 overflow-hidden">
+            {/* Chat Interface */}
+            <div className={`h-full flex flex-col ${rightPanelView === 'chat' ? 'block' : 'hidden'}`}>
+              <div className="flex-1 overflow-y-auto">
+                <div className="p-4">
+                  {voiceAssistant?.audioTrack && (
+                    <TranscriptionTile
+                      agentAudioTrack={voiceAssistant.audioTrack}
+                      accentColor="cyan"
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Info Panel */}
+            <div className={`h-full ${rightPanelView === 'info' ? 'block' : 'hidden'}`}>
+              <InfoPanel walkthroughCount={walkthroughCount} />
+            </div>
+          </div>
 
           {/* Status Bar */}
           <div className="p-3 bg-gray-900 border-t border-gray-800">
             <div className="flex items-center justify-between text-sm text-gray-400">
               <span>
-                {walkthroughCount > 0 && `Walkthrough #${walkthroughCount}`}
+                {currentAgentType === 'edit' && walkthroughCount > 0 && `Walkthrough #${walkthroughCount}`}
+                {currentAgentType === 'view' && 'View Mode'}
               </span>
               <span className="flex items-center gap-2">
                 {roomState === ConnectionState.Connected && (
                   <>
                     <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
-                    Walkthrough in Progress
+                    {currentAgentType === 'edit' ? 'Walkthrough in Progress' : 'Viewing'}
                   </>
                 )}
               </span>
