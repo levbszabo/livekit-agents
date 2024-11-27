@@ -743,7 +743,7 @@ export default function Playground({
         brdgeId={params.brdgeId}
         apiBaseUrl={params.coreApiUrl}
         selectedWalkthrough={selectedWalkthrough}
-        onWalkthroughClick={handleWalkthroughClick}
+        onWalkthroughClick={(agentType) => handleWalkthroughClick(agentType)}
         onGenerateClick={handleGenerateClick}
         onWalkthroughSelect={handleWalkthroughSelect}
       />
