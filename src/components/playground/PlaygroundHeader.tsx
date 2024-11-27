@@ -12,7 +12,7 @@ type PlaygroundHeaderProps = {
   brdgeId: string | null;
   apiBaseUrl: string | null;
   selectedWalkthrough: number | null;
-  onWalkthroughClick: () => void;
+  onWalkthroughClick: (agentType: 'edit' | 'view') => void;
   onGenerateClick: () => void;
   onWalkthroughSelect: (walkthroughId: number) => void;
 };
@@ -51,7 +51,7 @@ export const PlaygroundHeader = ({
         />
 
         <button
-          onClick={onWalkthroughClick}
+          onClick={() => onWalkthroughClick('edit')}
           disabled={isConnecting}
           className={`
             px-6 py-2 rounded-md transition-all duration-200
