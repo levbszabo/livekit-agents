@@ -111,10 +111,14 @@ export default function Playground({
     }
   }, [roomState]);
 
-  // Modify handleConnect to handle walkthrough
+  // Add state to track current agent type
+  const [currentAgentType, setCurrentAgentType] = useState<AgentType>('edit');
+
+  // Update handleWalkthroughClick to store the agent type
   const handleWalkthroughClick = useCallback(async (agentType: AgentType = 'edit') => {
     try {
       setIsConnecting(true);
+      setCurrentAgentType(agentType); // Store the agent type
       if (roomState === ConnectionState.Disconnected) {
         await onConnect(true);
         setRightPanelView('chat');
@@ -167,8 +171,8 @@ export default function Playground({
     setSelectedWalkthrough(walkthroughId);
   }, []);
 
-  // Modify the send function to use debounce and check connection state
-  const sendSlideUpdate = useCallback((agentType: AgentType = 'edit') => {
+  // Update sendSlideUpdate to use the stored agent type
+  const sendSlideUpdate = useCallback(() => {
     if (!params.brdgeId || roomState !== ConnectionState.Connected) {
       return;
     }
@@ -191,7 +195,7 @@ export default function Playground({
               apiBaseUrl: params.apiBaseUrl,
               currentSlide: params.currentSlide,
               slideUrl: slideUrl,
-              agentType: agentType
+              agentType: currentAgentType // Use the stored agent type
             };
 
             const encoder = new TextEncoder();
@@ -205,7 +209,7 @@ export default function Playground({
         }
       }, 300);
     }
-  }, [params, roomState, send]);
+  }, [params, roomState, send, currentAgentType]); // Add currentAgentType to dependencies
 
   // Simplify the connection effect
   useEffect(() => {
