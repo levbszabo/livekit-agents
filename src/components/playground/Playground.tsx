@@ -58,6 +58,9 @@ interface ScriptData {
   source_walkthrough_id: string;
 }
 
+// First, add this type near the top of the file
+type AgentType = 'edit' | 'view';
+
 export default function Playground({
   logo,
   themeColors,
@@ -109,7 +112,7 @@ export default function Playground({
   }, [roomState]);
 
   // Modify handleConnect to handle walkthrough
-  const handleWalkthroughClick = useCallback(async () => {
+  const handleWalkthroughClick = useCallback(async (agentType: AgentType = 'edit') => {
     try {
       setIsConnecting(true);
       if (roomState === ConnectionState.Disconnected) {
@@ -165,7 +168,7 @@ export default function Playground({
   }, []);
 
   // Modify the send function to use debounce and check connection state
-  const sendSlideUpdate = useCallback(() => {
+  const sendSlideUpdate = useCallback((agentType: AgentType = 'edit') => {
     if (!params.brdgeId || roomState !== ConnectionState.Connected) {
       return;
     }
@@ -179,7 +182,6 @@ export default function Playground({
     if (lastSentSlide.current !== params.currentSlide) {
       updateTimeoutRef.current = setTimeout(() => {
         try {
-          // Check connection state again before sending
           if (roomState === ConnectionState.Connected) {
             const slideUrl = `${params.apiBaseUrl}/brdges/${params.brdgeId}/slides/${params.currentSlide}`;
             const message = {
@@ -188,7 +190,8 @@ export default function Playground({
               numSlides: params.numSlides,
               apiBaseUrl: params.apiBaseUrl,
               currentSlide: params.currentSlide,
-              slideUrl: slideUrl
+              slideUrl: slideUrl,
+              agentType: agentType
             };
 
             const encoder = new TextEncoder();
@@ -196,8 +199,6 @@ export default function Playground({
             send(data, { reliable: true });
             lastSentSlide.current = params.currentSlide;
             console.log("Sent slide update:", message);
-          } else {
-            console.log("Not sending slide update - room not connected");
           }
         } catch (e) {
           console.error("Error sending slide update:", e);
@@ -339,6 +340,22 @@ export default function Playground({
               Slide {params.currentSlide} of {params.numSlides}
             </span>
             <div className="flex gap-3">
+              {/* Add Play button if scripts are loaded */}
+              {scripts && roomState === ConnectionState.Disconnected && (
+                <button
+                  onClick={() => handleWalkthroughClick('view')}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center gap-2"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                  Play
+                </button>
+              )}
               <button
                 onClick={handlePrevSlide}
                 disabled={params.currentSlide === 1}
@@ -761,6 +778,22 @@ export default function Playground({
                     Slide {params.currentSlide} of {params.numSlides}
                   </span>
                   <div className="flex gap-3">
+                    {/* Add Play button if scripts are loaded */}
+                    {scripts && roomState === ConnectionState.Disconnected && (
+                      <button
+                        onClick={() => handleWalkthroughClick('view')}
+                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center gap-2"
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                        >
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                        Play
+                      </button>
+                    )}
                     <button
                       onClick={handlePrevSlide}
                       disabled={params.currentSlide === 1}
