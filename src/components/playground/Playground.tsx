@@ -357,22 +357,51 @@ export default function Playground({
               Slide {params.currentSlide} of {params.numSlides}
             </span>
             <div className="flex gap-3">
-              {/* Only show Play button in edit mode */}
-              {currentAgentType === 'edit' && scripts && roomState === ConnectionState.Disconnected && (
+              {/* Show Play/Stop button based on connection state */}
+              {scripts && (
                 <button
-                  onClick={() => handleWalkthroughClick('view')}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center gap-2"
+                  onClick={() => {
+                    if (roomState === ConnectionState.Connected) {
+                      // Stop the session
+                      onConnect(false);
+                      setRightPanelView('info');
+                    } else {
+                      // Start the session
+                      handleWalkthroughClick('view');
+                    }
+                  }}
+                  className={`px-4 py-2 ${roomState === ConnectionState.Connected
+                      ? 'bg-red-600 hover:bg-red-700'
+                      : 'bg-green-600 hover:bg-green-700'
+                    } text-white rounded-md transition-colors flex items-center gap-2`}
                 >
-                  <svg
-                    className="w-4 h-4"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                  >
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                  Play
+                  {roomState === ConnectionState.Connected ? (
+                    <>
+                      <svg
+                        className="w-4 h-4"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                      >
+                        <path d="M6 6h12v12H6z" />
+                      </svg>
+                      Stop
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        className="w-4 h-4"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                      >
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                      Play
+                    </>
+                  )}
                 </button>
               )}
+
+              {/* Existing navigation buttons */}
               <button
                 onClick={handlePrevSlide}
                 disabled={params.currentSlide === 1}
@@ -740,7 +769,10 @@ export default function Playground({
 
         {/* Info Panel */}
         <div className={`h-full ${rightPanelView === 'info' ? 'block' : 'hidden'}`}>
-          <InfoPanel walkthroughCount={walkthroughCount} />
+          <InfoPanel
+            walkthroughCount={walkthroughCount}
+            agentType={currentAgentType}
+          />
         </div>
       </div>
     );
@@ -807,20 +839,51 @@ export default function Playground({
                     Slide {params.currentSlide} of {params.numSlides}
                   </span>
                   <div className="flex gap-3">
-                    {/* Play button - only in edit mode */}
-                    {currentAgentType === 'edit' && scripts && roomState === ConnectionState.Disconnected && (
+                    {/* Show Play/Stop button based on connection state */}
+                    {scripts && (
                       <button
-                        onClick={() => handleWalkthroughClick('view')}
-                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center gap-2"
+                        onClick={() => {
+                          if (roomState === ConnectionState.Connected) {
+                            // Stop the session
+                            onConnect(false);
+                            setRightPanelView('info');
+                          } else {
+                            // Start the session
+                            handleWalkthroughClick('view');
+                          }
+                        }}
+                        className={`px-4 py-2 ${roomState === ConnectionState.Connected
+                            ? 'bg-red-600 hover:bg-red-700'
+                            : 'bg-green-600 hover:bg-green-700'
+                          } text-white rounded-md transition-colors flex items-center gap-2`}
                       >
-                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M8 5v14l11-7z" />
-                        </svg>
-                        Play
+                        {roomState === ConnectionState.Connected ? (
+                          <>
+                            <svg
+                              className="w-4 h-4"
+                              viewBox="0 0 24 24"
+                              fill="currentColor"
+                            >
+                              <path d="M6 6h12v12H6z" />
+                            </svg>
+                            Stop
+                          </>
+                        ) : (
+                          <>
+                            <svg
+                              className="w-4 h-4"
+                              viewBox="0 0 24 24"
+                              fill="currentColor"
+                            >
+                              <path d="M8 5v14l11-7z" />
+                            </svg>
+                            Play
+                          </>
+                        )}
                       </button>
                     )}
 
-                    {/* Navigation buttons */}
+                    {/* Existing navigation buttons */}
                     <button
                       onClick={handlePrevSlide}
                       disabled={params.currentSlide === 1}
@@ -921,7 +984,10 @@ export default function Playground({
 
             {/* Info Panel */}
             <div className={`h-full ${rightPanelView === 'info' ? 'block' : 'hidden'}`}>
-              <InfoPanel walkthroughCount={walkthroughCount} />
+              <InfoPanel
+                walkthroughCount={walkthroughCount}
+                agentType={currentAgentType}
+              />
             </div>
           </div>
 
