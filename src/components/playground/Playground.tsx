@@ -371,8 +371,8 @@ export default function Playground({
                     }
                   }}
                   className={`px-4 py-2 ${roomState === ConnectionState.Connected
-                      ? 'bg-red-600 hover:bg-red-700'
-                      : 'bg-green-600 hover:bg-green-700'
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : 'bg-green-600 hover:bg-green-700'
                     } text-white rounded-md transition-colors flex items-center gap-2`}
                 >
                   {roomState === ConnectionState.Connected ? (
@@ -772,6 +772,7 @@ export default function Playground({
           <InfoPanel
             walkthroughCount={walkthroughCount}
             agentType={currentAgentType}
+            brdgeId={params.brdgeId}
           />
         </div>
       </div>
@@ -853,8 +854,8 @@ export default function Playground({
                           }
                         }}
                         className={`px-4 py-2 ${roomState === ConnectionState.Connected
-                            ? 'bg-red-600 hover:bg-red-700'
-                            : 'bg-green-600 hover:bg-green-700'
+                          ? 'bg-red-600 hover:bg-red-700'
+                          : 'bg-green-600 hover:bg-green-700'
                           } text-white rounded-md transition-colors flex items-center gap-2`}
                       >
                         {roomState === ConnectionState.Connected ? (
@@ -987,6 +988,7 @@ export default function Playground({
               <InfoPanel
                 walkthroughCount={walkthroughCount}
                 agentType={currentAgentType}
+                brdgeId={params.brdgeId}
               />
             </div>
           </div>
