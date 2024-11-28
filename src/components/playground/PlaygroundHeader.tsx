@@ -15,6 +15,7 @@ type PlaygroundHeaderProps = {
   onWalkthroughClick: (agentType: 'edit' | 'view') => void;
   onGenerateClick: () => void;
   onWalkthroughSelect: (walkthroughId: number) => void;
+  showEditControls?: boolean;
 };
 
 export const PlaygroundHeader = ({
@@ -28,6 +29,7 @@ export const PlaygroundHeader = ({
   onWalkthroughClick,
   onGenerateClick,
   onWalkthroughSelect,
+  showEditControls,
 }: PlaygroundHeaderProps) => {
   const isConnecting = connectionState === ConnectionState.Connecting;
   const isConnected = connectionState === ConnectionState.Connected;

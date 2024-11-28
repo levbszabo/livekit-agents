@@ -4,12 +4,14 @@ interface SlideScriptPanelProps {
     currentSlide: number;
     scripts: Record<string, string> | null;
     isGenerating: boolean;
+    readOnly?: boolean;
 }
 
 export const SlideScriptPanel = ({
     currentSlide,
     scripts,
-    isGenerating
+    isGenerating,
+    readOnly = false
 }: SlideScriptPanelProps) => {
     if (isGenerating) {
         return (
