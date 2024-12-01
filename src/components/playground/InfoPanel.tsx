@@ -112,8 +112,8 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts, isGen
             formData.append('name', voiceName);
 
             const response = await api.post(`/api/brdges/${brdgeId}/voice/clone`, formData);
-            if (response.data?.voice_id) {
-                setSelectedVoice(response.data.voice_id);
+            if (response.data?.voice?.cartesia_voice_id) {
+                setSelectedVoice(response.data.voice.cartesia_voice_id);
                 // Refresh voice list
                 const voicesResponse = await api.get(`/api/brdges/${brdgeId}/voices`);
                 setSavedVoices(voicesResponse.data.voices || []);
@@ -171,6 +171,24 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts, isGen
             console.error('Error saving script changes:', error);
         }
     };
+
+    // Add useEffect to load voices on mount
+    useEffect(() => {
+        const loadVoices = async () => {
+            if (!brdgeId) return;
+            try {
+                const response = await api.get(`/api/brdges/${brdgeId}/voices`);
+                if (response.data?.voices) {
+                    setSavedVoices(response.data.voices);
+                    console.log('Loaded voices:', response.data.voices);
+                }
+            } catch (error) {
+                console.error('Error loading voices:', error);
+            }
+        };
+
+        loadVoices();
+    }, [brdgeId]);
 
     return (
         <div className="h-full overflow-y-auto bg-gray-900">
