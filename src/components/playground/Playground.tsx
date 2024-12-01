@@ -772,7 +772,8 @@ export default function Playground({
           <InfoPanel
             walkthroughCount={walkthroughCount}
             agentType={currentAgentType}
-            brdgeId={params.brdgeId}
+            brdgeId={params.brdgeId!}
+            scripts={scripts}
           />
         </div>
       </div>
@@ -988,7 +989,8 @@ export default function Playground({
               <InfoPanel
                 walkthroughCount={walkthroughCount}
                 agentType={currentAgentType}
-                brdgeId={params.brdgeId}
+                brdgeId={params.brdgeId!}
+                scripts={scripts}
               />
             </div>
           </div>

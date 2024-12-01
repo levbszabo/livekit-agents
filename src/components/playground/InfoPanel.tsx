@@ -9,6 +9,7 @@ interface InfoPanelProps {
     walkthroughCount: number;
     agentType: AgentType;
     brdgeId: string | number;
+    scripts?: Record<string, string> | null;
 }
 
 interface VoiceConfig {
@@ -22,127 +23,21 @@ interface AgentIntent {
     questions: string[];
 }
 
-export function InfoPanel({ walkthroughCount, agentType, brdgeId }: InfoPanelProps) {
-    const [isRecording, setIsRecording] = useState(false);
-    const [recordingTime, setRecordingTime] = useState(0);
-    const [currentRecording, setCurrentRecording] = useState<Blob | null>(null);
-    const [voiceName, setVoiceName] = useState('');
-    const [isCloning, setIsCloning] = useState(false);
-    const [savedVoices, setSavedVoices] = useState<VoiceConfig[]>([]);
-    const [selectedVoice, setSelectedVoice] = useState<string | null>(null);
-
-    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-    const timerRef = useRef<NodeJS.Timeout | null>(null);
-    const chunksRef = useRef<Blob[]>([]);
-
+export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts }: InfoPanelProps) {
+    const [currentStep, setCurrentStep] = useState(1);
     const [agentIntent, setAgentIntent] = useState<AgentIntent>({
         prompt: '',
         questions: []
     });
     const [newQuestion, setNewQuestion] = useState('');
 
-    // Add new state for tracking progress
-    const [currentStep, setCurrentStep] = useState(1);
-
-    // Helper function to determine if a step is active
-    const isStepActive = (stepNumber: number) => {
-        if (walkthroughCount === 0) return stepNumber === 1;
-        if (!scripts && walkthroughCount > 0) return stepNumber === 2;
-        if (!selectedVoice && scripts) return stepNumber === 3;
-        return stepNumber === 4;
+    // Add tooltips content
+    const tooltips = {
+        agentIntent: "Describe how you want the AI to behave. For example:\n- 'Act as an expert who simplifies complex topics'\n- 'Be a friendly guide who encourages questions'\n- 'Maintain a professional, formal tone'",
+        questions: "Add questions that the AI should try to get answers for during viewer interactions. These help gather specific information from users."
     };
 
-    const startRecording = async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const mediaRecorder = new MediaRecorder(stream);
-            mediaRecorderRef.current = mediaRecorder;
-            chunksRef.current = [];
-
-            mediaRecorder.ondataavailable = (e) => {
-                if (e.data.size > 0) {
-                    chunksRef.current.push(e.data);
-                }
-            };
-
-            mediaRecorder.onstop = () => {
-                const audioBlob = new Blob(chunksRef.current, { type: 'audio/wav' });
-                setCurrentRecording(audioBlob);
-            };
-
-            mediaRecorder.start();
-            setIsRecording(true);
-
-            // Start timer
-            timerRef.current = setInterval(() => {
-                setRecordingTime(prev => prev + 1);
-            }, 1000);
-
-        } catch (err) {
-            console.error('Error accessing microphone:', err);
-        }
-    };
-
-    const stopRecording = () => {
-        if (mediaRecorderRef.current && isRecording) {
-            mediaRecorderRef.current.stop();
-            mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
-            setIsRecording(false);
-
-            // Clear timer
-            if (timerRef.current) {
-                clearInterval(timerRef.current);
-                timerRef.current = null;
-            }
-            setRecordingTime(0);
-        }
-    };
-
-    const formatTime = (seconds: number) => {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    };
-
-    const handleCloneVoice = async () => {
-        if (!currentRecording || !voiceName) return;
-
-        setIsCloning(true);
-        try {
-            const formData = new FormData();
-            formData.append('audio', currentRecording);
-            formData.append('name', voiceName);
-            formData.append('mode', 'stability');
-
-            console.log('Cloning voice for brdge:', brdgeId);
-            const response = await api.post(
-                `/api/brdges/${brdgeId}/voice/clone`,
-                formData,
-                {
-                    headers: {
-                        'Content-Type': 'multipart/form-data',
-                    },
-                }
-            );
-
-            console.log('Clone response:', response.data);
-
-            if (response.data) {
-                // Refresh voices list after successful clone
-                const voicesResponse = await api.get(`/api/brdges/${brdgeId}/voices`);
-                if (voicesResponse.data?.voices) {
-                    setSavedVoices(voicesResponse.data.voices);
-                }
-                setCurrentRecording(null);
-                setVoiceName('');
-            }
-        } catch (error) {
-            console.error('Error cloning voice:', error);
-        } finally {
-            setIsCloning(false);
-        }
-    };
-
+    // Add question handlers
     const addQuestion = () => {
         if (newQuestion.trim()) {
             setAgentIntent(prev => ({
@@ -160,40 +55,15 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId }: InfoPanelPro
         }));
     };
 
-    useEffect(() => {
-        const fetchVoices = async () => {
-            try {
-                console.log('Fetching voices for brdge:', brdgeId);
-                const response = await api.get(`/api/brdges/${brdgeId}/voices`);
-                console.log('Voice response:', response.data);
-
-                if (response.data?.voices) {
-                    setSavedVoices(response.data.voices);
-                    // If there are voices, select the first one by default
-                    if (response.data.voices.length > 0) {
-                        setSelectedVoice(response.data.voices[0].id);
-                    }
-                }
-            } catch (error) {
-                console.error('Error fetching voices:', error);
-            }
-        };
-
-        if (brdgeId) {
-            fetchVoices();
-        }
-    }, [brdgeId]);
-
-    // Add tooltips content
-    const tooltips = {
-        agentIntent: "Describe how you want the AI to behave. For example:\n- 'Act as an expert who simplifies complex topics'\n- 'Be a friendly guide who encourages questions'\n- 'Maintain a professional, formal tone'",
-        questions: "Add questions that the AI should try to get answers for during viewer interactions. These help gather specific information from users."
+    const isStepActive = (stepNumber: number) => {
+        if (walkthroughCount === 0) return stepNumber === 1;
+        if (walkthroughCount > 0 && !scripts) return stepNumber === 2;
+        return stepNumber === 3;
     };
 
     return (
         <div className="h-full overflow-y-auto bg-gray-900">
             <div className="p-6 space-y-8">
-                {/* Steps Guide */}
                 {agentType === 'edit' && (
                     <div className="space-y-6">
                         <h3 className="text-xl font-semibold text-gray-200">How it works</h3>
@@ -218,17 +88,11 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId }: InfoPanelPro
                                 {
                                     number: 2,
                                     title: "Generate",
-                                    subtitle: "Review Script",
-                                    tooltip: "Review and customize the AI-generated presentation script."
+                                    subtitle: "Create Brdge",
+                                    tooltip: "Generate an AI version of your presentation."
                                 },
                                 {
                                     number: 3,
-                                    title: "Configure",
-                                    subtitle: "Voice & Agent",
-                                    tooltip: "Set up your voice clone and configure the AI behavior."
-                                },
-                                {
-                                    number: 4,
                                     title: "Share",
                                     subtitle: "Publish",
                                     tooltip: "Share your Brdge with others."
@@ -261,96 +125,7 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId }: InfoPanelPro
                     </div>
                 )}
 
-                {/* Voice Configuration Section - Moved up */}
-                {agentType === 'edit' && (
-                    <div className="space-y-6">
-                        <h3 className="text-xl font-semibold text-gray-200">Voice Configuration</h3>
-
-                        {/* Voice Selection */}
-                        <div className="space-y-3">
-                            <label className="text-sm text-gray-400">Select Existing Voice</label>
-                            <select
-                                value={selectedVoice || ''}
-                                onChange={(e) => setSelectedVoice(e.target.value)}
-                                className="w-full bg-gray-800 text-gray-200 rounded-md px-3 py-2"
-                            >
-                                <option value="">Create new voice</option>
-                                {savedVoices.map(voice => (
-                                    <option key={voice.id} value={voice.id}>
-                                        {voice.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {/* New Voice Creation */}
-                        {!selectedVoice && (
-                            <div className="space-y-4">
-                                {/* Voice Name Input */}
-                                <div className="space-y-2">
-                                    <label className="text-sm text-gray-400">Voice Name</label>
-                                    <input
-                                        type="text"
-                                        value={voiceName}
-                                        onChange={(e) => setVoiceName(e.target.value)}
-                                        placeholder="Enter voice name"
-                                        className="w-full bg-gray-800 text-gray-200 rounded-md px-3 py-2"
-                                    />
-                                </div>
-
-                                {/* Recording Controls */}
-                                <div className="space-y-3">
-                                    <div className="flex items-center gap-4">
-                                        <button
-                                            onClick={isRecording ? stopRecording : startRecording}
-                                            className={`px-4 py-2 rounded-md flex items-center gap-2 transition-colors ${isRecording
-                                                ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                                                : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
-                                                }`}
-                                        >
-                                            {isRecording ? (
-                                                <>
-                                                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                                                    Stop Recording
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <span className="w-2 h-2 rounded-full bg-cyan-500" />
-                                                    Record Voice
-                                                </>
-                                            )}
-                                        </button>
-                                        {isRecording && (
-                                            <span className="text-gray-400">
-                                                {formatTime(recordingTime)}
-                                            </span>
-                                        )}
-                                    </div>
-
-                                    {/* Recording Preview */}
-                                    {currentRecording && (
-                                        <div className="space-y-3">
-                                            <audio
-                                                src={URL.createObjectURL(currentRecording)}
-                                                controls
-                                                className="w-full"
-                                            />
-                                            <button
-                                                onClick={handleCloneVoice}
-                                                disabled={!voiceName || isCloning}
-                                                className="w-full px-4 py-2 bg-cyan-500/20 text-cyan-400 rounded-md hover:bg-cyan-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                            >
-                                                {isCloning ? 'Creating Voice Clone...' : 'Create Voice Clone'}
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Agent Configuration - Moved down */}
+                {/* Agent Configuration */}
                 {agentType === 'edit' && (
                     <div className="space-y-6">
                         <h3 className="text-xl font-semibold text-gray-200">Agent Configuration</h3>
@@ -371,7 +146,7 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId }: InfoPanelPro
                             <textarea
                                 value={agentIntent.prompt}
                                 onChange={(e) => setAgentIntent(prev => ({ ...prev, prompt: e.target.value }))}
-                                placeholder="Describe how you want the AI to behave when presenting (e.g., 'Act as an enthusiastic teacher who makes complex topics simple')"
+                                placeholder="Describe how you want the AI to behave when presenting..."
                                 className="w-full h-24 bg-gray-800 text-gray-200 rounded-md px-3 py-2 resize-none"
                             />
                         </div>
