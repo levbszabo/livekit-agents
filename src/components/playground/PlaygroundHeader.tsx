@@ -1,7 +1,7 @@
 import { Button } from "@/components/button/Button";
 import { LoadingSVG } from "@/components/button/LoadingSVG";
 import { ConnectionState } from "livekit-client";
-import { ReactNode } from "react";
+import { ReactNode, useState, useCallback } from "react";
 import { WalkthroughSelector } from "./WalkthroughSelector";
 
 type PlaygroundHeaderProps = {
@@ -36,6 +36,20 @@ export const PlaygroundHeader = ({
   const isConnecting = connectionState === ConnectionState.Connecting;
   const isConnected = connectionState === ConnectionState.Connected;
   const canGenerate = selectedWalkthrough !== null;
+  const [localWalkthroughs, setLocalWalkthroughs] = useState<any[]>([]);
+
+  const handleWalkthroughComplete = async () => {
+    try {
+      await onWalkthroughClick('edit');
+      // The selector will automatically refresh after completion
+    } catch (error) {
+      console.error('Error completing walkthrough:', error);
+    }
+  };
+
+  const handleWalkthroughsLoaded = useCallback((walkthroughs: any[]) => {
+    setLocalWalkthroughs(walkthroughs);
+  }, []);
 
   return (
     <div
@@ -52,10 +66,11 @@ export const PlaygroundHeader = ({
           apiBaseUrl={apiBaseUrl}
           selectedWalkthrough={selectedWalkthrough}
           onWalkthroughSelect={onWalkthroughSelect}
+          onWalkthroughsLoaded={handleWalkthroughsLoaded}
         />
 
         <button
-          onClick={() => onWalkthroughClick('edit')}
+          onClick={handleWalkthroughComplete}
           disabled={isConnecting}
           className={`
             px-6 py-2 rounded-md transition-all duration-200

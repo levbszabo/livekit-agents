@@ -218,81 +218,13 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts, isGen
                     </div>
                 )}
 
-                {/* Agent Configuration */}
-                {agentType === 'edit' && (
+                {/* Hide Agent Configuration section for now */}
+                {/* {agentType === 'edit' && (
                     <div className="space-y-6">
                         <h3 className="text-xl font-semibold text-gray-200">Agent Configuration</h3>
-
-                        {/* Intent/Prompt */}
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <label className="text-sm text-gray-400">Agent Intent</label>
-                                <div className="relative group">
-                                    <button className="text-cyan-400 hover:text-cyan-300">
-                                        <span className="text-xs">(?)</span>
-                                    </button>
-                                    <div className="absolute bottom-full right-0 mb-2 w-64 p-3 bg-gray-800 rounded-md text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity whitespace-pre-line">
-                                        {tooltips.agentIntent}
-                                    </div>
-                                </div>
-                            </div>
-                            <textarea
-                                value={agentIntent.prompt}
-                                onChange={(e) => setAgentIntent(prev => ({ ...prev, prompt: e.target.value }))}
-                                placeholder="Describe how you want the AI to behave when presenting..."
-                                className="w-full h-24 bg-gray-800 text-gray-200 rounded-md px-3 py-2 resize-none"
-                            />
-                        </div>
-
-                        {/* Questions List */}
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <label className="text-sm text-gray-400">Information to Extract</label>
-                                <div className="relative group">
-                                    <button className="text-cyan-400 hover:text-cyan-300">
-                                        <span className="text-xs">(?)</span>
-                                    </button>
-                                    <div className="absolute bottom-full right-0 mb-2 w-64 p-3 bg-gray-800 rounded-md text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        {tooltips.questions}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Add Question Input */}
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    value={newQuestion}
-                                    onChange={(e) => setNewQuestion(e.target.value)}
-                                    onKeyPress={(e) => e.key === 'Enter' && addQuestion()}
-                                    placeholder="Add a question to ask viewers..."
-                                    className="flex-1 bg-gray-800 text-gray-200 rounded-md px-3 py-2"
-                                />
-                                <button
-                                    onClick={addQuestion}
-                                    className="px-4 py-2 bg-cyan-500/20 text-cyan-400 rounded-md hover:bg-cyan-500/30"
-                                >
-                                    Add
-                                </button>
-                            </div>
-
-                            {/* Questions List */}
-                            <div className="space-y-2 max-h-40 overflow-y-auto">
-                                {agentIntent.questions.map((question, index) => (
-                                    <div key={index} className="flex items-center justify-between bg-gray-800 rounded-md px-3 py-2">
-                                        <span className="text-gray-300">{question}</span>
-                                        <button
-                                            onClick={() => removeQuestion(index)}
-                                            className="text-gray-500 hover:text-red-400"
-                                        >
-                                            ×
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+                        ... agent configuration content ...
                     </div>
-                )}
+                )} */}
 
                 {/* Voice Configuration */}
                 {agentType === 'edit' && scripts && (
