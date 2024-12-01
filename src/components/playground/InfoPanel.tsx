@@ -31,13 +31,98 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts }: Inf
     });
     const [newQuestion, setNewQuestion] = useState('');
 
+    // Voice-related state
+    const [isRecording, setIsRecording] = useState(false);
+    const [recordingTime, setRecordingTime] = useState(0);
+    const [currentRecording, setCurrentRecording] = useState<Blob | null>(null);
+    const [voiceName, setVoiceName] = useState('');
+    const [isCloning, setIsCloning] = useState(false);
+    const [savedVoices, setSavedVoices] = useState<VoiceConfig[]>([]);
+    const [selectedVoice, setSelectedVoice] = useState<string | null>(null);
+
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
+
     // Add tooltips content
     const tooltips = {
         agentIntent: "Describe how you want the AI to behave. For example:\n- 'Act as an expert who simplifies complex topics'\n- 'Be a friendly guide who encourages questions'\n- 'Maintain a professional, formal tone'",
         questions: "Add questions that the AI should try to get answers for during viewer interactions. These help gather specific information from users."
     };
 
-    // Add question handlers
+    // Add back isStepActive function
+    const isStepActive = (stepNumber: number) => {
+        if (walkthroughCount === 0) return stepNumber === 1;
+        if (walkthroughCount > 0 && !scripts) return stepNumber === 2;
+        if (scripts) return stepNumber === 3;
+        return false;
+    };
+
+    // Voice recording handlers
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = mediaRecorder;
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) {
+                    setCurrentRecording(new Blob([e.data], { type: 'audio/wav' }));
+                }
+            };
+
+            mediaRecorder.start();
+            setIsRecording(true);
+            timerRef.current = setInterval(() => {
+                setRecordingTime(prev => prev + 1);
+            }, 1000);
+        } catch (err) {
+            console.error('Error accessing microphone:', err);
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop();
+            mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+            setIsRecording(false);
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+                setRecordingTime(0);
+            }
+        }
+    };
+
+    // Format time for recording display
+    const formatTime = (seconds: number) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    // Handle voice cloning
+    const handleCloneVoice = async () => {
+        if (!currentRecording || !voiceName) return;
+        setIsCloning(true);
+        try {
+            const formData = new FormData();
+            formData.append('audio', currentRecording);
+            formData.append('name', voiceName);
+
+            const response = await api.post(`/api/brdges/${brdgeId}/voice/clone`, formData);
+            if (response.data?.voice_id) {
+                setSelectedVoice(response.data.voice_id);
+                // Refresh voice list
+                const voicesResponse = await api.get(`/api/brdges/${brdgeId}/voices`);
+                setSavedVoices(voicesResponse.data.voices || []);
+            }
+        } catch (error) {
+            console.error('Error cloning voice:', error);
+        } finally {
+            setIsCloning(false);
+        }
+    };
+
+    // Question handlers
     const addQuestion = () => {
         if (newQuestion.trim()) {
             setAgentIntent(prev => ({
@@ -55,15 +140,10 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts }: Inf
         }));
     };
 
-    const isStepActive = (stepNumber: number) => {
-        if (walkthroughCount === 0) return stepNumber === 1;
-        if (walkthroughCount > 0 && !scripts) return stepNumber === 2;
-        return stepNumber === 3;
-    };
-
     return (
         <div className="h-full overflow-y-auto bg-gray-900">
             <div className="p-6 space-y-8">
+                {/* Steps Guide */}
                 {agentType === 'edit' && (
                     <div className="space-y-6">
                         <h3 className="text-xl font-semibold text-gray-200">How it works</h3>
@@ -198,6 +278,84 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts }: Inf
                                 ))}
                             </div>
                         </div>
+                    </div>
+                )}
+
+                {/* Voice Configuration */}
+                {agentType === 'edit' && scripts && (
+                    <div className="space-y-6">
+                        <h3 className="text-xl font-semibold text-gray-200">Voice Configuration</h3>
+
+                        {/* Voice Selection */}
+                        <div className="space-y-3">
+                            <label className="text-sm text-gray-400">Select Voice</label>
+                            <select
+                                value={selectedVoice || ''}
+                                onChange={(e) => setSelectedVoice(e.target.value)}
+                                className="w-full bg-gray-800 text-gray-200 rounded-md px-3 py-2"
+                            >
+                                <option value="">Create new voice</option>
+                                {savedVoices.map(voice => (
+                                    <option key={voice.id} value={voice.id}>
+                                        {voice.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Voice Recording */}
+                        {!selectedVoice && (
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm text-gray-400">Voice Name</label>
+                                    <input
+                                        type="text"
+                                        value={voiceName}
+                                        onChange={(e) => setVoiceName(e.target.value)}
+                                        placeholder="Enter voice name"
+                                        className="w-full bg-gray-800 text-gray-200 rounded-md px-3 py-2"
+                                    />
+                                </div>
+
+                                <div className="space-y-3">
+                                    <div className="flex items-center gap-4">
+                                        <button
+                                            onClick={isRecording ? stopRecording : startRecording}
+                                            className={`px-4 py-2 rounded-md flex items-center gap-2 ${isRecording
+                                                ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                                                : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
+                                                }`}
+                                        >
+                                            <span className={`w-2 h-2 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-cyan-500'
+                                                }`} />
+                                            {isRecording ? 'Stop Recording' : 'Record Voice'}
+                                        </button>
+                                        {isRecording && (
+                                            <span className="text-gray-400">
+                                                {formatTime(recordingTime)}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {currentRecording && (
+                                        <div className="space-y-3">
+                                            <audio
+                                                src={URL.createObjectURL(currentRecording)}
+                                                controls
+                                                className="w-full"
+                                            />
+                                            <button
+                                                onClick={handleCloneVoice}
+                                                disabled={!voiceName || isCloning}
+                                                className="w-full px-4 py-2 bg-cyan-500/20 text-cyan-400 rounded-md hover:bg-cyan-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                {isCloning ? 'Creating Voice Clone...' : 'Create Voice Clone'}
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
