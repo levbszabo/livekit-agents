@@ -94,9 +94,6 @@ export default function Playground({
     console.log("Received message on slide_updates channel:", message);
   });
 
-  // Add walkthrough count state
-  const [walkthroughCount, setWalkthroughCount] = useState(0);
-
   // Add brdgeMetadata state
   const [brdgeMetadata, setBrdgeMetadata] = useState<BrdgeMetadata | null>(null);
 
@@ -127,26 +124,6 @@ export default function Playground({
     }
   }, []);
 
-  // Update handleWalkthroughClick to store the agent type
-  const handleWalkthroughClick = useCallback(async (agentType: AgentType = 'edit') => {
-    try {
-      setIsConnecting(true);
-      setCurrentAgentType(agentType); // Store the agent type
-      if (roomState === ConnectionState.Disconnected) {
-        await onConnect(true);
-        setRightPanelView('chat');
-      } else {
-        await onConnect(false);
-        setWalkthroughCount(prev => prev + 1);
-        setRightPanelView('info');
-      }
-    } catch (error) {
-      console.error('Connection error:', error);
-    } finally {
-      setIsConnecting(false);
-    }
-  }, [roomState, onConnect]);
-
   // Move state declarations to the top
   const [selectedWalkthrough, setSelectedWalkthrough] = useState<number | null>(null);
   const [scripts, setScripts] = useState<SlideScripts | null>(null);
@@ -154,6 +131,49 @@ export default function Playground({
   const [editingSlide, setEditingSlide] = useState<string | null>(null);
   const [editedScripts, setEditedScripts] = useState<SlideScripts>({});
   const [isGeneratingScripts, setIsGeneratingScripts] = useState(false);
+  const [walkthroughs, setWalkthroughs] = useState<Array<any>>([]);
+
+  // Add effect to load walkthroughs
+  useEffect(() => {
+    const loadWalkthroughs = async () => {
+      if (!params.brdgeId) return;
+
+      try {
+        const response = await api.get(`/api/brdges/${params.brdgeId}/walkthrough-list`);
+        if (response.data.has_walkthroughs) {
+          setWalkthroughs(response.data.walkthroughs);
+        }
+      } catch (error) {
+        console.error('Error loading walkthroughs:', error);
+      }
+    };
+
+    loadWalkthroughs();
+  }, [params.brdgeId]);
+
+  // Single handleWalkthroughClick implementation
+  const handleWalkthroughClick = useCallback(async (agentType: AgentType = 'edit') => {
+    try {
+      setIsConnecting(true);
+      setCurrentAgentType(agentType);
+      if (roomState === ConnectionState.Disconnected) {
+        await onConnect(true);
+        setRightPanelView('chat');
+      } else {
+        await onConnect(false);
+        // Refresh walkthroughs after completion
+        const response = await api.get(`/api/brdges/${params.brdgeId}/walkthrough-list`);
+        if (response.data.has_walkthroughs) {
+          setWalkthroughs(response.data.walkthroughs);
+        }
+        setRightPanelView('info');
+      }
+    } catch (error) {
+      console.error('Connection error:', error);
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [roomState, onConnect, params.brdgeId]);
 
   // Remove the first handleGenerateClick declaration and keep only this one
   const handleGenerateClick = async () => {
@@ -798,7 +818,7 @@ export default function Playground({
         {/* Info Panel */}
         <div className={`h-full ${rightPanelView === 'info' ? 'block' : 'hidden'}`}>
           <InfoPanel
-            walkthroughCount={walkthroughCount}
+            walkthroughCount={walkthroughs.length}
             agentType={currentAgentType}
             brdgeId={params.brdgeId!}
             scripts={scripts}
@@ -817,7 +837,7 @@ export default function Playground({
           title={brdgeMetadata?.name || params.brdgeId || 'Loading...'}
           height={headerHeight}
           connectionState={roomState}
-          walkthroughCount={walkthroughCount}
+          walkthroughCount={walkthroughs.length}
           brdgeId={params.brdgeId}
           apiBaseUrl={params.coreApiUrl}
           selectedWalkthrough={selectedWalkthrough}
@@ -1017,7 +1037,7 @@ export default function Playground({
             {/* Info Panel */}
             <div className={`h-full ${rightPanelView === 'info' ? 'block' : 'hidden'}`}>
               <InfoPanel
-                walkthroughCount={walkthroughCount}
+                walkthroughCount={walkthroughs.length}
                 agentType={currentAgentType}
                 brdgeId={params.brdgeId!}
                 scripts={scripts}
@@ -1030,7 +1050,7 @@ export default function Playground({
           <div className="p-3 bg-gray-900 border-t border-gray-800">
             <div className="flex items-center justify-between text-sm text-gray-400">
               <span>
-                {currentAgentType === 'edit' && walkthroughCount > 0 && `Walkthrough #${walkthroughCount}`}
+                {currentAgentType === 'edit' && walkthroughs.length > 0 && `Walkthrough #${walkthroughs.length}`}
                 {currentAgentType === 'view' && 'View Mode'}
               </span>
               <span className="flex items-center gap-2">

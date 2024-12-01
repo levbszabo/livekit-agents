@@ -10,6 +10,7 @@ interface InfoPanelProps {
     agentType: AgentType;
     brdgeId: string | number;
     scripts?: Record<string, string> | null;
+    isGenerating: boolean;
 }
 
 interface VoiceConfig {
@@ -23,7 +24,7 @@ interface AgentIntent {
     questions: string[];
 }
 
-export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts }: InfoPanelProps) {
+export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts, isGenerating }: InfoPanelProps) {
     const [currentStep, setCurrentStep] = useState(1);
     const [agentIntent, setAgentIntent] = useState<AgentIntent>({
         prompt: '',
@@ -49,7 +50,7 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts }: Inf
         questions: "Add questions that the AI should try to get answers for during viewer interactions. These help gather specific information from users."
     };
 
-    // Add back isStepActive function
+    // Use the isGenerating prop directly in isStepActive
     const isStepActive = (stepNumber: number) => {
         if (walkthroughCount === 0) return stepNumber === 1;
         if (walkthroughCount > 0 && !scripts) {
@@ -141,35 +142,6 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts }: Inf
             questions: prev.questions.filter((_, i) => i !== index)
         }));
     };
-
-    // Add polling for script generation
-    const [isGenerating, setIsGenerating] = useState(false);
-
-    useEffect(() => {
-        let pollInterval: NodeJS.Timeout;
-
-        const checkScripts = async () => {
-            try {
-                const response = await api.get(`/api/brdges/${brdgeId}/scripts`);
-                if (response.data.has_scripts) {
-                    setIsGenerating(false);
-                    // The parent component will handle updating the scripts
-                }
-            } catch (error) {
-                console.error('Error checking scripts:', error);
-            }
-        };
-
-        if (isGenerating) {
-            pollInterval = setInterval(checkScripts, 2000); // Poll every 2 seconds
-        }
-
-        return () => {
-            if (pollInterval) {
-                clearInterval(pollInterval);
-            }
-        };
-    }, [isGenerating, brdgeId]);
 
     return (
         <div className="h-full overflow-y-auto bg-gray-900">
