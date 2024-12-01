@@ -16,6 +16,7 @@ type PlaygroundHeaderProps = {
   onGenerateClick: () => void;
   onWalkthroughSelect: (walkthroughId: number) => void;
   showEditControls?: boolean;
+  isGenerating: boolean;
 };
 
 export const PlaygroundHeader = ({
@@ -30,6 +31,7 @@ export const PlaygroundHeader = ({
   onGenerateClick,
   onWalkthroughSelect,
   showEditControls,
+  isGenerating,
 }: PlaygroundHeaderProps) => {
   const isConnecting = connectionState === ConnectionState.Connecting;
   const isConnected = connectionState === ConnectionState.Connected;
@@ -74,16 +76,23 @@ export const PlaygroundHeader = ({
 
         <button
           onClick={onGenerateClick}
-          disabled={!canGenerate}
+          disabled={!canGenerate || isGenerating}
           className={`
             px-6 py-2 rounded-md transition-all duration-200
             ${canGenerate
-              ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.25)] animate-pulse'
+              ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
               : 'bg-gray-800/50 text-gray-500 cursor-not-allowed'
             }
           `}
         >
-          Generate Brdge
+          {isGenerating ? (
+            <div className="flex items-center gap-2">
+              <LoadingSVG diameter={16} />
+              Generating...
+            </div>
+          ) : (
+            "Generate Brdge"
+          )}
         </button>
       </div>
     </div>

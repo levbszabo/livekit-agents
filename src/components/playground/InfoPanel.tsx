@@ -52,9 +52,11 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts }: Inf
     // Add back isStepActive function
     const isStepActive = (stepNumber: number) => {
         if (walkthroughCount === 0) return stepNumber === 1;
-        if (walkthroughCount > 0 && !scripts) return stepNumber === 2;
-        if (scripts) return stepNumber === 3;
-        return false;
+        if (walkthroughCount > 0 && !scripts) {
+            if (isGenerating) return stepNumber === 2;
+            return stepNumber === 2;
+        }
+        return stepNumber === 3;
     };
 
     // Voice recording handlers
@@ -140,6 +142,35 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts }: Inf
         }));
     };
 
+    // Add polling for script generation
+    const [isGenerating, setIsGenerating] = useState(false);
+
+    useEffect(() => {
+        let pollInterval: NodeJS.Timeout;
+
+        const checkScripts = async () => {
+            try {
+                const response = await api.get(`/api/brdges/${brdgeId}/scripts`);
+                if (response.data.has_scripts) {
+                    setIsGenerating(false);
+                    // The parent component will handle updating the scripts
+                }
+            } catch (error) {
+                console.error('Error checking scripts:', error);
+            }
+        };
+
+        if (isGenerating) {
+            pollInterval = setInterval(checkScripts, 2000); // Poll every 2 seconds
+        }
+
+        return () => {
+            if (pollInterval) {
+                clearInterval(pollInterval);
+            }
+        };
+    }, [isGenerating, brdgeId]);
+
     return (
         <div className="h-full overflow-y-auto bg-gray-900">
             <div className="p-6 space-y-8">
@@ -202,6 +233,16 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts }: Inf
                                 </div>
                             ))}
                         </div>
+                        {isGenerating && (
+                            <div className="mt-4 text-center">
+                                <div className="animate-pulse text-cyan-400">
+                                    Generating Brdge...
+                                </div>
+                                <div className="text-sm text-gray-500 mt-2">
+                                    This may take a few minutes
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 

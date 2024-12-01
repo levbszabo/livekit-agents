@@ -153,31 +153,59 @@ export default function Playground({
   const [isGenerating, setIsGenerating] = useState(false);
   const [editingSlide, setEditingSlide] = useState<string | null>(null);
   const [editedScripts, setEditedScripts] = useState<SlideScripts>({});
+  const [isGeneratingScripts, setIsGeneratingScripts] = useState(false);
 
   // Remove the first handleGenerateClick declaration and keep only this one
-  const handleGenerateClick = useCallback(async () => {
-    if (!params.brdgeId || !selectedWalkthrough) return;
+  const handleGenerateClick = async () => {
+    if (!selectedWalkthrough) return;
 
-    setIsGenerating(true);
+    setIsGeneratingScripts(true);
     try {
-      const response = await api.post(`/api/brdges/${params.brdgeId}/generate-slide-scripts`, {
+      // Start script generation
+      await api.post(`/api/brdges/${params.brdgeId}/generate-slide-scripts`, {
         walkthrough_id: selectedWalkthrough
       });
 
-      if (response.data.slide_scripts) {
-        setScripts(response.data.slide_scripts);
-        setEditedScripts(response.data.slide_scripts);
-        console.log('Generated scripts:', response.data.slide_scripts);
-      } else {
-        throw new Error('No scripts in response');
+      // Immediately check for scripts after generation
+      const response = await api.get(`/api/brdges/${params.brdgeId}/scripts`);
+      if (response.data.has_scripts) {
+        setScripts(response.data.scripts);
       }
     } catch (error) {
       console.error('Error generating scripts:', error);
-      // Optionally show an error message to the user
     } finally {
-      setIsGenerating(false);
+      setIsGeneratingScripts(false);
     }
-  }, [params.brdgeId, selectedWalkthrough]);
+  };
+
+  // Add polling for scripts at component level
+  useEffect(() => {
+    let pollInterval: NodeJS.Timeout;
+
+    const checkScripts = async () => {
+      if (!params.brdgeId) return;
+
+      try {
+        const response = await api.get(`/api/brdges/${params.brdgeId}/scripts`);
+        if (response.data.has_scripts) {
+          setScripts(response.data.scripts);
+          setIsGeneratingScripts(false);
+        }
+      } catch (error) {
+        console.error('Error checking scripts:', error);
+      }
+    };
+
+    if (isGeneratingScripts) {
+      pollInterval = setInterval(checkScripts, 2000);
+    }
+
+    return () => {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+    };
+  }, [isGeneratingScripts, params.brdgeId]);
 
   // Add the handler function
   const handleWalkthroughSelect = useCallback((walkthroughId: number) => {
@@ -774,6 +802,7 @@ export default function Playground({
             agentType={currentAgentType}
             brdgeId={params.brdgeId!}
             scripts={scripts}
+            isGenerating={isGeneratingScripts}
           />
         </div>
       </div>
@@ -796,6 +825,7 @@ export default function Playground({
           onGenerateClick={handleGenerateClick}
           onWalkthroughSelect={handleWalkthroughSelect}
           showEditControls={true}
+          isGenerating={isGeneratingScripts}
         />
       ) : (
         <ViewerHeader
@@ -991,6 +1021,7 @@ export default function Playground({
                 agentType={currentAgentType}
                 brdgeId={params.brdgeId!}
                 scripts={scripts}
+                isGenerating={isGeneratingScripts}
               />
             </div>
           </div>
