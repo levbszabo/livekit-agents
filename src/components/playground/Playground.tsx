@@ -129,7 +129,8 @@ export default function Playground({
   const [scripts, setScripts] = useState<SlideScripts | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [editingSlide, setEditingSlide] = useState<string | null>(null);
-  const [editedScripts, setEditedScripts] = useState<SlideScripts>({});
+  const [editedScripts, setEditedScripts] = useState<Record<string, string>>({});
+  const [hasScriptChanges, setHasScriptChanges] = useState(false);
   const [isGeneratingScripts, setIsGeneratingScripts] = useState(false);
   const [walkthroughs, setWalkthroughs] = useState<Array<any>>([]);
 
@@ -355,6 +356,28 @@ export default function Playground({
     return valid;
   }, [params]);
 
+  // Move handleScriptChange up here, before any usage
+  const handleScriptChange = useCallback((slideId: string, newScript: string) => {
+    setEditedScripts((prevScripts) => ({
+      ...prevScripts,
+      [slideId]: newScript,
+    }));
+    setHasScriptChanges(true);
+  }, []);
+
+  // Function to save changes to the database
+  const saveScriptChanges = async () => {
+    try {
+      await api.put(`/api/brdges/${params.brdgeId}/scripts/update`, {
+        scripts: editedScripts,
+      });
+      setHasScriptChanges(false);
+      console.log('Scripts updated successfully');
+    } catch (error) {
+      console.error('Error updating scripts:', error);
+    }
+  };
+
   // Simplified slide content
   const slideTileContent = useMemo(() => {
     if (!hasRequiredParams) {
@@ -471,12 +494,12 @@ export default function Playground({
         <SlideScriptPanel
           currentSlide={params.currentSlide}
           scripts={scripts}
-          isGenerating={isGenerating}
-          readOnly={currentAgentType === 'view'}
+          onScriptChange={handleScriptChange}
+          brdgeId={params.brdgeId}
         />
       </div>
     );
-  }, [params, roomState, hasRequiredParams, scripts, isGenerating, currentAgentType]);
+  }, [params, roomState, hasRequiredParams, scripts, isGenerating, currentAgentType, handleScriptChange]);
 
   useEffect(() => {
     document.body.style.setProperty(
@@ -965,8 +988,8 @@ export default function Playground({
                 <SlideScriptPanel
                   currentSlide={params.currentSlide}
                   scripts={scripts}
-                  isGenerating={isGenerating}
-                  readOnly={false}
+                  onScriptChange={handleScriptChange}
+                  brdgeId={params.brdgeId}
                 />
               )}
             </div>

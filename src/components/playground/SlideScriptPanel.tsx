@@ -1,49 +1,73 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { api } from '@/api';
 
 interface SlideScriptPanelProps {
     currentSlide: number;
     scripts: Record<string, string> | null;
-    isGenerating: boolean;
-    readOnly?: boolean;
+    onScriptChange?: (slideNumber: string, content: string) => void;
+    brdgeId?: string | number | null;
 }
 
-export const SlideScriptPanel = ({
-    currentSlide,
-    scripts,
-    isGenerating,
-    readOnly = false
-}: SlideScriptPanelProps) => {
-    if (isGenerating) {
-        return (
-            <div className="p-6 bg-gray-900 border-t border-gray-800">
-                <div className="flex items-center justify-center text-gray-400">
-                    <span className="animate-pulse">Generating scripts...</span>
-                </div>
-            </div>
-        );
-    }
+export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, brdgeId }: SlideScriptPanelProps) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [editedScript, setEditedScript] = useState('');
+    const [hasChanges, setHasChanges] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
-    if (!scripts) {
-        return (
-            <div className="p-6 bg-gray-900 border-t border-gray-800">
-                <div className="flex items-center justify-center text-gray-400">
-                    <span>No script generated yet</span>
-                </div>
-            </div>
-        );
-    }
+    useEffect(() => {
+        if (scripts && scripts[currentSlide]) {
+            setEditedScript(scripts[currentSlide]);
+        }
+    }, [currentSlide, scripts]);
 
-    const currentScript = scripts[currentSlide.toString()];
+    const handleScriptChange = (content: string) => {
+        setEditedScript(content);
+        setHasChanges(true);
+        onScriptChange?.(currentSlide.toString(), content);
+    };
+
+    const handleSaveChanges = async () => {
+        if (!brdgeId || !scripts) return;
+
+        setIsSaving(true);
+        try {
+            await api.put(`/api/brdges/${brdgeId}/scripts/update`, {
+                scripts: {
+                    ...scripts,
+                    [currentSlide]: editedScript
+                }
+            });
+            setHasChanges(false);
+            console.log('Scripts updated successfully');
+        } catch (error) {
+            console.error('Error updating scripts:', error);
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     return (
-        <div className="p-6 bg-gray-900 border-t border-gray-800">
-            <div className="flex flex-col gap-3">
-                <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-gray-300">Script for Slide {currentSlide}</span>
+        <div className="p-4 bg-gray-900 border-t border-gray-800">
+            <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium text-gray-400">
+                        Script for Slide {currentSlide}
+                    </h3>
+                    {hasChanges && (
+                        <button
+                            onClick={handleSaveChanges}
+                            disabled={isSaving}
+                            className="px-3 py-1 text-sm bg-green-500/20 text-green-400 rounded-md hover:bg-green-500/30 disabled:opacity-50"
+                        >
+                            {isSaving ? 'Saving...' : 'Save Changes'}
+                        </button>
+                    )}
                 </div>
-                <div className="bg-gray-800 rounded-lg p-4 text-gray-300 leading-relaxed min-h-[100px]">
-                    {currentScript || 'No script available for this slide'}
-                </div>
+                <textarea
+                    value={editedScript}
+                    onChange={(e) => handleScriptChange(e.target.value)}
+                    className="w-full h-24 bg-gray-800 text-gray-200 rounded-md px-3 py-2 resize-none"
+                />
             </div>
         </div>
     );

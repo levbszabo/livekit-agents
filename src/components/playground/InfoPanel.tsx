@@ -143,6 +143,35 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts, isGen
         }));
     };
 
+    const [editedScripts, setEditedScripts] = useState<Record<string, string>>({});
+    const [hasChanges, setHasChanges] = useState(false);
+
+    // Initialize editedScripts when scripts prop changes
+    useEffect(() => {
+        if (scripts) {
+            setEditedScripts(scripts);
+        }
+    }, [scripts]);
+
+    const handleScriptChange = (slideNumber: string, content: string) => {
+        setEditedScripts(prev => ({
+            ...prev,
+            [slideNumber]: content
+        }));
+        setHasChanges(true);
+    };
+
+    const handleSaveChanges = async () => {
+        try {
+            await api.post(`/api/brdges/${brdgeId}/scripts/update`, {
+                scripts: editedScripts
+            });
+            setHasChanges(false);
+        } catch (error) {
+            console.error('Error saving script changes:', error);
+        }
+    };
+
     return (
         <div className="h-full overflow-y-auto bg-gray-900">
             <div className="p-6 space-y-8">
@@ -303,6 +332,7 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts, isGen
                         )}
                     </div>
                 )}
+
             </div>
         </div>
     );
