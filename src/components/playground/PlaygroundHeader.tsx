@@ -2,7 +2,7 @@ import { Button } from "@/components/button/Button";
 import { LoadingSVG } from "@/components/button/LoadingSVG";
 import { ConnectionState } from "livekit-client";
 import { ReactNode, useState, useCallback } from "react";
-import { WalkthroughSelector } from "./WalkthroughSelector";
+import { WalkthroughSelector, WalkthroughSelectorRef } from "./WalkthroughSelector";
 
 type PlaygroundHeaderProps = {
   title?: ReactNode;
@@ -17,6 +17,7 @@ type PlaygroundHeaderProps = {
   onWalkthroughSelect: (walkthroughId: number) => void;
   showEditControls?: boolean;
   isGenerating: boolean;
+  walkthroughSelectorRef?: React.RefObject<WalkthroughSelectorRef>;
 };
 
 export const PlaygroundHeader = ({
@@ -32,6 +33,7 @@ export const PlaygroundHeader = ({
   onWalkthroughSelect,
   showEditControls,
   isGenerating,
+  walkthroughSelectorRef
 }: PlaygroundHeaderProps) => {
   const isConnecting = connectionState === ConnectionState.Connecting;
   const isConnected = connectionState === ConnectionState.Connected;
@@ -62,6 +64,7 @@ export const PlaygroundHeader = ({
 
       <div className="flex items-center gap-3">
         <WalkthroughSelector
+          ref={walkthroughSelectorRef}
           brdgeId={brdgeId}
           apiBaseUrl={apiBaseUrl}
           selectedWalkthrough={selectedWalkthrough}

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { ChevronIcon } from './icons';
 import { api } from '@/api';
@@ -18,13 +18,18 @@ interface WalkthroughSelectorProps {
     onWalkthroughsLoaded?: (walkthroughs: any[]) => void;
 }
 
-export const WalkthroughSelector = ({
+// Define the ref type
+export interface WalkthroughSelectorRef {
+    refreshWalkthroughs: () => void;
+}
+
+export const WalkthroughSelector = forwardRef<WalkthroughSelectorRef, WalkthroughSelectorProps>(({
     brdgeId,
     apiBaseUrl,
     selectedWalkthrough,
     onWalkthroughSelect,
     onWalkthroughsLoaded
-}: WalkthroughSelectorProps) => {
+}, ref) => {
     const [walkthroughs, setWalkthroughs] = useState<any[]>([]);
 
     const loadWalkthroughs = useCallback(async () => {
@@ -34,7 +39,7 @@ export const WalkthroughSelector = ({
             const response = await api.get(`/api/brdges/${brdgeId}/walkthrough-list`);
             if (response.data.has_walkthroughs) {
                 const sortedWalkthroughs = response.data.walkthroughs.sort(
-                    (a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+                    (a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
                 );
                 setWalkthroughs(sortedWalkthroughs);
                 onWalkthroughsLoaded?.(sortedWalkthroughs);
@@ -43,6 +48,11 @@ export const WalkthroughSelector = ({
             console.error('Error loading walkthroughs:', error);
         }
     }, [brdgeId, onWalkthroughsLoaded]);
+
+    // Expose the refresh function via ref
+    useImperativeHandle(ref, () => ({
+        refreshWalkthroughs: loadWalkthroughs
+    }));
 
     useEffect(() => {
         loadWalkthroughs();
@@ -62,4 +72,6 @@ export const WalkthroughSelector = ({
             ))}
         </select>
     );
-}; 
+});
+
+WalkthroughSelector.displayName = 'WalkthroughSelector'; 

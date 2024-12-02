@@ -132,25 +132,63 @@ export default function Playground({
   const [editedScripts, setEditedScripts] = useState<Record<string, string>>({});
   const [hasScriptChanges, setHasScriptChanges] = useState(false);
   const [isGeneratingScripts, setIsGeneratingScripts] = useState(false);
-  const [walkthroughs, setWalkthroughs] = useState<Array<any>>([]);
+  const [walkthroughs, setWalkthroughs] = useState<any[]>([]);
 
-  // Add effect to load walkthroughs
-  useEffect(() => {
-    const loadWalkthroughs = async () => {
-      if (!params.brdgeId) return;
-
-      try {
-        const response = await api.get(`/api/brdges/${params.brdgeId}/walkthrough-list`);
-        if (response.data.has_walkthroughs) {
-          setWalkthroughs(response.data.walkthroughs);
-        }
-      } catch (error) {
-        console.error('Error loading walkthroughs:', error);
+  // Add a function to load walkthroughs
+  const loadWalkthroughs = useCallback(async () => {
+    if (!params.brdgeId) return;
+    try {
+      const response = await api.get(`/api/brdges/${params.brdgeId}/walkthrough-list`);
+      if (response.data.has_walkthroughs) {
+        const sortedWalkthroughs = response.data.walkthroughs.sort(
+          (a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+        setWalkthroughs(sortedWalkthroughs);
       }
-    };
-
-    loadWalkthroughs();
+    } catch (error) {
+      console.error('Error loading walkthroughs:', error);
+    }
   }, [params.brdgeId]);
+
+  // Single onDataReceived handler that handles both transcription and walkthrough completion
+  const onDataReceived = useCallback(
+    (msg: any) => {
+      if (msg.topic === "transcription") {
+        const decoded = JSON.parse(
+          new TextDecoder("utf-8").decode(msg.payload)
+        );
+        let timestamp = new Date().getTime();
+        if ("timestamp" in decoded && decoded.timestamp > 0) {
+          timestamp = decoded.timestamp;
+        }
+        setTranscripts(prev => [...prev, {
+          name: "You",
+          message: decoded.text,
+          timestamp: timestamp,
+          isSelf: true,
+        }]);
+      } else {
+        try {
+          const decoded = JSON.parse(new TextDecoder("utf-8").decode(msg.payload));
+          if (decoded.type === "WALKTHROUGH_COMPLETED") {
+            // Just reload the walkthroughs
+            loadWalkthroughs();
+          }
+        } catch (e) {
+          console.error("Error decoding message:", e);
+        }
+      }
+    },
+    [loadWalkthroughs]  // Add loadWalkthroughs to dependencies
+  );
+
+  // Use the data channel
+  useDataChannel(onDataReceived);
+
+  // Initial load of walkthroughs
+  useEffect(() => {
+    loadWalkthroughs();
+  }, [loadWalkthroughs]);
 
   // Single handleWalkthroughClick implementation
   const handleWalkthroughClick = useCallback(async (agentType: AgentType = 'edit') => {
@@ -162,19 +200,15 @@ export default function Playground({
         setRightPanelView('chat');
       } else {
         await onConnect(false);
-        // Refresh walkthroughs after completion
-        const response = await api.get(`/api/brdges/${params.brdgeId}/walkthrough-list`);
-        if (response.data.has_walkthroughs) {
-          setWalkthroughs(response.data.walkthroughs);
-        }
-        setRightPanelView('info');
+        // After disconnecting, refresh the page
+        window.location.reload();
       }
     } catch (error) {
       console.error('Connection error:', error);
     } finally {
       setIsConnecting(false);
     }
-  }, [roomState, onConnect, params.brdgeId]);
+  }, [roomState, onConnect]);
 
   // Remove the first handleGenerateClick declaration and keep only this one
   const handleGenerateClick = async () => {
@@ -310,30 +344,6 @@ export default function Playground({
     }
   }, []);
 
-  // Handle transcription data
-  const onDataReceived = useCallback(
-    (msg: any) => {
-      if (msg.topic === "transcription") {
-        const decoded = JSON.parse(
-          new TextDecoder("utf-8").decode(msg.payload)
-        );
-        let timestamp = new Date().getTime();
-        if ("timestamp" in decoded && decoded.timestamp > 0) {
-          timestamp = decoded.timestamp;
-        }
-        setTranscripts(prev => [...prev, {
-          name: "You",
-          message: decoded.text,
-          timestamp: timestamp,
-          isSelf: true,
-        }]);
-      }
-    },
-    []
-  );
-
-  useDataChannel(onDataReceived);
-
   // Handle slide navigation
   const handlePrevSlide = () => {
     if (params.currentSlide > 1) {
@@ -371,6 +381,8 @@ export default function Playground({
       await api.put(`/api/brdges/${params.brdgeId}/scripts/update`, {
         scripts: editedScripts,
       });
+      // Update the scripts state with the edited version
+      setScripts(editedScripts);
       setHasScriptChanges(false);
       console.log('Scripts updated successfully');
     } catch (error) {
@@ -852,7 +864,10 @@ export default function Playground({
     );
   };
 
-  // Update the PlaygroundHeader render to use coreApiUrl
+  // Add a ref to hold the WalkthroughSelector component
+  const walkthroughSelectorRef = useRef<{ refreshWalkthroughs: () => void }>(null);
+
+  // Update the PlaygroundHeader render to include the ref
   return (
     <div className="h-screen flex flex-col bg-[#121212] relative">
       {currentAgentType === 'edit' ? (
@@ -869,6 +884,7 @@ export default function Playground({
           onWalkthroughSelect={handleWalkthroughSelect}
           showEditControls={true}
           isGenerating={isGeneratingScripts}
+          walkthroughSelectorRef={walkthroughSelectorRef}
         />
       ) : (
         <ViewerHeader
