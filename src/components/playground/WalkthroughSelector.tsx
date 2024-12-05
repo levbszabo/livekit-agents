@@ -39,15 +39,20 @@ export const WalkthroughSelector = forwardRef<WalkthroughSelectorRef, Walkthroug
             const response = await api.get(`/api/brdges/${brdgeId}/walkthrough-list`);
             if (response.data.has_walkthroughs) {
                 const sortedWalkthroughs = response.data.walkthroughs.sort(
-                    (a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+                    (a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
                 );
                 setWalkthroughs(sortedWalkthroughs);
                 onWalkthroughsLoaded?.(sortedWalkthroughs);
+
+                if (sortedWalkthroughs.length > 0) {
+                    const latestWalkthrough = sortedWalkthroughs[0];
+                    onWalkthroughSelect(latestWalkthrough.id);
+                }
             }
         } catch (error) {
             console.error('Error loading walkthroughs:', error);
         }
-    }, [brdgeId, onWalkthroughsLoaded]);
+    }, [brdgeId, onWalkthroughsLoaded, onWalkthroughSelect]);
 
     // Expose the refresh function via ref
     useImperativeHandle(ref, () => ({
@@ -66,8 +71,12 @@ export const WalkthroughSelector = forwardRef<WalkthroughSelectorRef, Walkthroug
         >
             <option value="">Select Walkthrough</option>
             {walkthroughs.map((walkthrough, index) => (
-                <option key={walkthrough.id} value={walkthrough.id}>
-                    {`Walkthrough ${index + 1}`}
+                <option
+                    key={walkthrough.id}
+                    value={walkthrough.id}
+                    selected={index === 0}
+                >
+                    {`Walkthrough ${walkthroughs.length - index}`}
                 </option>
             ))}
         </select>

@@ -284,6 +284,7 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts, isGen
                         <GuideContent
                             walkthroughCount={walkthroughCount}
                             isGenerating={isGenerating}
+                            agentType={agentType}
                         />
                     )}
                     {activeTab === 'voice' && (
@@ -316,38 +317,123 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts, isGen
 }
 
 // Split content into separate components for better organization
-function GuideContent({ walkthroughCount, isGenerating }: { walkthroughCount: number; isGenerating: boolean }) {
-    return (
-        <div className="space-y-6">
-            <h3 className="text-xl font-semibold text-gray-200">How it works</h3>
-            <div className="relative">
-                {/* Progress Line */}
-                <div className="absolute top-4 left-0 right-0 h-0.5 bg-gray-800" />
+function GuideContent({ walkthroughCount, isGenerating, agentType }: {
+    walkthroughCount: number;
+    isGenerating: boolean;
+    agentType: 'edit' | 'view';
+}) {
+    if (agentType === 'view') {
+        return (
+            <div className="space-y-8">
+                <h3 className="text-xl font-semibold text-gray-200">How it works</h3>
+                {/* Keep existing view mode content */}
+                <div className="relative px-4">
+                    <div className="absolute top-4 left-0 right-0 h-0.5 bg-gray-800" />
+                    <div className="relative z-10 flex justify-between gap-8">
+                        {[
+                            {
+                                number: 1,
+                                title: "Listen & Learn",
+                                subtitle: "Interactive Presentation",
+                                description: "The AI presents each slide and engages in discussion"
+                            },
+                            {
+                                number: 2,
+                                title: "Ask Questions",
+                                subtitle: "Real-time Interaction",
+                                description: "Get contextual answers about the content"
+                            },
+                            {
+                                number: 3,
+                                title: "Explore Topics",
+                                subtitle: "Deep Understanding",
+                                description: "Request examples and clarifications"
+                            }
+                        ].map((step) => (
+                            <StepItem key={step.number} {...step} isActive={step.number === 1} />
+                        ))}
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
-                {/* Steps */}
-                <div className="relative z-10 flex justify-between">
+    // Edit mode content
+    return (
+        <div className="space-y-8">
+            <h3 className="text-xl font-semibold text-gray-200">Recording Walkthrough</h3>
+
+            <div className="relative px-4">
+                <div className="absolute top-4 left-0 right-0 h-0.5 bg-gray-800" />
+                <div className="relative z-10 flex justify-between gap-8">
                     {[
                         {
                             number: 1,
-                            title: "Walkthrough",
-                            subtitle: "Present & Record",
-                            description: "Present your slides naturally while the AI learns your style and content. Take your time to explain each slide as you normally would."
+                            title: "Present",
+                            subtitle: "Natural Explanation",
+                            description: "Walk through your slides naturally, explaining key points"
                         },
                         {
                             number: 2,
-                            title: "Generate",
-                            subtitle: "Create Brdge",
-                            description: "Our AI processes your presentation to create an interactive version that maintains your unique style and expertise. Once generated, you can edit the scripts to perfect them."
+                            title: "Interact",
+                            subtitle: "AI Learning",
+                            description: "The AI will ask clarifying questions to understand your content"
                         },
                         {
                             number: 3,
-                            title: "Share",
-                            subtitle: "Publish",
-                            description: "Share your Brdge with others, allowing them to interact with your content in your voice and style."
+                            title: "Review",
+                            subtitle: "Verify Content",
+                            description: "Ensure the AI has captured your message accurately"
                         }
                     ].map((step) => (
-                        <StepItem key={step.number} {...step} isActive={step.number === 1} />
+                        <StepItem
+                            key={step.number}
+                            {...step}
+                            isActive={
+                                (walkthroughCount === 0 && step.number === 1) ||
+                                (walkthroughCount > 0 && step.number === 2) ||
+                                (isGenerating && step.number === 3)
+                            }
+                        />
                     ))}
+                </div>
+            </div>
+
+            {/* Recording Tips */}
+            <div className="space-y-4">
+                <h4 className="text-lg font-medium text-gray-300">Recording Tips</h4>
+                <div className="bg-gray-800/50 rounded-lg p-4">
+                    <ul className="space-y-3 text-sm text-gray-400">
+                        <li className="flex items-start gap-2">
+                            <span className="text-cyan-400 mt-1">•</span>
+                            Speak naturally as if presenting to your audience
+                        </li>
+                        <li className="flex items-start gap-2">
+                            <span className="text-cyan-400 mt-1">•</span>
+                            Take your time to explain complex concepts
+                        </li>
+                        <li className="flex items-start gap-2">
+                            <span className="text-cyan-400 mt-1">•</span>
+                            Answer AI questions to provide more context
+                        </li>
+                        <li className="flex items-start gap-2">
+                            <span className="text-cyan-400 mt-1">•</span>
+                            Use examples to illustrate your points
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            {/* Current Status */}
+            <div className="space-y-4">
+                <h4 className="text-lg font-medium text-gray-300">Recording Status</h4>
+                <div className="bg-gray-800/50 rounded-lg p-4">
+                    <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-400">Walkthrough Progress</span>
+                        <span className="text-cyan-400">
+                            {isGenerating ? 'Processing...' : `${walkthroughCount} recordings`}
+                        </span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -356,9 +442,9 @@ function GuideContent({ walkthroughCount, isGenerating }: { walkthroughCount: nu
 
 function StepItem({ number, title, subtitle, description, isActive }: StepItemProps) {
     return (
-        <div className="flex flex-col items-center group relative">
+        <div className="flex flex-col items-center group">
             <div className={`
-                w-8 h-8 rounded-full flex items-center justify-center mb-2
+                w-8 h-8 rounded-full flex items-center justify-center mb-3
                 transition-all duration-300
                 ${isActive
                     ? 'bg-cyan-500 text-gray-900 shadow-lg shadow-cyan-500/50 animate-pulse'
@@ -367,13 +453,13 @@ function StepItem({ number, title, subtitle, description, isActive }: StepItemPr
             `}>
                 {number}
             </div>
-            <div className="text-center space-y-1 max-w-[200px]">
+            <div className="text-center space-y-2 max-w-[180px]">
                 <p className={`text-sm font-medium transition-colors duration-300 
                     ${isActive ? 'text-cyan-400' : 'text-gray-400'}`}>
                     {title}
                 </p>
                 <p className="text-xs text-gray-500">{subtitle}</p>
-                <p className="text-xs text-gray-400">{description}</p>
+                <p className="text-xs text-gray-400 leading-relaxed">{description}</p>
             </div>
         </div>
     );
