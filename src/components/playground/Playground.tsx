@@ -32,6 +32,7 @@ import { API_BASE_URL } from '@/config';
 import { api } from '@/api';
 import { SlideScriptPanel } from './SlideScriptPanel';
 import { ViewerHeader } from './ViewerHeader';
+import { jwtDecode } from "jwt-decode";
 
 export interface PlaygroundProps {
   logo?: ReactNode;
@@ -62,12 +63,50 @@ interface ScriptData {
 // First, add this type near the top of the file
 type AgentType = 'edit' | 'view';
 
+// Add interface for JWT payload
+interface JWTPayload {
+  sub: string;  // subject (user id)
+  exp: number;  // expiration time
+  iat: number;  // issued at
+}
+
 export default function Playground({
   logo,
   themeColors,
   onConnect,
 }: PlaygroundProps) {
-  // State declarations
+  // URL parameters state
+  const [params, setParams] = useState({
+    brdgeId: null as string | null,
+    numSlides: 0,
+    apiBaseUrl: null as string | null,
+    coreApiUrl: API_BASE_URL,
+    currentSlide: 1,
+    userId: null as string | null
+  });
+
+  // Update params setup to just use anonymous ID
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get('token');
+      const newParams = {
+        brdgeId: urlParams.get('brdgeId'),
+        numSlides: parseInt(urlParams.get('numSlides') || '0'),
+        apiBaseUrl: urlParams.get('apiBaseUrl'),
+        coreApiUrl: API_BASE_URL,
+        currentSlide: 1,
+        userId: token ?
+          `user_${jwtDecode<JWTPayload>(token).sub}` :
+          `anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      };
+
+      console.log('Setting initial params:', newParams);
+      setParams(newParams);
+    }
+  }, []);
+
+  // Rest of the state declarations
   const { config, setUserSettings } = useConfig();
   const { name } = useRoomInfo();
   const { localParticipant } = useLocalParticipant();
@@ -75,15 +114,6 @@ export default function Playground({
   const roomState = useConnectionState();
   const [transcripts, setTranscripts] = useState<ChatMessageType[]>([]);
   const [isConnecting, setIsConnecting] = useState(false);
-
-  // URL parameters state - modify to separate LiveKit and core backend URLs
-  const [params, setParams] = useState({
-    brdgeId: null as string | null,
-    numSlides: 0,
-    apiBaseUrl: null as string | null,  // This will be LiveKit URL
-    coreApiUrl: API_BASE_URL,  // Use the imported API_BASE_URL
-    currentSlide: 1
-  });
 
   // Refs
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -291,7 +321,8 @@ export default function Playground({
               apiBaseUrl: params.apiBaseUrl,
               currentSlide: params.currentSlide,
               slideUrl: slideUrl,
-              agentType: currentAgentType // Include the agent type in the message
+              agentType: currentAgentType,
+              userId: params.userId
             };
 
             const encoder = new TextEncoder();
@@ -305,7 +336,7 @@ export default function Playground({
         }
       }, 300);
     }
-  }, [params, roomState, send, currentAgentType]); // Add currentAgentType to dependencies
+  }, [params, roomState, send, currentAgentType]); // params now includes userId
 
   // Simplify the connection effect
   useEffect(() => {
@@ -326,23 +357,6 @@ export default function Playground({
       lastSentSlide.current = null;
     };
   }, [roomState]);
-
-  // Handle initial params setup
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const urlParams = new URLSearchParams(window.location.search);
-      const newParams = {
-        brdgeId: urlParams.get('brdgeId'),
-        numSlides: parseInt(urlParams.get('numSlides') || '0'),
-        apiBaseUrl: urlParams.get('apiBaseUrl'),
-        coreApiUrl: API_BASE_URL,
-        currentSlide: 1
-      };
-
-      console.log('Setting initial params:', newParams);
-      setParams(newParams);
-    }
-  }, []);
 
   // Handle slide navigation
   const handlePrevSlide = () => {
