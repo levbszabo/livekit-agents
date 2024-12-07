@@ -33,6 +33,7 @@ import { api } from '@/api';
 import { SlideScriptPanel } from './SlideScriptPanel';
 import { ViewerHeader } from './ViewerHeader';
 import { jwtDecode } from "jwt-decode";
+import Image from 'next/image';
 
 export interface PlaygroundProps {
   logo?: ReactNode;
@@ -435,7 +436,7 @@ export default function Playground({
     return (
       <div className="flex flex-col w-full h-full">
         <div className="flex-1 relative bg-gray-900 flex items-center justify-center">
-          <img
+          <Image
             key={slideUrl}
             src={slideUrl}
             alt={`Slide ${params.currentSlide}`}
@@ -446,6 +447,8 @@ export default function Playground({
               target.onerror = null;
               target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="50%" y="50%" text-anchor="middle" fill="gray">Error loading slide</text></svg>';
             }}
+            width={100}
+            height={100}
           />
         </div>
         <div className="p-4 bg-gray-900 border-t border-gray-800">
@@ -918,7 +921,7 @@ export default function Playground({
               {/* Slide Image */}
               <div className="relative w-full">
                 {getSlideUrl() ? (
-                  <img
+                  <Image
                     key={getSlideUrl()}
                     src={getSlideUrl()}
                     alt={`Slide ${params.currentSlide}`}
@@ -929,6 +932,8 @@ export default function Playground({
                       target.onerror = null;
                       target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="50%" y="50%" text-anchor="middle" fill="gray">Error loading slide</text></svg>';
                     }}
+                    width={100}
+                    height={100}
                   />
                 ) : (
                   <div className="w-full aspect-[4/3] flex items-center justify-center bg-gray-900 text-gray-500">
