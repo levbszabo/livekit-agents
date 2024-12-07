@@ -63,11 +63,9 @@ export const ChatMessageInput = ({
     >
       <div className="flex flex-row pt-3 gap-2 items-center relative">
         <div
-          className={`w-2 h-4 bg-${inputHasFocus ? accentColor : "gray"}-${
-            inputHasFocus ? 500 : 800
-          } ${inputHasFocus ? "shadow-" + accentColor : ""} absolute left-2 ${
-            !isTyping && inputHasFocus ? "cursor-animation" : ""
-          }`}
+          className={`w-2 h-4 bg-${inputHasFocus ? accentColor : "gray"}-${inputHasFocus ? 500 : 800
+            } ${inputHasFocus ? "shadow-" + accentColor : ""} absolute left-2 ${!isTyping && inputHasFocus ? "cursor-animation" : ""
+            }`}
           style={{
             transform:
               "translateX(" +
@@ -79,7 +77,22 @@ export const ChatMessageInput = ({
         ></div>
         <input
           ref={inputRef}
-          className={`w-full text-xs caret-transparent bg-transparent opacity-25 text-gray-300 p-2 pr-6 rounded-sm focus:opacity-100 focus:outline-none focus:border-${accentColor}-700 focus:ring-1 focus:ring-${accentColor}-700`}
+          className={`
+            w-full 
+            text-[15px] leading-relaxed
+            caret-transparent 
+            bg-transparent 
+            opacity-25 
+            text-gray-300 
+            p-2 pr-6 
+            rounded-sm 
+            focus:opacity-100 
+            focus:outline-none 
+            focus:border-${accentColor}-700 
+            focus:ring-1 
+            focus:ring-${accentColor}-700
+            font-medium
+          `}
           style={{
             paddingLeft: message.length > 0 ? "12px" : "24px",
             caretShape: "block",
@@ -110,9 +123,18 @@ export const ChatMessageInput = ({
         <button
           disabled={message.length === 0 || !onSend}
           onClick={handleSend}
-          className={`text-xs uppercase text-${accentColor}-500 hover:bg-${accentColor}-950 p-2 rounded-md opacity-${
-            message.length > 0 ? 100 : 25
-          } pointer-events-${message.length > 0 ? "auto" : "none"}`}
+          className={`
+            text-[13px] 
+            uppercase 
+            font-bold
+            tracking-wider
+            text-${accentColor}-500 
+            hover:bg-${accentColor}-950 
+            p-2 
+            rounded-md 
+            opacity-${message.length > 0 ? 100 : 25} 
+            pointer-events-${message.length > 0 ? "auto" : "none"}
+          `}
         >
           Send
         </button>

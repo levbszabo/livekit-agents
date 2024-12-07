@@ -2,6 +2,41 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  body {
+    @apply font-sans antialiased text-base leading-relaxed;
+    font-feature-settings: "ss01" 1, "ss02" 1, "cv01" 1, "cv02" 1;
+  }
+
+  /* Headings with bolder weight and tighter line height */
+  h1 {
+    @apply font-sans font-bold text-4xl md:text-5xl leading-tight;
+  }
+
+  h2 {
+    @apply font-sans font-bold text-3xl md:text-4xl leading-tight;
+  }
+
+  h3 {
+    @apply font-sans font-bold text-2xl md:text-3xl leading-snug;
+  }
+
+  /* For chat messages and UI elements */
+  .chat-message {
+    @apply font-medium tracking-wide;
+  }
+
+  /* For buttons and interactive elements */
+  .interactive-element {
+    @apply font-bold tracking-wide uppercase text-sm;
+  }
+
+  /* For status and metadata */
+  .metadata {
+    @apply font-medium text-sm tracking-wider uppercase;
+  }
+}
+
 body {
   background: black;
   --lk-va-bar-gap: 4px;
@@ -35,7 +70,8 @@ body {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #555; /* Even lighter grey thumb on hover */
+  background: #555;
+  /* Even lighter grey thumb on hover */
 }
 
 ::-webkit-scrollbar {
@@ -47,6 +83,7 @@ body {
   0% {
     opacity: 0;
   }
+
   100% {
     opacity: 1;
   }

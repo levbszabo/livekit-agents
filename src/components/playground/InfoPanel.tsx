@@ -266,12 +266,12 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts, isGen
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`flex items-center gap-2 px-6 py-3 text-sm font-medium transition-colors
+                        className={`flex items-center gap-1.5 px-4 py-2 text-[12px] font-medium tracking-tight transition-colors
                             ${activeTab === tab.id
                                 ? 'text-cyan-400 border-b-2 border-cyan-400 bg-gray-800/30'
                                 : 'text-gray-400 hover:text-gray-300 hover:bg-gray-800/20'}`}
                     >
-                        <tab.icon className="w-4 h-4" />
+                        <tab.icon className="w-3.5 h-3.5" />
                         {tab.title}
                     </button>
                 ))}
@@ -279,7 +279,7 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts, isGen
 
             {/* Tab Content */}
             <div className="flex-1 overflow-y-auto">
-                <div className="p-6">
+                <div className="p-4">
                     {activeTab === 'guide' && (
                         <GuideContent
                             walkthroughCount={walkthroughCount}
@@ -360,8 +360,8 @@ function GuideContent({ walkthroughCount, isGenerating, agentType }: {
 
     // Edit mode content
     return (
-        <div className="space-y-8">
-            <h3 className="text-xl font-semibold text-gray-200">Recording Walkthrough</h3>
+        <div className="space-y-6">
+            <h3 className="text-[16px] font-semibold text-gray-200 tracking-tight">Recording Walkthrough</h3>
 
             <div className="relative px-4">
                 <div className="absolute top-4 left-0 right-0 h-0.5 bg-gray-800" />
@@ -400,24 +400,24 @@ function GuideContent({ walkthroughCount, isGenerating, agentType }: {
             </div>
 
             {/* Recording Tips */}
-            <div className="space-y-4">
-                <h4 className="text-lg font-medium text-gray-300">Recording Tips</h4>
-                <div className="bg-gray-800/50 rounded-lg p-4">
-                    <ul className="space-y-3 text-sm text-gray-400">
-                        <li className="flex items-start gap-2">
-                            <span className="text-cyan-400 mt-1">•</span>
+            <div className="space-y-3">
+                <h4 className="text-[14px] font-medium text-gray-300 tracking-tight">Recording Tips</h4>
+                <div className="bg-gray-800/50 rounded-lg p-3">
+                    <ul className="space-y-2 text-[12px] text-gray-400 leading-snug">
+                        <li className="flex items-start gap-1.5">
+                            <span className="text-cyan-400 mt-0.5">•</span>
                             Speak naturally as if presenting to your audience
                         </li>
-                        <li className="flex items-start gap-2">
-                            <span className="text-cyan-400 mt-1">•</span>
+                        <li className="flex items-start gap-1.5">
+                            <span className="text-cyan-400 mt-0.5">•</span>
                             Take your time to explain complex concepts
                         </li>
-                        <li className="flex items-start gap-2">
-                            <span className="text-cyan-400 mt-1">•</span>
+                        <li className="flex items-start gap-1.5">
+                            <span className="text-cyan-400 mt-0.5">•</span>
                             Answer AI questions to provide more context
                         </li>
-                        <li className="flex items-start gap-2">
-                            <span className="text-cyan-400 mt-1">•</span>
+                        <li className="flex items-start gap-1.5">
+                            <span className="text-cyan-400 mt-0.5">•</span>
                             Use examples to illustrate your points
                         </li>
                     </ul>
@@ -425,10 +425,10 @@ function GuideContent({ walkthroughCount, isGenerating, agentType }: {
             </div>
 
             {/* Current Status */}
-            <div className="space-y-4">
-                <h4 className="text-lg font-medium text-gray-300">Recording Status</h4>
-                <div className="bg-gray-800/50 rounded-lg p-4">
-                    <div className="flex items-center justify-between text-sm">
+            <div className="space-y-2">
+                <h4 className="text-[14px] font-medium text-gray-300 tracking-tight">Recording Status</h4>
+                <div className="bg-gray-800/50 rounded-lg p-3">
+                    <div className="flex items-center justify-between text-[12px]">
                         <span className="text-gray-400">Walkthrough Progress</span>
                         <span className="text-cyan-400">
                             {isGenerating ? 'Processing...' : `${walkthroughCount} recordings`}
@@ -444,8 +444,8 @@ function StepItem({ number, title, subtitle, description, isActive }: StepItemPr
     return (
         <div className="flex flex-col items-center group">
             <div className={`
-                w-8 h-8 rounded-full flex items-center justify-center mb-3
-                transition-all duration-300
+                w-6 h-6 rounded-full flex items-center justify-center mb-2
+                transition-all duration-300 text-[12px]
                 ${isActive
                     ? 'bg-cyan-500 text-gray-900 shadow-lg shadow-cyan-500/50 animate-pulse'
                     : 'bg-gray-800 text-gray-400'
@@ -453,13 +453,13 @@ function StepItem({ number, title, subtitle, description, isActive }: StepItemPr
             `}>
                 {number}
             </div>
-            <div className="text-center space-y-2 max-w-[180px]">
-                <p className={`text-sm font-medium transition-colors duration-300 
+            <div className="text-center space-y-1 max-w-[160px]">
+                <p className={`text-[13px] font-medium tracking-tight transition-colors duration-300 
                     ${isActive ? 'text-cyan-400' : 'text-gray-400'}`}>
                     {title}
                 </p>
-                <p className="text-xs text-gray-500">{subtitle}</p>
-                <p className="text-xs text-gray-400 leading-relaxed">{description}</p>
+                <p className="text-[11px] text-gray-500 leading-tight">{subtitle}</p>
+                <p className="text-[11px] text-gray-400 leading-snug">{description}</p>
             </div>
         </div>
     );
@@ -482,8 +482,8 @@ function VoiceContent({
     setSelectedVoice
 }: VoiceContentProps) {
     return (
-        <div className="space-y-6">
-            <h3 className="text-xl font-semibold text-gray-200">Voice Configuration</h3>
+        <div className="space-y-4">
+            <h3 className="text-[16px] font-semibold text-gray-200 tracking-tight">Voice Configuration</h3>
 
             {/* Voice Selection - Move this before the recording controls */}
             <div className="space-y-3">
@@ -506,25 +506,25 @@ function VoiceContent({
             {!selectedVoice && (
                 <>
                     {/* Voice Tips */}
-                    <div className="bg-gray-800/50 rounded-lg p-4 space-y-3">
-                        <p className="text-sm text-gray-300">
+                    <div className="bg-gray-800/50 rounded-lg p-3 space-y-2">
+                        <p className="text-[12px] text-gray-300 leading-snug">
                             Create a natural-sounding AI voice clone by following these tips:
                         </p>
-                        <ul className="space-y-2 text-sm text-gray-400">
-                            <li className="flex items-start gap-2">
-                                <span className="text-cyan-400 mt-1">•</span>
+                        <ul className="space-y-1.5 text-[12px] text-gray-400 leading-snug">
+                            <li className="flex items-start gap-1.5">
+                                <span className="text-cyan-400 mt-0.5">•</span>
                                 Record 10-20 seconds of clear speech
                             </li>
-                            <li className="flex items-start gap-2">
-                                <span className="text-cyan-400 mt-1">•</span>
+                            <li className="flex items-start gap-1.5">
+                                <span className="text-cyan-400 mt-0.5">•</span>
                                 Speak naturally at your normal pace
                             </li>
-                            <li className="flex items-start gap-2">
-                                <span className="text-cyan-400 mt-1">•</span>
+                            <li className="flex items-start gap-1.5">
+                                <span className="text-cyan-400 mt-0.5">•</span>
                                 You can read from your slides or speak freely
                             </li>
-                            <li className="flex items-start gap-2">
-                                <span className="text-cyan-400 mt-1">•</span>
+                            <li className="flex items-start gap-1.5">
+                                <span className="text-cyan-400 mt-0.5">•</span>
                                 Avoid background noise and echoes
                             </li>
                         </ul>

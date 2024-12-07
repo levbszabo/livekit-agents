@@ -92,12 +92,13 @@ export function TranscriptionTile({
   ]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full font-sans">
       <div className="flex-1 overflow-y-auto">
         <ChatTile
           messages={messages}
           accentColor={accentColor}
           onSend={sendChat}
+          className="font-display"
         />
       </div>
     </div>
