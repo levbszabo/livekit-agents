@@ -1,10 +1,10 @@
-import preval from "next-plugin-preval";
-import resolveConfig from "tailwindcss/resolveConfig";
-import tailwindConfig from "../../tailwind.config.js";
+import { resolveConfig } from 'tailwindcss';
+import tailwindConfig from '../../tailwind.config';
 
 async function getTheme() {
-  const fullTWConfig = resolveConfig(tailwindConfig);
+  // Cast the config to any to avoid type issues with the complex theme structure
+  const fullTWConfig = resolveConfig(tailwindConfig as any);
   return fullTWConfig.theme;
 }
 
-export default preval(getTheme());
+export default getTheme();
