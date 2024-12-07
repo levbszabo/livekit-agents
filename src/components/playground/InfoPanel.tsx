@@ -595,7 +595,7 @@ function ScriptsContent({ scripts }: ScriptsContentProps) {
             <h3 className="text-xl font-semibold text-gray-200">Script Preview & Editing</h3>
             <div className="bg-gray-800/50 rounded-lg p-4 space-y-3">
                 <p className="text-sm text-gray-300">
-                    Fine-tune your Brdge's responses:
+                    Fine-tune your Brdge&apos;s responses:
                 </p>
                 <ul className="space-y-2 text-sm text-gray-400">
                     <li className="flex items-start gap-2">
