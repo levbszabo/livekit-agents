@@ -85,7 +85,7 @@ export default function Playground({
     userId: null as string | null
   });
 
-  // Update params setup to just use anonymous ID
+  // Update params setup to extract just the numeric ID
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
@@ -97,7 +97,7 @@ export default function Playground({
         coreApiUrl: API_BASE_URL,
         currentSlide: 1,
         userId: token ?
-          `user_${jwtDecode<JWTPayload>(token).sub}` :
+          jwtDecode<JWTPayload>(token).sub : // Just use the numeric ID directly
           `anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       };
 
