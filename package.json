@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev -p 3001",
     "build": "next build",
+    "prestart": "sudo fuser -k 3001/tcp || true",
     "start": "next start -p 3001",
     "lint": "next lint"
   },
