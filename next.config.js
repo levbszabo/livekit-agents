@@ -6,6 +6,16 @@ const nextConfig = {
   reactStrictMode: false,
   basePath: '/playground',
   assetPrefix: '/playground',
+  images: {
+    domains: ['brdge-ai.com'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'brdge-ai.com',
+        pathname: '/api/brdges/**',
+      },
+    ],
+  },
   poweredByHeader: false,
   output: 'standalone',
   async headers() {
