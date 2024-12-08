@@ -169,7 +169,7 @@ export default function Playground({
   const loadWalkthroughs = useCallback(async () => {
     if (!params.brdgeId) return;
     try {
-      const response = await api.get(`/api/brdges/${params.brdgeId}/walkthrough-list`);
+      const response = await api.get(`/brdges/${params.brdgeId}/walkthrough-list`);
       if (response.data.has_walkthroughs) {
         const sortedWalkthroughs = response.data.walkthroughs.sort(
           (a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
@@ -248,12 +248,12 @@ export default function Playground({
     setIsGeneratingScripts(true);
     try {
       // Start script generation
-      await api.post(`/api/brdges/${params.brdgeId}/generate-slide-scripts`, {
+      await api.post(`/brdges/${params.brdgeId}/generate-slide-scripts`, {
         walkthrough_id: selectedWalkthrough
       });
 
       // Immediately check for scripts after generation
-      const response = await api.get(`/api/brdges/${params.brdgeId}/scripts`);
+      const response = await api.get(`/brdges/${params.brdgeId}/scripts`);
       if (response.data.has_scripts) {
         setScripts(response.data.scripts);
       }
@@ -272,7 +272,7 @@ export default function Playground({
       if (!params.brdgeId) return;
 
       try {
-        const response = await api.get(`/api/brdges/${params.brdgeId}/scripts`);
+        const response = await api.get(`/brdges/${params.brdgeId}/scripts`);
         if (response.data.has_scripts) {
           setScripts(response.data.scripts);
           setIsGeneratingScripts(false);
@@ -393,7 +393,7 @@ export default function Playground({
   // Function to save changes to the database
   const saveScriptChanges = async () => {
     try {
-      await api.put(`/api/brdges/${params.brdgeId}/scripts/update`, {
+      await api.put(`/brdges/${params.brdgeId}/scripts/update`, {
         scripts: editedScripts,
       });
       // Update the scripts state with the edited version
@@ -818,9 +818,9 @@ export default function Playground({
 
       try {
         // Log the URL we're trying to access
-        console.log('Fetching scripts from:', `/api/brdges/${params.brdgeId}/scripts`);
+        console.log('Fetching scripts from:', `/brdges/${params.brdgeId}/scripts`);
 
-        const response = await api.get(`/api/brdges/${params.brdgeId}/scripts`);
+        const response = await api.get(`/brdges/${params.brdgeId}/scripts`);
 
         if (response.data.has_scripts) {
           console.log('Found existing scripts:', response.data.scripts);
@@ -838,7 +838,7 @@ export default function Playground({
       } catch (error) {
         console.error('Error checking for existing scripts:', error, {
           brdgeId: params.brdgeId,
-          url: `/api/brdges/${params.brdgeId}/scripts`
+          url: `/brdges/${params.brdgeId}/scripts`
         });
       }
     };

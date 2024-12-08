@@ -31,7 +31,7 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, brdgeI
 
         setIsSaving(true);
         try {
-            await api.put(`/api/brdges/${brdgeId}/scripts/update`, {
+            await api.put(`/brdges/${brdgeId}/scripts/update`, {
                 scripts: {
                     ...scripts,
                     [currentSlide]: editedScript

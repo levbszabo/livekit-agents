@@ -146,10 +146,10 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts, isGen
             formData.append('audio', currentRecording);
             formData.append('name', voiceName);
 
-            const response = await api.post(`/api/brdges/${brdgeId}/voice/clone`, formData);
+            const response = await api.post(`/brdges/${brdgeId}/voice/clone`, formData);
 
             // Refresh voice list immediately after successful clone
-            const voicesResponse = await api.get(`/api/brdges/${brdgeId}/voices`);
+            const voicesResponse = await api.get(`/brdges/${brdgeId}/voices`);
             if (voicesResponse.data?.voices) {
                 setSavedVoices(voicesResponse.data.voices);
 
@@ -207,7 +207,7 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts, isGen
 
     const handleSaveChanges = async () => {
         try {
-            await api.post(`/api/brdges/${brdgeId}/scripts/update`, {
+            await api.post(`/brdges/${brdgeId}/scripts/update`, {
                 scripts: editedScripts
             });
             setHasChanges(false);
@@ -221,7 +221,7 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts, isGen
         const loadVoices = async () => {
             if (!brdgeId) return;
             try {
-                const response = await api.get(`/api/brdges/${brdgeId}/voices`);
+                const response = await api.get(`/brdges/${brdgeId}/voices`);
                 if (response.data?.voices) {
                     setSavedVoices(response.data.voices);
                     console.log('Loaded voices:', response.data.voices);

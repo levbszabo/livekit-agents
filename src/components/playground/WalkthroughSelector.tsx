@@ -36,7 +36,7 @@ export const WalkthroughSelector = forwardRef<WalkthroughSelectorRef, Walkthroug
         if (!brdgeId) return;
 
         try {
-            const response = await api.get(`/api/brdges/${brdgeId}/walkthrough-list`);
+            const response = await api.get(`/brdges/${brdgeId}/walkthrough-list`);
             if (response.data.has_walkthroughs) {
                 const sortedWalkthroughs = response.data.walkthroughs.sort(
                     (a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
