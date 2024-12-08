@@ -5,6 +5,7 @@ const withNextPluginPreval = createNextPluginPreval();
 const nextConfig = {
   reactStrictMode: false,
   basePath: '/playground',
+  assetPrefix: '/playground',
   poweredByHeader: false,
   output: 'standalone',
   async headers() {
