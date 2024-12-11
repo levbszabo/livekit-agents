@@ -53,8 +53,9 @@ export const ConnectionProvider = ({
         if (!process.env.NEXT_PUBLIC_LIVEKIT_URL) {
           throw new Error("NEXT_PUBLIC_LIVEKIT_URL is not set");
         }
+        const path = process.env.NODE_ENV === "development" ? "/api/token" : "/playground/api/token";
         url = process.env.NEXT_PUBLIC_LIVEKIT_URL;
-        const { accessToken } = await fetch("/playground/api/token").then((res) =>
+        const { accessToken } = await fetch(path).then((res) =>
           res.json()
         );
         token = accessToken;

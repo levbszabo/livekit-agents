@@ -4,14 +4,22 @@ const withNextPluginPreval = createNextPluginPreval();
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: false,
-  basePath: '/playground',
-  assetPrefix: '/playground',
+  // Only set basePath and assetPrefix in production
+  ...(process.env.NODE_ENV === 'production' ? {
+    basePath: '/playground',
+    assetPrefix: '/playground',
+  } : {}),
   images: {
-    domains: ['brdge-ai.com'],
+    domains: ['brdge-ai.com', 'localhost'],
     remotePatterns: [
       {
         protocol: 'https',
         hostname: 'brdge-ai.com',
+        pathname: '/api/brdges/**',
+      },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
         pathname: '/api/brdges/**',
       },
     ],
@@ -27,22 +35,27 @@ const nextConfig = {
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           {
             key: 'Content-Security-Policy',
-            value: "frame-ancestors 'self' https://brdge-ai.com"
+            value: process.env.NODE_ENV === 'development'
+              ? "frame-ancestors 'self' http://localhost:3000 http://localhost:3001"
+              : "frame-ancestors 'self' https://brdge-ai.com"
           },
         ],
       },
     ];
   },
-  async rewrites() {
-    return {
-      beforeFiles: [
-        {
-          source: '/playground/:path*',
-          destination: '/:path*',
-        },
-      ],
-    };
-  },
+  // Only apply rewrites in production
+  ...(process.env.NODE_ENV === 'production' ? {
+    async rewrites() {
+      return {
+        beforeFiles: [
+          {
+            source: '/playground/:path*',
+            destination: '/:path*',
+          },
+        ],
+      };
+    },
+  } : {}),
 };
 
 module.exports = withNextPluginPreval(nextConfig);

@@ -441,14 +441,15 @@ export default function Playground({
             src={slideUrl}
             alt={`Slide ${params.currentSlide}`}
             className="max-w-full max-h-full object-contain"
+            priority={true}
+            width={1920}
+            height={1080}
             onError={(e) => {
               console.error('Error loading slide image:', slideUrl);
               const target = e.target as HTMLImageElement;
               target.onerror = null;
               target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="50%" y="50%" text-anchor="middle" fill="gray">Error loading slide</text></svg>';
             }}
-            width={100}
-            height={100}
           />
         </div>
         <div className="p-4 bg-gray-900 border-t border-gray-800">
@@ -926,14 +927,15 @@ export default function Playground({
                     src={getSlideUrl()}
                     alt={`Slide ${params.currentSlide}`}
                     className="w-full h-auto"
+                    priority={true}
+                    width={1920}
+                    height={1080}
                     onError={(e) => {
                       console.error('Error loading slide image:', getSlideUrl());
                       const target = e.target as HTMLImageElement;
                       target.onerror = null;
                       target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="50%" y="50%" text-anchor="middle" fill="gray">Error loading slide</text></svg>';
                     }}
-                    width={100}
-                    height={100}
                   />
                 ) : (
                   <div className="w-full aspect-[4/3] flex items-center justify-center bg-gray-900 text-gray-500">
