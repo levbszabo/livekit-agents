@@ -929,7 +929,7 @@ export default function Playground({
         `}>
           <div className={`
             flex flex-col
-            ${isMobile ? 'h-[35vh]' : 'h-full'}
+            ${isMobile ? 'h-[35vh] min-h-[250px]' : 'h-full'}
           `}>
             <div className="relative w-full h-full bg-black">
               {getSlideUrl() ? (
@@ -955,12 +955,12 @@ export default function Playground({
               )}
             </div>
 
-            <div className="p-4 bg-gray-900 border-t border-gray-800">
-              <div className="flex justify-between items-center">
+            <div className="p-4 bg-gray-900 border-t border-gray-800 sticky bottom-0 left-0 right-0">
+              <div className="flex justify-between items-center flex-wrap gap-2">
                 <span className="text-gray-400 text-sm">
                   Slide {params.currentSlide} of {params.numSlides}
                 </span>
-                <div className="flex gap-3">
+                <div className="flex gap-2 flex-wrap">
                   {scripts && (
                     <button
                       onClick={() => {
@@ -971,10 +971,10 @@ export default function Playground({
                           handleWalkthroughClick('view');
                         }
                       }}
-                      className={`px-4 py-2 ${roomState === ConnectionState.Connected
+                      className={`px-3 py-1.5 ${roomState === ConnectionState.Connected
                         ? 'bg-red-600 hover:bg-red-700'
                         : 'bg-green-600 hover:bg-green-700'
-                        } text-white rounded-md transition-colors flex items-center gap-2`}
+                        } text-white rounded-md transition-colors flex items-center gap-1 text-sm`}
                     >
                       {roomState === ConnectionState.Connected ? (
                         <>
@@ -985,7 +985,7 @@ export default function Playground({
                           >
                             <path d="M6 6h12v12H6z" />
                           </svg>
-                          Stop
+                          <span>Stop</span>
                         </>
                       ) : (
                         <>
@@ -996,7 +996,7 @@ export default function Playground({
                           >
                             <path d="M8 5v14l11-7z" />
                           </svg>
-                          Play
+                          <span>Play</span>
                         </>
                       )}
                     </button>
@@ -1005,44 +1005,25 @@ export default function Playground({
                   <button
                     onClick={handlePrevSlide}
                     disabled={params.currentSlide === 1}
-                    className="px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="px-3 py-1.5 bg-gray-800 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
                   >
                     Previous
                   </button>
                   <button
                     onClick={handleNextSlide}
                     disabled={params.currentSlide === params.numSlides}
-                    className="px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="px-3 py-1.5 bg-gray-800 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
                   >
                     Next
                   </button>
                 </div>
               </div>
             </div>
-
-            {!isMobile && (
-              <>
-                {currentAgentType === 'view' ? (
-                  <div className="p-4 bg-gray-900 border-t border-gray-800">
-                    <div className="text-gray-300 text-sm">
-                      {scripts?.[params.currentSlide.toString()] || 'No script available for this slide'}
-                    </div>
-                  </div>
-                ) : (
-                  <SlideScriptPanel
-                    currentSlide={params.currentSlide}
-                    scripts={scripts}
-                    onScriptChange={handleScriptChange}
-                    brdgeId={params.brdgeId}
-                  />
-                )}
-              </>
-            )}
           </div>
 
           {isMobile && roomState === ConnectionState.Connected && (
-            <div className="h-[45vh] border-t border-gray-800 bg-gray-900">
-              <div className="p-2 border-b border-gray-700">
+            <div className="flex-1 min-h-[45vh] border-t border-gray-800 bg-gray-900 flex flex-col">
+              <div className="p-2 border-b border-gray-700 sticky top-0 bg-gray-900 z-10">
                 <button
                   onClick={() => {
                     if (roomState === ConnectionState.Connected) {
@@ -1055,13 +1036,12 @@ export default function Playground({
                       : 'bg-gray-800 text-gray-400'
                     }`}
                 >
-                  <span className={`w-2 h-2 rounded-full ${localParticipant.isMicrophoneEnabled ? 'bg-cyan-500 animate-pulse' : 'bg-gray-600'
-                    }`} />
+                  <span className={`w-2 h-2 rounded-full ${localParticipant.isMicrophoneEnabled ? 'bg-cyan-500 animate-pulse' : 'bg-gray-600'}`} />
                   {localParticipant.isMicrophoneEnabled ? 'Mic On' : 'Mic Off'}
                 </button>
               </div>
 
-              <div className="h-[calc(100%-48px)] overflow-y-auto">
+              <div className="flex-1 overflow-y-auto">
                 <div className="p-2">
                   <ChatTile
                     messages={transcripts}
