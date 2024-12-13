@@ -71,11 +71,38 @@ interface JWTPayload {
   iat: number;  // issued at
 }
 
+// Add this at the top with other hooks
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 640); // sm breakpoint
+    };
+
+    // Initial check
+    checkIsMobile();
+
+    // Add event listener
+    window.addEventListener('resize', checkIsMobile);
+
+    // Cleanup
+    return () => window.removeEventListener('resize', checkIsMobile);
+  }, []);
+
+  return isMobile;
+};
+
+// Add mobile tab type
+type MobileTab = 'chat' | 'script' | 'voice' | 'info';
+
 export default function Playground({
   logo,
   themeColors,
   onConnect,
 }: PlaygroundProps) {
+  const isMobile = useIsMobile();
+
   // URL parameters state
   const [params, setParams] = useState({
     brdgeId: null as string | null,
@@ -337,7 +364,7 @@ export default function Playground({
         }
       }, 300);
     }
-  }, [params, roomState, send, currentAgentType]); // params now includes userId
+  }, [params, roomState, send, currentAgentType]);
 
   // Simplify the connection effect
   useEffect(() => {
@@ -381,7 +408,6 @@ export default function Playground({
     return valid;
   }, [params]);
 
-  // Move handleScriptChange up here, before any usage
   const handleScriptChange = useCallback((slideId: string, newScript: string) => {
     setEditedScripts((prevScripts) => ({
       ...prevScripts,
@@ -405,7 +431,42 @@ export default function Playground({
     }
   };
 
-  // Simplified slide content
+  const chatTileContent = useMemo(() => {
+    return (
+      <div className="flex flex-col h-full max-h-full overflow-hidden">
+        <div className="flex-grow overflow-y-auto min-h-0">
+          <ChatTile messages={transcripts} accentColor={config.settings.theme_color} />
+          {voiceAssistant.audioTrack && (
+            <TranscriptionTile
+              agentAudioTrack={voiceAssistant.audioTrack}
+              accentColor={config.settings.theme_color}
+            />
+          )}
+        </div>
+        {localParticipant && (
+          <div className="border-t border-gray-700 p-4 flex-shrink-0">
+            <ConfigurationPanelItem
+              title="Voice Input"
+              deviceSelectorKind="audioinput"
+            >
+              <AudioInputTile
+                trackRef={{
+                  source: Track.Source.Microphone,
+                  participant: localParticipant
+                }}
+              />
+            </ConfigurationPanelItem>
+          </div>
+        )}
+      </div>
+    );
+  }, [
+    transcripts,
+    voiceAssistant.audioTrack,
+    config.settings.theme_color,
+    localParticipant
+  ]);
+
   const slideTileContent = useMemo(() => {
     if (!hasRequiredParams) {
       return (
@@ -458,7 +519,6 @@ export default function Playground({
               Slide {params.currentSlide} of {params.numSlides}
             </span>
             <div className="flex gap-3">
-              {/* Show Play/Stop button based on connection state */}
               {scripts && (
                 <button
                   onClick={() => {
@@ -502,7 +562,6 @@ export default function Playground({
                 </button>
               )}
 
-              {/* Existing navigation buttons */}
               <button
                 onClick={handlePrevSlide}
                 disabled={params.currentSlide === 1}
@@ -520,13 +579,15 @@ export default function Playground({
             </div>
           </div>
         </div>
-
-        <SlideScriptPanel
-          currentSlide={params.currentSlide}
-          scripts={scripts}
-          onScriptChange={handleScriptChange}
-          brdgeId={params.brdgeId}
-        />
+        {/* FOR MOBILE ONLY: Replace script display with chat + transcription */}
+        {!isMobile && (
+          <SlideScriptPanel
+            currentSlide={params.currentSlide}
+            scripts={scripts}
+            onScriptChange={handleScriptChange}
+            brdgeId={params.brdgeId}
+          />
+        )}
       </div>
     );
   }, [params, roomState, hasRequiredParams, scripts, isGenerating, currentAgentType, handleScriptChange]);
@@ -586,45 +647,6 @@ export default function Playground({
     voiceAssistant.state,
   ]);
 
-  // Update the chatTileContent to include proper sizing and scrolling
-  const chatTileContent = useMemo(() => {
-    return (
-      <div className="flex flex-col h-full max-h-full overflow-hidden">
-        {/* Transcription area with fixed height and scrolling */}
-        <div className="flex-grow overflow-y-auto min-h-0">
-          {voiceAssistant.audioTrack && (
-            <TranscriptionTile
-              agentAudioTrack={voiceAssistant.audioTrack}
-              accentColor={config.settings.theme_color}
-            />
-          )}
-        </div>
-
-        {/* Microphone controls with fixed height */}
-        {localParticipant && (
-          <div className="border-t border-gray-700 p-4 flex-shrink-0">
-            <ConfigurationPanelItem
-              title="Voice Input"
-              deviceSelectorKind="audioinput"
-            >
-              <AudioInputTile
-                trackRef={{
-                  source: Track.Source.Microphone,
-                  participant: localParticipant
-                }}
-              />
-            </ConfigurationPanelItem>
-          </div>
-        )}
-      </div>
-    );
-  }, [
-    voiceAssistant.audioTrack,
-    config.settings.theme_color,
-    localParticipant
-  ]);
-
-  // Settings content with microphone status
   const settingsTileContent = useMemo(() => {
     return (
       <div className="flex flex-col gap-4 h-full w-full items-start overflow-y-auto">
@@ -704,7 +726,6 @@ export default function Playground({
 
   let mobileTabs: PlaygroundTab[] = [];
 
-  // Slides tab
   mobileTabs.push({
     title: "Slides",
     content: (
@@ -752,7 +773,6 @@ export default function Playground({
     ),
   });
 
-  // Add constant for theme
   const THEME = {
     primary: 'cyan',
     bgDark: 'gray-900',
@@ -760,14 +780,12 @@ export default function Playground({
     text: 'gray-100',
   };
 
-  // Enable microphone by default when connecting
   useEffect(() => {
     if (roomState === ConnectionState.Connected && localParticipant) {
       localParticipant.setMicrophoneEnabled(true);
     }
   }, [roomState, localParticipant]);
 
-  // Add a function to construct the slide URL
   const getSlideUrl = useCallback((): string => {
     if (!params.apiBaseUrl || !params.brdgeId || !params.currentSlide) {
       return '';
@@ -775,7 +793,6 @@ export default function Playground({
     return `${params.apiBaseUrl}/brdges/${params.brdgeId}/slides/${params.currentSlide}`;
   }, [params.apiBaseUrl, params.brdgeId, params.currentSlide]);
 
-  // Add effect to fetch brdge metadata
   useEffect(() => {
     const fetchBrdgeMetadata = async () => {
       if (!params.brdgeId || !params.apiBaseUrl) return;
@@ -787,12 +804,11 @@ export default function Playground({
         const data = await response.json();
         setBrdgeMetadata({
           id: params.brdgeId,
-          name: data.name || params.brdgeId, // Fallback to ID if name not available
+          name: data.name || params.brdgeId,
           numSlides: params.numSlides
         });
       } catch (error) {
         console.error('Error fetching Brdge metadata:', error);
-        // Set fallback metadata using brdgeId as name
         setBrdgeMetadata({
           id: params.brdgeId!,
           name: params.brdgeId!,
@@ -804,12 +820,10 @@ export default function Playground({
     fetchBrdgeMetadata();
   }, [params.brdgeId, params.apiBaseUrl, params.numSlides]);
 
-  // Add this to debug the params
   useEffect(() => {
     console.log('Current params:', params);
   }, [params]);
 
-  // Update the checkExistingScripts effect
   useEffect(() => {
     const checkExistingScripts = async () => {
       if (!params.brdgeId) {
@@ -818,7 +832,6 @@ export default function Playground({
       }
 
       try {
-        // Log the URL we're trying to access
         console.log('Fetching scripts from:', `/brdges/${params.brdgeId}/scripts`);
 
         const response = await api.get(`/brdges/${params.brdgeId}/scripts`);
@@ -828,7 +841,6 @@ export default function Playground({
           setScripts(response.data.scripts);
           setEditedScripts(response.data.scripts);
 
-          // If there are existing scripts, also select the walkthrough that generated them
           const walkthrough_id = parseInt(response.data.metadata.source_walkthrough_id);
           if (walkthrough_id) {
             setSelectedWalkthrough(walkthrough_id);
@@ -847,14 +859,11 @@ export default function Playground({
     checkExistingScripts();
   }, [params.brdgeId]);
 
-  // Add state for panel view with auto-switch effect
   const [rightPanelView, setRightPanelView] = useState<'chat' | 'info'>('info');
 
-  // Update the renderRightPanelContent function
   const renderRightPanelContent = () => {
     return (
       <div className="flex-1 overflow-hidden">
-        {/* Chat Interface - Always mounted, conditionally visible */}
         <div className={`h-full flex flex-col ${rightPanelView === 'chat' ? 'block' : 'hidden'}`}>
           <div className="flex-1 overflow-y-auto">
             <div className="p-4">
@@ -868,7 +877,6 @@ export default function Playground({
           </div>
         </div>
 
-        {/* Info Panel */}
         <div className={`h-full ${rightPanelView === 'info' ? 'block' : 'hidden'}`}>
           <InfoPanel
             walkthroughCount={walkthroughs.length}
@@ -882,12 +890,10 @@ export default function Playground({
     );
   };
 
-  // Add a ref to hold the WalkthroughSelector component
   const walkthroughSelectorRef = useRef<{ refreshWalkthroughs: () => void }>(null);
 
-  // Update the PlaygroundHeader render to include the ref
   return (
-    <div className="h-screen flex flex-col bg-[#121212] relative">
+    <div className="h-[calc(100vh-1px)] flex flex-col bg-[#121212] relative overflow-hidden">
       {currentAgentType === 'edit' ? (
         <PlaygroundHeader
           title={brdgeMetadata?.name || params.brdgeId || 'Loading...'}
@@ -915,215 +921,250 @@ export default function Playground({
       )}
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Side - Slides */}
-        <div className={`flex-1 p-6 overflow-y-auto ${currentAgentType === 'view' ? 'w-full' : ''}`}>
-          <div className="min-h-full flex flex-col">
-            <div className="w-full bg-black rounded-2xl overflow-hidden flex flex-col">
-              {/* Slide Image */}
-              <div className="relative w-full">
-                {getSlideUrl() ? (
-                  <Image
-                    key={getSlideUrl()}
-                    src={getSlideUrl()}
-                    alt={`Slide ${params.currentSlide}`}
-                    className="w-full h-auto"
-                    priority={true}
-                    width={1920}
-                    height={1080}
-                    onError={(e) => {
-                      console.error('Error loading slide image:', getSlideUrl());
-                      const target = e.target as HTMLImageElement;
-                      target.onerror = null;
-                      target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="50%" y="50%" text-anchor="middle" fill="gray">Error loading slide</text></svg>';
-                    }}
-                  />
-                ) : (
-                  <div className="w-full aspect-[4/3] flex items-center justify-center bg-gray-900 text-gray-500">
-                    No slide available
-                  </div>
-                )}
-              </div>
-
-              {/* Navigation Controls */}
-              <div className="p-4 bg-gray-900 border-t border-gray-800">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400 text-sm">
-                    Slide {params.currentSlide} of {params.numSlides}
-                  </span>
-                  <div className="flex gap-3">
-                    {/* Show Play/Stop button based on connection state */}
-                    {scripts && (
-                      <button
-                        onClick={() => {
-                          if (roomState === ConnectionState.Connected) {
-                            // Stop the session
-                            onConnect(false);
-                            setRightPanelView('info');
-                          } else {
-                            // Start the session
-                            handleWalkthroughClick('view');
-                          }
-                        }}
-                        className={`px-4 py-2 ${roomState === ConnectionState.Connected
-                          ? 'bg-red-600 hover:bg-red-700'
-                          : 'bg-green-600 hover:bg-green-700'
-                          } text-white rounded-md transition-colors flex items-center gap-2`}
-                      >
-                        {roomState === ConnectionState.Connected ? (
-                          <>
-                            <svg
-                              className="w-4 h-4"
-                              viewBox="0 0 24 24"
-                              fill="currentColor"
-                            >
-                              <path d="M6 6h12v12H6z" />
-                            </svg>
-                            Stop
-                          </>
-                        ) : (
-                          <>
-                            <svg
-                              className="w-4 h-4"
-                              viewBox="0 0 24 24"
-                              fill="currentColor"
-                            >
-                              <path d="M8 5v14l11-7z" />
-                            </svg>
-                            Play
-                          </>
-                        )}
-                      </button>
-                    )}
-
-                    {/* Existing navigation buttons */}
-                    <button
-                      onClick={handlePrevSlide}
-                      disabled={params.currentSlide === 1}
-                      className="px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      Previous
-                    </button>
-                    <button
-                      onClick={handleNextSlide}
-                      disabled={params.currentSlide === params.numSlides}
-                      className="px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Scripts Panel - Simplified in view mode */}
-              {currentAgentType === 'view' ? (
-                <div className="p-4 bg-gray-900 border-t border-gray-800">
-                  <div className="text-gray-300 text-sm">
-                    {scripts?.[params.currentSlide.toString()] || 'No script available for this slide'}
-                  </div>
-                </div>
-              ) : (
-                <SlideScriptPanel
-                  currentSlide={params.currentSlide}
-                  scripts={scripts}
-                  onScriptChange={handleScriptChange}
-                  brdgeId={params.brdgeId}
+        <div className={`
+          flex-1 
+          ${currentAgentType === 'view' ? 'w-full' : ''}
+          ${isMobile ? 'flex flex-col p-0 h-[calc(100vh-57px)]' : 'p-6'}
+          overflow-y-auto
+        `}>
+          <div className={`
+            flex flex-col
+            ${isMobile ? 'h-[35vh]' : 'h-full'}
+          `}>
+            <div className="relative w-full h-full bg-black">
+              {getSlideUrl() ? (
+                <Image
+                  key={getSlideUrl()}
+                  src={getSlideUrl()}
+                  alt={`Slide ${params.currentSlide}`}
+                  className="w-full h-auto"
+                  priority={true}
+                  width={1920}
+                  height={1080}
+                  onError={(e) => {
+                    console.error('Error loading slide image:', getSlideUrl());
+                    const target = e.target as HTMLImageElement;
+                    target.onerror = null;
+                    target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="50%" y="50%" text-anchor="middle" fill="gray">Error loading slide</text></svg>';
+                  }}
                 />
+              ) : (
+                <div className="w-full aspect-[4/3] flex items-center justify-center bg-gray-900 text-gray-500">
+                  No slide available
+                </div>
               )}
             </div>
-          </div>
-        </div>
 
-        {/* Right Side Panel - Show in both modes but with different content */}
-        <div className="w-[420px] border-l border-gray-800 flex flex-col bg-gray-900">
-          {/* Combined Header with Mic Toggle and Tabs */}
-          <div className="p-4 border-b border-gray-800 flex items-center gap-4">
-            {/* Mic Toggle - Show in both modes */}
-            <button
-              onClick={() => {
-                if (roomState === ConnectionState.Connected) {
-                  localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
-                }
-              }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors flex-shrink-0
-                ${localParticipant.isMicrophoneEnabled
-                  ? 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
-                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
-            >
-              <span className={`w-2 h-2 rounded-full ${localParticipant.isMicrophoneEnabled ? 'bg-cyan-500 animate-pulse' : 'bg-gray-600'}`} />
-              <span className="text-sm font-medium">
-                {localParticipant.isMicrophoneEnabled ? 'Mic On' : 'Mic Off'}
-              </span>
-            </button>
+            <div className="p-4 bg-gray-900 border-t border-gray-800">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400 text-sm">
+                  Slide {params.currentSlide} of {params.numSlides}
+                </span>
+                <div className="flex gap-3">
+                  {scripts && (
+                    <button
+                      onClick={() => {
+                        if (roomState === ConnectionState.Connected) {
+                          onConnect(false);
+                          setRightPanelView('info');
+                        } else {
+                          handleWalkthroughClick('view');
+                        }
+                      }}
+                      className={`px-4 py-2 ${roomState === ConnectionState.Connected
+                        ? 'bg-red-600 hover:bg-red-700'
+                        : 'bg-green-600 hover:bg-green-700'
+                        } text-white rounded-md transition-colors flex items-center gap-2`}
+                    >
+                      {roomState === ConnectionState.Connected ? (
+                        <>
+                          <svg
+                            className="w-4 h-4"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                          >
+                            <path d="M6 6h12v12H6z" />
+                          </svg>
+                          Stop
+                        </>
+                      ) : (
+                        <>
+                          <svg
+                            className="w-4 h-4"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                          >
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                          Play
+                        </>
+                      )}
+                    </button>
+                  )}
 
-            {/* Tab Toggle - Show in both modes */}
-            {roomState === ConnectionState.Connected && (
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setRightPanelView('chat')}
-                  className={`px-3 py-2 text-sm rounded-md transition-colors ${rightPanelView === 'chat'
-                    ? 'bg-cyan-500/20 text-cyan-400'
-                    : 'text-gray-400 hover:text-gray-300'}`}
-                >
-                  Chat
-                </button>
-                <button
-                  onClick={() => setRightPanelView('info')}
-                  className={`px-3 py-2 text-sm rounded-md transition-colors ${rightPanelView === 'info'
-                    ? 'bg-cyan-500/20 text-cyan-400'
-                    : 'text-gray-400 hover:text-gray-300'}`}
-                >
-                  Info
-                </button>
+                  <button
+                    onClick={handlePrevSlide}
+                    disabled={params.currentSlide === 1}
+                    className="px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    onClick={handleNextSlide}
+                    disabled={params.currentSlide === params.numSlides}
+                    className="px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
+            </div>
+
+            {!isMobile && (
+              <>
+                {currentAgentType === 'view' ? (
+                  <div className="p-4 bg-gray-900 border-t border-gray-800">
+                    <div className="text-gray-300 text-sm">
+                      {scripts?.[params.currentSlide.toString()] || 'No script available for this slide'}
+                    </div>
+                  </div>
+                ) : (
+                  <SlideScriptPanel
+                    currentSlide={params.currentSlide}
+                    scripts={scripts}
+                    onScriptChange={handleScriptChange}
+                    brdgeId={params.brdgeId}
+                  />
+                )}
+              </>
             )}
           </div>
 
-          {/* Content Area */}
-          <div className="flex-1 overflow-hidden">
-            {/* Chat Interface */}
-            <div className={`h-full flex flex-col ${rightPanelView === 'chat' ? 'block' : 'hidden'}`}>
-              <div className="flex-1 overflow-y-auto">
-                <div className="p-4">
-                  {voiceAssistant?.audioTrack && (
+          {isMobile && roomState === ConnectionState.Connected && (
+            <div className="h-[45vh] border-t border-gray-800 bg-gray-900">
+              <div className="p-2 border-b border-gray-700">
+                <button
+                  onClick={() => {
+                    if (roomState === ConnectionState.Connected) {
+                      localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
+                    }
+                  }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors w-full justify-center
+                    ${localParticipant.isMicrophoneEnabled
+                      ? 'bg-cyan-500/20 text-cyan-400'
+                      : 'bg-gray-800 text-gray-400'
+                    }`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${localParticipant.isMicrophoneEnabled ? 'bg-cyan-500 animate-pulse' : 'bg-gray-600'
+                    }`} />
+                  {localParticipant.isMicrophoneEnabled ? 'Mic On' : 'Mic Off'}
+                </button>
+              </div>
+
+              <div className="h-[calc(100%-48px)] overflow-y-auto">
+                <div className="p-2">
+                  <ChatTile
+                    messages={transcripts}
+                    accentColor={config.settings.theme_color}
+                    className="mb-2"
+                  />
+                  {voiceAssistant.audioTrack && (
                     <TranscriptionTile
                       agentAudioTrack={voiceAssistant.audioTrack}
-                      accentColor="cyan"
+                      accentColor={config.settings.theme_color}
                     />
                   )}
                 </div>
               </div>
             </div>
-
-            {/* Info Panel */}
-            <div className={`h-full ${rightPanelView === 'info' ? 'block' : 'hidden'}`}>
-              <InfoPanel
-                walkthroughCount={walkthroughs.length}
-                agentType={currentAgentType}
-                brdgeId={params.brdgeId!}
-                scripts={scripts}
-                isGenerating={isGeneratingScripts}
-              />
-            </div>
-          </div>
-
-          {/* Status Bar */}
-          <div className="p-3 bg-gray-900 border-t border-gray-800">
-            <div className="flex items-center justify-between text-sm text-gray-400">
-              <span>
-                {currentAgentType === 'edit' && walkthroughs.length > 0 && `Walkthrough #${walkthroughs.length}`}
-                {currentAgentType === 'view' && 'View Mode'}
-              </span>
-              <span className="flex items-center gap-2">
-                {roomState === ConnectionState.Connected && (
-                  <>
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
-                    {currentAgentType === 'edit' ? 'Walkthrough in Progress' : 'Viewing'}
-                  </>
-                )}
-              </span>
-            </div>
-          </div>
+          )}
         </div>
+
+        {!isMobile && (
+          <div className="w-[320px] border-l border-gray-800 flex flex-col overflow-hidden">
+            <div className="p-4 border-b border-gray-800 flex items-center gap-4">
+              <button
+                onClick={() => {
+                  if (roomState === ConnectionState.Connected) {
+                    localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
+                  }
+                }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors flex-shrink-0
+                  ${localParticipant.isMicrophoneEnabled
+                    ? 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
+                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+              >
+                <span className={`w-2 h-2 rounded-full ${localParticipant.isMicrophoneEnabled ? 'bg-cyan-500 animate-pulse' : 'bg-gray-600'}`} />
+                <span className="text-sm font-medium">
+                  {localParticipant.isMicrophoneEnabled ? 'Mic On' : 'Mic Off'}
+                </span>
+              </button>
+
+              {roomState === ConnectionState.Connected && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setRightPanelView('chat')}
+                    className={`px-3 py-2 text-sm rounded-md transition-colors ${rightPanelView === 'chat'
+                      ? 'bg-cyan-500/20 text-cyan-400'
+                      : 'text-gray-400 hover:text-gray-300'}`}
+                  >
+                    Chat
+                  </button>
+                  <button
+                    onClick={() => setRightPanelView('info')}
+                    className={`px-3 py-2 text-sm rounded-md transition-colors ${rightPanelView === 'info'
+                      ? 'bg-cyan-500/20 text-cyan-400'
+                      : 'text-gray-400 hover:text-gray-300'}`}
+                  >
+                    Info
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 overflow-hidden">
+              <div className={`h-full flex flex-col ${rightPanelView === 'chat' ? 'block' : 'hidden'}`}>
+                <div className="flex-1 overflow-y-auto">
+                  <div className="p-4">
+                    {voiceAssistant?.audioTrack && (
+                      <TranscriptionTile
+                        agentAudioTrack={voiceAssistant.audioTrack}
+                        accentColor="cyan"
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className={`h-full ${rightPanelView === 'info' ? 'block' : 'hidden'}`}>
+                <InfoPanel
+                  walkthroughCount={walkthroughs.length}
+                  agentType={currentAgentType}
+                  brdgeId={params.brdgeId!}
+                  scripts={scripts}
+                  isGenerating={isGeneratingScripts}
+                />
+              </div>
+            </div>
+
+            <div className="p-3 bg-gray-900 border-t border-gray-800">
+              <div className="flex items-center justify-between text-sm text-gray-400">
+                <span>
+                  {currentAgentType === 'edit' && walkthroughs.length > 0 && `Walkthrough #${walkthroughs.length}`}
+                  {currentAgentType === 'view' && 'View Mode'}
+                </span>
+                <span className="flex items-center gap-2">
+                  {roomState === ConnectionState.Connected && (
+                    <>
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
+                      {currentAgentType === 'edit' ? 'Walkthrough in Progress' : 'Viewing'}
+                    </>
+                  )}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
