@@ -416,6 +416,13 @@ export default function Playground({
     setHasScriptChanges(true);
   }, []);
 
+  // We should also add a function to update the main scripts state
+  const updateScripts = useCallback((newScripts: Record<string, string>) => {
+    setScripts(newScripts);
+    setEditedScripts({}); // Clear edited scripts
+    setHasScriptChanges(false);
+  }, []);
+
   // Function to save changes to the database
   const saveScriptChanges = async () => {
     try {
@@ -585,12 +592,13 @@ export default function Playground({
             currentSlide={params.currentSlide}
             scripts={scripts}
             onScriptChange={handleScriptChange}
+            onScriptsUpdate={updateScripts}
             brdgeId={params.brdgeId}
           />
         )}
       </div>
     );
-  }, [params, roomState, hasRequiredParams, scripts, isGenerating, currentAgentType, handleScriptChange]);
+  }, [params, roomState, hasRequiredParams, scripts, isGenerating, currentAgentType, handleScriptChange, updateScripts]);
 
   useEffect(() => {
     document.body.style.setProperty(
@@ -931,13 +939,13 @@ export default function Playground({
             flex flex-col
             ${isMobile ? 'h-[35vh] min-h-[250px]' : 'h-full'}
           `}>
-            <div className="relative w-full h-full bg-black">
+            <div className="flex-1 relative bg-black overflow-hidden">
               {getSlideUrl() ? (
                 <Image
                   key={getSlideUrl()}
                   src={getSlideUrl()}
                   alt={`Slide ${params.currentSlide}`}
-                  className="w-full h-auto"
+                  className="w-full h-full object-contain"
                   priority={true}
                   width={1920}
                   height={1080}
@@ -949,18 +957,18 @@ export default function Playground({
                   }}
                 />
               ) : (
-                <div className="w-full aspect-[4/3] flex items-center justify-center bg-gray-900 text-gray-500">
+                <div className="w-full h-full flex items-center justify-center bg-gray-900 text-gray-500">
                   No slide available
                 </div>
               )}
             </div>
 
-            <div className="p-4 bg-gray-900 border-t border-gray-800 sticky bottom-0 left-0 right-0">
-              <div className="flex justify-between items-center flex-wrap gap-2">
+            <div className="flex-shrink-0 h-[60px] bg-gray-900 border-t border-gray-800">
+              <div className="h-full px-4 flex justify-between items-center">
                 <span className="text-gray-400 text-sm">
                   Slide {params.currentSlide} of {params.numSlides}
                 </span>
-                <div className="flex gap-2 flex-wrap">
+                <div className="flex gap-2">
                   {scripts && (
                     <button
                       onClick={() => {
@@ -974,7 +982,7 @@ export default function Playground({
                       className={`px-3 py-1.5 ${roomState === ConnectionState.Connected
                         ? 'bg-red-600 hover:bg-red-700'
                         : 'bg-green-600 hover:bg-green-700'
-                        } text-white rounded-md transition-colors flex items-center gap-1 text-sm`}
+                        } text-white rounded-md transition-colors flex items-center gap-1 text-sm whitespace-nowrap`}
                     >
                       {roomState === ConnectionState.Connected ? (
                         <>
@@ -1005,14 +1013,14 @@ export default function Playground({
                   <button
                     onClick={handlePrevSlide}
                     disabled={params.currentSlide === 1}
-                    className="px-3 py-1.5 bg-gray-800 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                    className="px-3 py-1.5 bg-gray-800 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm whitespace-nowrap"
                   >
                     Previous
                   </button>
                   <button
                     onClick={handleNextSlide}
                     disabled={params.currentSlide === params.numSlides}
-                    className="px-3 py-1.5 bg-gray-800 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                    className="px-3 py-1.5 bg-gray-800 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm whitespace-nowrap"
                   >
                     Next
                   </button>
@@ -1020,6 +1028,27 @@ export default function Playground({
               </div>
             </div>
           </div>
+
+          {/* Add back the desktop script panel */}
+          {!isMobile && (
+            <div className="border-t border-gray-800">
+              {currentAgentType === 'view' ? (
+                <div className="p-4 bg-gray-900">
+                  <div className="text-gray-300 text-sm">
+                    {scripts?.[params.currentSlide.toString()] || 'No script available for this slide'}
+                  </div>
+                </div>
+              ) : (
+                <SlideScriptPanel
+                  currentSlide={params.currentSlide}
+                  scripts={scripts}
+                  onScriptChange={handleScriptChange}
+                  onScriptsUpdate={updateScripts}
+                  brdgeId={params.brdgeId}
+                />
+              )}
+            </div>
+          )}
 
           {isMobile && roomState === ConnectionState.Connected && (
             <div className="flex-1 min-h-[45vh] border-t border-gray-800 bg-gray-900 flex flex-col">

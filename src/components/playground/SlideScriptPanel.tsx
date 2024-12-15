@@ -5,10 +5,11 @@ interface SlideScriptPanelProps {
     currentSlide: number;
     scripts: Record<string, string> | null;
     onScriptChange?: (slideNumber: string, content: string) => void;
+    onScriptsUpdate?: (scripts: Record<string, string>) => void;
     brdgeId?: string | number | null;
 }
 
-export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, brdgeId }: SlideScriptPanelProps) => {
+export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScriptsUpdate, brdgeId }: SlideScriptPanelProps) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editedScript, setEditedScript] = useState('');
     const [hasChanges, setHasChanges] = useState(false);
@@ -17,7 +18,10 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, brdgeI
     useEffect(() => {
         if (scripts && scripts[currentSlide]) {
             setEditedScript(scripts[currentSlide]);
+        } else {
+            setEditedScript('');
         }
+        setHasChanges(false);
     }, [currentSlide, scripts]);
 
     const handleScriptChange = (content: string) => {
@@ -31,16 +35,25 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, brdgeI
 
         setIsSaving(true);
         try {
-            await api.put(`/brdges/${brdgeId}/scripts/update`, {
+            const response = await api.put(`/brdges/${brdgeId}/scripts/update`, {
                 scripts: {
                     ...scripts,
                     [currentSlide]: editedScript
                 }
             });
+
+            if (response.data.scripts) {
+                setEditedScript(response.data.scripts[currentSlide]);
+                onScriptsUpdate?.(response.data.scripts);
+            }
+
             setHasChanges(false);
             console.log('Scripts updated successfully');
         } catch (error) {
             console.error('Error updating scripts:', error);
+            if (scripts[currentSlide]) {
+                setEditedScript(scripts[currentSlide]);
+            }
         } finally {
             setIsSaving(false);
         }
@@ -52,6 +65,9 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, brdgeI
                 <div className="flex items-center justify-between">
                     <h3 className="text-sm font-medium text-gray-400">
                         Script for Slide {currentSlide}
+                        {(!scripts || !scripts[currentSlide]) && (
+                            <span className="ml-2 text-gray-500">(No script available)</span>
+                        )}
                     </h3>
                     {hasChanges && (
                         <button
@@ -66,7 +82,9 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, brdgeI
                 <textarea
                     value={editedScript}
                     onChange={(e) => handleScriptChange(e.target.value)}
-                    className="w-full h-24 bg-gray-800 text-gray-200 rounded-md px-3 py-2 resize-none"
+                    placeholder={(!scripts || !scripts[currentSlide]) ? "No script available for this slide" : ""}
+                    className="w-full h-24 bg-gray-800 text-gray-200 rounded-md px-3 py-2 resize-none placeholder:text-gray-600"
+                    disabled={isSaving}
                 />
             </div>
         </div>
