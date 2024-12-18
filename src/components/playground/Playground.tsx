@@ -21,6 +21,7 @@ import {
   useLocalParticipant,
   useRoomInfo,
   useVoiceAssistant,
+  useChat
 } from "@livekit/components-react";
 import { ConnectionState, LocalParticipant, Track, DataPacket_Kind } from "livekit-client";
 import { QRCodeSVG } from "qrcode.react";
@@ -34,6 +35,7 @@ import { SlideScriptPanel } from './SlideScriptPanel';
 import { ViewerHeader } from './ViewerHeader';
 import { jwtDecode } from "jwt-decode";
 import Image from 'next/image';
+import { ChatMessageInput } from "@/components/chat/ChatMessageInput";
 
 export interface PlaygroundProps {
   logo?: ReactNode;
@@ -438,11 +440,22 @@ export default function Playground({
     }
   };
 
+  // Update the hook name
+  const chat = useChat();
+
   const chatTileContent = useMemo(() => {
     return (
       <div className="flex flex-col h-full max-h-full overflow-hidden">
         <div className="flex-grow overflow-y-auto min-h-0">
-          <ChatTile messages={transcripts} accentColor={config.settings.theme_color} />
+          <ChatTile
+            messages={transcripts}
+            accentColor={config.settings.theme_color}
+            onSend={async (message) => {
+              if (chat) {
+                return chat.send(message);
+              }
+            }}
+          />
           {voiceAssistant.audioTrack && (
             <TranscriptionTile
               agentAudioTrack={voiceAssistant.audioTrack}
@@ -450,7 +463,8 @@ export default function Playground({
             />
           )}
         </div>
-        {localParticipant && (
+        {/* Voice input controls */}
+        {localParticipant && !isMobile && (
           <div className="border-t border-gray-700 p-4 flex-shrink-0">
             <ConfigurationPanelItem
               title="Voice Input"
@@ -471,7 +485,9 @@ export default function Playground({
     transcripts,
     voiceAssistant.audioTrack,
     config.settings.theme_color,
-    localParticipant
+    localParticipant,
+    chat,
+    isMobile
   ]);
 
   const slideTileContent = useMemo(() => {
@@ -1072,11 +1088,7 @@ export default function Playground({
 
               <div className="flex-1 overflow-y-auto">
                 <div className="p-2">
-                  <ChatTile
-                    messages={transcripts}
-                    accentColor={config.settings.theme_color}
-                    className="mb-2"
-                  />
+                  {/* Only show transcription tile here since ChatTile is already shown above */}
                   {voiceAssistant.audioTrack && (
                     <TranscriptionTile
                       agentAudioTrack={voiceAssistant.audioTrack}
