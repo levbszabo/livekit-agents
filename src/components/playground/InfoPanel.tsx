@@ -17,7 +17,9 @@ interface InfoPanelProps {
 interface VoiceConfig {
     id: string;
     name: string;
-    createdAt: string;
+    created_at: string;
+    description?: string;
+    language?: string;
 }
 
 interface AgentIntent {
@@ -481,11 +483,13 @@ function VoiceContent({
     selectedVoice,
     setSelectedVoice
 }: VoiceContentProps) {
+    console.log('Saved voices:', savedVoices); // Debug log
+
     return (
         <div className="space-y-4">
             <h3 className="text-[16px] font-semibold text-gray-200 tracking-tight">Voice Configuration</h3>
 
-            {/* Voice Selection - Move this before the recording controls */}
+            {/* Voice Selection */}
             <div className="space-y-3">
                 <label className="text-sm text-gray-400">Select Voice</label>
                 <select
@@ -494,13 +498,37 @@ function VoiceContent({
                     className="w-full bg-gray-800 text-gray-200 rounded-md px-3 py-2"
                 >
                     <option value="">Create new voice</option>
-                    {savedVoices.map(voice => (
+                    {savedVoices && savedVoices.length > 0 && savedVoices.map(voice => (
                         <option key={voice.id} value={voice.id}>
-                            {voice.name}
+                            {voice.name} ({new Date(voice.created_at).toLocaleDateString()})
                         </option>
                     ))}
                 </select>
             </div>
+
+            {/* Show selected voice details if one is selected */}
+            {selectedVoice && savedVoices.find(v => v.id === selectedVoice) && (
+                <div className="bg-gray-800/50 rounded-lg p-3 space-y-2">
+                    <h4 className="text-sm font-medium text-gray-300">Selected Voice Details</h4>
+                    {(() => {
+                        const voice = savedVoices.find(v => v.id === selectedVoice);
+                        return voice ? (
+                            <div className="space-y-1 text-[12px]">
+                                <p className="text-gray-400">Name: <span className="text-cyan-400">{voice.name}</span></p>
+                                <p className="text-gray-400">Created: <span className="text-cyan-400">
+                                    {new Date(voice.created_at).toLocaleString()}
+                                </span></p>
+                                {voice.language && (
+                                    <p className="text-gray-400">Language: <span className="text-cyan-400">{voice.language}</span></p>
+                                )}
+                                {voice.description && (
+                                    <p className="text-gray-400">Description: <span className="text-cyan-400">{voice.description}</span></p>
+                                )}
+                            </div>
+                        ) : null
+                    })()}
+                </div>
+            )}
 
             {/* Only show recording controls if no voice is selected */}
             {!selectedVoice && (
