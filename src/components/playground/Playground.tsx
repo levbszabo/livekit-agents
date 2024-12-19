@@ -150,8 +150,20 @@ export default function Playground({
   const lastSentSlide = useRef<number | null>(null);
 
   // Data channel setup with DataPacket_Kind
-  const { send } = useDataChannel("slide_updates", (message) => {
-    console.log("Received message on slide_updates channel:", message);
+  const { send } = useDataChannel("slide_updates", {
+    onMessage: (message) => {
+      console.log("Received message on slide_updates channel:", message);
+      try {
+        const decoded = JSON.parse(new TextDecoder().decode(message));
+        if (decoded.type === "SCRIPTS_UPDATED") {
+          // Refresh scripts if needed
+          loadInitialScripts();
+        }
+      } catch (error) {
+        console.error("Error processing data channel message:", error);
+      }
+    },
+    reliable: true
   });
 
   // Add brdgeMetadata state
@@ -270,21 +282,28 @@ export default function Playground({
     }
   }, [roomState, onConnect]);
 
-  // Remove the first handleGenerateClick declaration and keep only this one
+  // Modify the handleGenerateClick function
   const handleGenerateClick = async () => {
     if (!selectedWalkthrough) return;
 
     setIsGeneratingScripts(true);
     try {
-      // Start script generation
-      await api.post(`/brdges/${params.brdgeId}/generate-slide-scripts`, {
+      // Generate scripts
+      const response = await api.post(`/brdges/${params.brdgeId}/generate-slide-scripts`, {
         walkthrough_id: selectedWalkthrough
       });
 
-      // Immediately check for scripts after generation
-      const response = await api.get(`/brdges/${params.brdgeId}/scripts`);
-      if (response.data.has_scripts) {
+      if (response.data.scripts) {
+        // Update scripts state with new scripts
         setScripts(response.data.scripts);
+
+        // Notify parent of script update
+        onScriptsGenerated?.(response.data.scripts);
+
+        // Force a re-render of the script panel
+        setParams(prev => ({ ...prev, currentSlide: prev.currentSlide }));
+      } else {
+        console.error('No scripts returned from generation');
       }
     } catch (error) {
       console.error('Error generating scripts:', error);
@@ -293,34 +312,44 @@ export default function Playground({
     }
   };
 
-  // Add polling for scripts at component level
-  useEffect(() => {
-    let pollInterval: NodeJS.Timeout;
+  // Add handler for script generation completion
+  const handleScriptsGenerated = useCallback((newScripts: Record<string, any>) => {
+    setScripts(newScripts);
 
-    const checkScripts = async () => {
-      if (!params.brdgeId) return;
-
+    // Only try to send if we have a valid data channel and are connected
+    if (send && roomState === ConnectionState.Connected) {
       try {
-        const response = await api.get(`/brdges/${params.brdgeId}/scripts`);
-        if (response.data.has_scripts) {
-          setScripts(response.data.scripts);
-          setIsGeneratingScripts(false);
-        }
+        const message = {
+          type: "SCRIPTS_UPDATED",
+          brdgeId: params.brdgeId,
+          timestamp: Date.now()
+        };
+        send(new TextEncoder().encode(JSON.stringify(message)), { reliable: true });
+        console.log('Sent script update notification');
       } catch (error) {
-        console.error('Error checking scripts:', error);
+        console.error('Error sending script update:', error);
       }
-    };
-
-    if (isGeneratingScripts) {
-      pollInterval = setInterval(checkScripts, 2000);
     }
+  }, [send, roomState, params.brdgeId]); // Add dependencies
 
-    return () => {
-      if (pollInterval) {
-        clearInterval(pollInterval);
+  // Add loadInitialScripts as a named function
+  const loadInitialScripts = useCallback(async () => {
+    if (!params.brdgeId) return;
+
+    try {
+      const response = await api.get(`/brdges/${params.brdgeId}/scripts`);
+      if (response.data.has_scripts) {
+        setScripts(response.data.scripts);
       }
-    };
-  }, [isGeneratingScripts, params.brdgeId]);
+    } catch (error) {
+      console.error('Error loading initial scripts:', error);
+    }
+  }, [params.brdgeId]);
+
+  // Update the initial scripts effect to use the named function
+  useEffect(() => {
+    loadInitialScripts();
+  }, [loadInitialScripts]);
 
   // Add the handler function
   const handleWalkthroughSelect = useCallback((walkthroughId: number) => {
@@ -609,7 +638,9 @@ export default function Playground({
             scripts={scripts}
             onScriptChange={handleScriptChange}
             onScriptsUpdate={updateScripts}
+            onScriptsGenerated={handleScriptsGenerated}
             brdgeId={params.brdgeId}
+            isGenerating={isGeneratingScripts}
           />
         )}
       </div>
@@ -1046,57 +1077,31 @@ export default function Playground({
           </div>
 
           {/* Add back the desktop script panel */}
-          {!isMobile && (
+          {!isMobile && currentAgentType === 'edit' && (
             <div className="border-t border-gray-800">
-              {currentAgentType === 'view' ? (
-                <div className="p-4 bg-gray-900">
-                  <div className="text-gray-300 text-sm">
-                    {scripts?.[params.currentSlide.toString()] || 'No script available for this slide'}
-                  </div>
-                </div>
-              ) : (
-                <SlideScriptPanel
-                  currentSlide={params.currentSlide}
-                  scripts={scripts}
-                  onScriptChange={handleScriptChange}
-                  onScriptsUpdate={updateScripts}
-                  brdgeId={params.brdgeId}
-                />
-              )}
+              <SlideScriptPanel
+                currentSlide={params.currentSlide}
+                scripts={scripts}
+                onScriptChange={handleScriptChange}
+                onScriptsUpdate={updateScripts}
+                onScriptsGenerated={handleScriptsGenerated}
+                brdgeId={params.brdgeId}
+                isGenerating={isGeneratingScripts}
+              />
             </div>
           )}
 
-          {isMobile && roomState === ConnectionState.Connected && (
+          {isMobile && roomState === ConnectionState.Connected && currentAgentType === 'edit' && (
             <div className="flex-1 min-h-[45vh] border-t border-gray-800 bg-gray-900 flex flex-col">
-              <div className="p-2 border-b border-gray-700 sticky top-0 bg-gray-900 z-10">
-                <button
-                  onClick={() => {
-                    if (roomState === ConnectionState.Connected) {
-                      localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
-                    }
-                  }}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors w-full justify-center
-                    ${localParticipant.isMicrophoneEnabled
-                      ? 'bg-cyan-500/20 text-cyan-400'
-                      : 'bg-gray-800 text-gray-400'
-                    }`}
-                >
-                  <span className={`w-2 h-2 rounded-full ${localParticipant.isMicrophoneEnabled ? 'bg-cyan-500 animate-pulse' : 'bg-gray-600'}`} />
-                  {localParticipant.isMicrophoneEnabled ? 'Mic On' : 'Mic Off'}
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto">
-                <div className="p-2">
-                  {/* Only show transcription tile here since ChatTile is already shown above */}
-                  {voiceAssistant.audioTrack && (
-                    <TranscriptionTile
-                      agentAudioTrack={voiceAssistant.audioTrack}
-                      accentColor={config.settings.theme_color}
-                    />
-                  )}
-                </div>
-              </div>
+              <SlideScriptPanel
+                currentSlide={params.currentSlide}
+                scripts={scripts}
+                onScriptChange={handleScriptChange}
+                onScriptsUpdate={updateScripts}
+                onScriptsGenerated={handleScriptsGenerated}
+                brdgeId={params.brdgeId}
+                isGenerating={isGeneratingScripts}
+              />
             </div>
           )}
         </div>

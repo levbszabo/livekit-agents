@@ -66,7 +66,7 @@ export const PlaygroundTabbedTile: React.FC<PlaygroundTabbedTileProps> = ({
 }) => {
   const contentPadding = 4;
   const [activeTab, setActiveTab] = useState(initialTab);
-  if(activeTab >= tabs.length) {
+  if (activeTab >= tabs.length) {
     return null;
   }
   return (
@@ -82,11 +82,10 @@ export const PlaygroundTabbedTile: React.FC<PlaygroundTabbedTileProps> = ({
         {tabs.map((tab, index) => (
           <button
             key={index}
-            className={`px-4 py-2 rounded-sm hover:bg-gray-800 hover:text-gray-300 border-r border-r-gray-800 ${
-              index === activeTab
+            className={`px-4 py-2 rounded-sm hover:bg-gray-800 hover:text-gray-300 border-r border-r-gray-800 ${index === activeTab
                 ? `bg-gray-900 text-gray-300`
                 : `bg-transparent text-gray-500`
-            }`}
+              }`}
             onClick={() => setActiveTab(index)}
           >
             {tab.title}

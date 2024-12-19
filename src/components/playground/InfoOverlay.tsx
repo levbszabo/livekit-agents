@@ -7,13 +7,19 @@ interface StepInfo {
     status: 'pending' | 'active' | 'completed';
 }
 
-export const InfoOverlay = ({
-    isVisible,
-    walkthroughCount
-}: {
+interface InfoOverlayProps {
     isVisible: boolean;
     walkthroughCount: number;
-}) => {
+    hasScripts?: boolean;
+    isGenerating?: boolean;
+}
+
+export const InfoOverlay = ({
+    isVisible,
+    walkthroughCount,
+    hasScripts = false,
+    isGenerating = false
+}: InfoOverlayProps) => {
     const steps: StepInfo[] = [
         {
             number: 1,
@@ -25,7 +31,9 @@ export const InfoOverlay = ({
             number: 2,
             title: "Generate Brdge",
             description: "Create an AI version of your presentation that can interact with others on your behalf.",
-            status: walkthroughCount === 0 ? 'pending' : 'active'
+            status: walkthroughCount === 0 ? 'pending' :
+                hasScripts ? 'completed' :
+                    isGenerating ? 'active' : 'active'
         }
     ];
 
