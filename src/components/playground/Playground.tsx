@@ -213,6 +213,7 @@ export default function Playground({
   const [hasScriptChanges, setHasScriptChanges] = useState(false);
   const [walkthroughs, setWalkthroughs] = useState<any[]>([]);
   const [rightPanelView, setRightPanelView] = useState<'chat' | 'info'>('info');
+  const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
 
   useEffect(() => {
     if (roomState === ConnectionState.Connected) {
@@ -841,6 +842,104 @@ export default function Playground({
     );
   };
 
+  // Add voice-related state
+  const [selectedVoice, setSelectedVoice] = useState<string | null>(null);
+  const [voiceName, setVoiceName] = useState('');
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [currentRecording, setCurrentRecording] = useState<Blob | null>(null);
+  const [isCloning, setIsCloning] = useState(false);
+  const [savedVoices, setSavedVoices] = useState<Array<{ id: string; name: string; created_at: string }>>([]);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Add voice-related handlers
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          setCurrentRecording(new Blob([e.data], { type: 'audio/wav' }));
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      timerRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error('Error accessing microphone:', err);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      setIsRecording(false);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        setRecordingTime(0);
+      }
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleCloneVoice = async () => {
+    if (!currentRecording || !voiceName || !params.brdgeId) return;
+    setIsCloning(true);
+    try {
+      const formData = new FormData();
+      formData.append('audio', currentRecording);
+      formData.append('name', voiceName);
+
+      const response = await api.post(`/brdges/${params.brdgeId}/voice/clone`, formData);
+
+      // Refresh voice list
+      const voicesResponse = await api.get(`/brdges/${params.brdgeId}/voices`);
+      if (voicesResponse.data?.voices) {
+        setSavedVoices(voicesResponse.data.voices);
+        if (response.data?.voice?.id) {
+          setSelectedVoice(response.data.voice.id);
+        }
+      }
+
+      // Reset recording state
+      setCurrentRecording(null);
+      setVoiceName('');
+    } catch (error) {
+      console.error('Error cloning voice:', error);
+    } finally {
+      setIsCloning(false);
+    }
+  };
+
+  // Load saved voices on mount
+  useEffect(() => {
+    const loadVoices = async () => {
+      if (!params.brdgeId) return;
+      try {
+        const response = await api.get(`/brdges/${params.brdgeId}/voices`);
+        if (response.data?.voices) {
+          setSavedVoices(response.data.voices);
+        }
+      } catch (error) {
+        console.error('Error loading voices:', error);
+      }
+    };
+
+    loadVoices();
+  }, [params.brdgeId]);
+
   return (
     <div className="h-[calc(100vh-1px)] flex flex-col bg-[#121212] relative overflow-hidden">
       {/* Minimal Header */}
@@ -854,9 +953,10 @@ export default function Playground({
       <div className="flex-1 flex overflow-hidden">
         {/* Left Content Area */}
         <PanelGroup direction="horizontal">
-          <Panel defaultSize={75} minSize={30}>
+          <div className={`flex-1 transition-all duration-300 ${isRightPanelCollapsed ? 'mr-0' : 'mr-[400px]'
+            }`}>
             <PanelGroup direction="vertical">
-              {/* Slides Area - Scrollable */}
+              {/* Slides Area */}
               <Panel defaultSize={70} minSize={30}>
                 <div className="h-full overflow-auto bg-black">
                   <div className="min-h-full flex items-center justify-center p-4">
@@ -904,8 +1004,8 @@ export default function Playground({
                             }
                           }}
                           className={`p-2 rounded-lg transition-colors ${roomState === ConnectionState.Connected
-                              ? 'bg-red-500/20 text-red-300 hover:bg-red-500/30'
-                              : 'bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30'
+                            ? 'bg-red-500/20 text-red-300 hover:bg-red-500/30'
+                            : 'bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30'
                             }`}
                         >
                           {roomState === ConnectionState.Connected ? (
@@ -927,8 +1027,8 @@ export default function Playground({
                             }
                           }}
                           className={`p-2 rounded-lg transition-colors ${localParticipant?.isMicrophoneEnabled
-                              ? 'bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30'
-                              : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                            ? 'bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30'
+                            : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
                             }`}
                           disabled={roomState !== ConnectionState.Connected}
                         >
@@ -982,24 +1082,46 @@ export default function Playground({
                 </div>
               </Panel>
             </PanelGroup>
-          </Panel>
+          </div>
 
-          <PanelResizeHandle className={resizeHandleStyles.vertical}>
-            <div className="h-8 w-0.5 bg-gray-700 group-hover:bg-cyan-500 transition-colors duration-150" />
-          </PanelResizeHandle>
-
-          {/* Right Configuration Panel */}
+          {/* Collapsible Right Panel */}
           {!isMobile && (
-            <Panel defaultSize={25} minSize={20}>
+            <div className={`fixed right-0 top-[48px] bottom-0 w-[400px] transition-all duration-300 ${isRightPanelCollapsed ? 'translate-x-full' : 'translate-x-0'
+              }`}>
+              {/* Collapse Toggle Button */}
+              <button
+                onClick={() => setIsRightPanelCollapsed(!isRightPanelCollapsed)}
+                className="absolute -left-8 top-1/2 transform -translate-y-1/2 z-10
+                  w-8 h-16 bg-gray-800 rounded-l-lg flex items-center justify-center
+                  text-gray-400 hover:text-white transition-colors"
+              >
+                <svg
+                  className={`w-5 h-5 transform transition-transform ${isRightPanelCollapsed ? 'rotate-180' : ''
+                    }`}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </button>
+
+              {/* Right Panel Content */}
               <div className="h-full flex flex-col bg-gray-900/50 backdrop-blur-md">
+                {/* Tab Navigation */}
                 <div className="flex border-b border-gray-800">
                   {['Agent', 'Voice', 'Workflow'].map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setConfigTab(tab.toLowerCase() as any)}
-                      className={`${componentStyles.tabButton} ${configTab === tab.toLowerCase()
-                        ? componentStyles.activeTab
-                        : 'text-gray-400 hover:text-gray-300'
+                      className={`px-4 py-2 text-xs font-medium transition-colors ${configTab === tab.toLowerCase()
+                        ? 'bg-cyan-500/10 text-cyan-400 border-b-2 border-cyan-500'
+                        : 'text-gray-400 hover:text-gray-300 hover:bg-gray-800/50'
                         }`}
                     >
                       {tab}
@@ -1007,77 +1129,198 @@ export default function Playground({
                   ))}
                 </div>
 
-                <div className={`flex-1 overflow-y-auto ${componentStyles.scrollArea}`}>
+                {/* Tab Content */}
+                <div className="flex-1 overflow-y-auto">
+                  {/* Agent Tab */}
                   {configTab === 'agent' && (
-                    <div className="p-4 h-full">
-                      <SlideScriptPanel
-                        currentSlide={params.currentSlide}
-                        scripts={scripts}
-                        onScriptChange={handleScriptChange}
-                        onScriptsUpdate={updateScripts}
-                        onScriptsGenerated={handleScriptsGenerated}
-                        brdgeId={params.brdgeId}
-                        isGenerating={isGeneratingScripts}
-                      />
-                    </div>
+                    <SlideScriptPanel
+                      currentSlide={params.currentSlide}
+                      scripts={scripts}
+                      onScriptChange={handleScriptChange}
+                      onScriptsUpdate={updateScripts}
+                      onScriptsGenerated={handleScriptsGenerated}
+                      brdgeId={params.brdgeId}
+                      isGenerating={isGeneratingScripts}
+                    />
                   )}
 
+                  {/* Voice Tab */}
                   {configTab === 'voice' && (
                     <div className="p-4 space-y-6">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-2">
-                          Voice Selection
-                        </label>
-                        <select className={componentStyles.input}>
-                          <option value="default">Default Voice</option>
-                          <option value="clone">Voice Clone</option>
+                      <h3 className="text-[16px] font-semibold text-gray-200 tracking-tight">Voice Setup</h3>
+
+                      {/* Voice Selection */}
+                      <div className="space-y-2">
+                        <select
+                          className="w-full bg-gray-800/50 border border-gray-700 rounded-lg
+                            px-3 py-2 text-sm text-gray-300
+                            focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                          value={selectedVoice || ''}
+                          onChange={(e) => setSelectedVoice(e.target.value)}
+                        >
+                          <option value="">Create new voice</option>
+                          {savedVoices.map(voice => (
+                            <option key={voice.id} value={voice.id}>
+                              {voice.name}
+                            </option>
+                          ))}
                         </select>
                       </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-3">
-                          Speed
-                        </label>
-                        <input
-                          type="range"
-                          min="0.5"
-                          max="2"
-                          step="0.1"
-                          defaultValue="1"
-                          className="w-full accent-cyan-500"
-                        />
-                      </div>
+                      {/* Voice Creation Section */}
+                      {!selectedVoice && (
+                        <>
+                          <div className="bg-gray-800/30 rounded-lg p-4">
+                            <p className="text-sm text-gray-300 leading-relaxed mb-3">
+                              Create a natural-sounding AI voice clone by recording a short sample of your voice.
+                            </p>
+                            <ul className="space-y-2 text-sm text-gray-400">
+                              <li className="flex items-start gap-2">
+                                <span className="text-cyan-400 mt-0.5">•</span>
+                                Record 10-20 seconds of clear speech
+                              </li>
+                              <li className="flex items-start gap-2">
+                                <span className="text-cyan-400 mt-0.5">•</span>
+                                Speak naturally at your normal pace
+                              </li>
+                              <li className="flex items-start gap-2">
+                                <span className="text-cyan-400 mt-0.5">•</span>
+                                Avoid background noise and echoes
+                              </li>
+                            </ul>
+                          </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-3">
-                          Pitch
-                        </label>
-                        <input
-                          type="range"
-                          min="0.5"
-                          max="2"
-                          step="0.1"
-                          defaultValue="1"
-                          className="w-full accent-cyan-500"
-                        />
-                      </div>
+                          <div className="space-y-3">
+                            <input
+                              type="text"
+                              value={voiceName}
+                              onChange={(e) => setVoiceName(e.target.value)}
+                              placeholder="Enter voice name"
+                              className="w-full bg-gray-800/50 border border-gray-700 rounded-lg
+                                px-3 py-2 text-sm text-gray-300
+                                focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                            />
+                            <button
+                              onClick={isRecording ? stopRecording : startRecording}
+                              className={`w-full px-4 py-2 ${isRecording
+                                  ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                                  : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
+                                } rounded-lg text-sm font-medium transition-colors
+                              flex items-center justify-center gap-2`}
+                            >
+                              <span className={`w-2 h-2 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-cyan-500'}`} />
+                              {isRecording ? (
+                                <>Stop Recording ({formatTime(recordingTime)})</>
+                              ) : (
+                                <>Record Voice</>
+                              )}
+                            </button>
 
-                      <button className={componentStyles.button}>
-                        Record Voice Clone
-                      </button>
+                            {currentRecording && (
+                              <div className="space-y-3">
+                                <audio
+                                  src={URL.createObjectURL(currentRecording)}
+                                  controls
+                                  className="w-full h-8"
+                                />
+                                <button
+                                  onClick={handleCloneVoice}
+                                  disabled={!voiceName || isCloning}
+                                  className="w-full px-4 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg 
+                                    hover:bg-cyan-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {isCloning ? 'Creating Voice Clone...' : 'Create Voice Clone'}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
+
+                      {/* Selected Voice Details */}
+                      {selectedVoice && savedVoices.find(v => v.id === selectedVoice) && (
+                        <div className="bg-gray-800/30 rounded-lg p-3 space-y-2">
+                          {(() => {
+                            const voice = savedVoices.find(v => v.id === selectedVoice);
+                            return voice ? (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm text-gray-400">Name</span>
+                                  <span className="text-sm text-cyan-400">{voice.name}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm text-gray-400">Created</span>
+                                  <span className="text-sm text-cyan-400">
+                                    {new Date(voice.created_at).toLocaleDateString()}
+                                  </span>
+                                </div>
+                              </div>
+                            ) : null;
+                          })()}
+                        </div>
+                      )}
                     </div>
                   )}
 
+                  {/* Workflow Tab */}
                   {configTab === 'workflow' && (
-                    <div className="p-4">
+                    <div className="p-4 space-y-6">
+                      {/* Getting Started Section */}
+                      <div className="space-y-4">
+                        <h3 className="text-[16px] font-semibold text-gray-200 tracking-tight">Recording Walkthrough</h3>
+
+                        <div className="relative px-4">
+                          <div className="absolute top-4 left-0 right-0 h-0.5 bg-gray-800" />
+                          <div className="relative z-10 flex justify-between">
+                            {[
+                              {
+                                step: 1,
+                                title: "Present",
+                                subtitle: "Natural Explanation",
+                                description: "Walk through your slides naturally"
+                              },
+                              {
+                                step: 2,
+                                title: "Interact",
+                                subtitle: "AI Learning",
+                                description: "Answer AI's clarifying questions"
+                              },
+                              {
+                                step: 3,
+                                title: "Review",
+                                subtitle: "Verify Content",
+                                description: "Ensure accuracy"
+                              }
+                            ].map(({ step, title, subtitle, description }) => (
+                              <div key={step} className="flex flex-col items-center">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-3
+                                  ${step <= currentStep
+                                    ? 'bg-cyan-500/20 text-cyan-400'
+                                    : 'bg-gray-800 text-gray-500'
+                                  }`}>
+                                  {step}
+                                </div>
+                                <div className="text-center space-y-1">
+                                  <p className="text-sm font-medium text-gray-300">{title}</p>
+                                  <p className="text-xs text-gray-500">{subtitle}</p>
+                                  <p className="text-xs text-gray-400">{description}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
                       {/* Walkthrough Controls */}
-                      <div className="mb-8 space-y-4">
+                      <div className="space-y-4">
                         <select
-                          className={componentStyles.input}
+                          className="w-full bg-gray-800/50 border border-gray-700 rounded-lg
+                            px-3 py-2 text-sm text-gray-300
+                            focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
                           value={selectedWalkthrough || ''}
                           onChange={(e) => handleWalkthroughSelect(Number(e.target.value))}
                         >
-                          <option value="">Select Walkthrough</option>
+                          <option value="">Select a walkthrough</option>
                           {walkthroughs.map((w, index) => (
                             <option key={w.id} value={w.id}>
                               Walkthrough #{index + 1}
@@ -1085,55 +1328,30 @@ export default function Playground({
                           ))}
                         </select>
 
-                        <div className="flex gap-3">
+                        <div className="flex gap-2">
                           <button
                             onClick={() => handleWalkthroughClick('edit')}
-                            className={componentStyles.button}
+                            className="flex-1 px-3 py-2 bg-cyan-500/20 text-cyan-400
+                              rounded-lg text-sm font-medium hover:bg-cyan-500/30 transition-colors"
                           >
-                            Start Walkthrough
+                            Record Walkthrough
                           </button>
                           <button
                             onClick={handleGenerateScripts}
                             disabled={!selectedWalkthrough || isGeneratingScripts}
-                            className={componentStyles.button}
+                            className="flex-1 px-3 py-2 bg-cyan-500/20 text-cyan-400
+                              rounded-lg text-sm font-medium hover:bg-cyan-500/30 transition-colors
+                              disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            {isGeneratingScripts ? 'Generating...' : 'Generate Brdge'}
+                            {isGeneratingScripts ? 'Generating...' : 'Generate Scripts'}
                           </button>
                         </div>
-                      </div>
-
-                      {/* Progress Steps */}
-                      <div className="space-y-6">
-                        {['Record walkthrough', 'Generate script + agent', 'Configure', 'Share'].map((step, index) => (
-                          <div key={step} className="flex items-start gap-4">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0
-                              ${index + 1 <= currentStep
-                                ? 'bg-gradient-to-br from-cyan-500 to-cyan-600 text-white shadow-lg shadow-cyan-500/30'
-                                : 'bg-gray-800 text-gray-400'
-                              }`}
-                            >
-                              {index + 1}
-                            </div>
-                            <div className="flex-1">
-                              <h3 className={`text-sm font-medium ${index + 1 <= currentStep ? 'text-gray-200' : 'text-gray-400'
-                                }`}>
-                                {step}
-                              </h3>
-                              <p className="mt-1 text-sm text-gray-500">
-                                {index === 0 && "Record your presentation walkthrough"}
-                                {index === 1 && "AI generates script and configures agent"}
-                                {index === 2 && "Fine-tune agent settings and voice"}
-                                {index === 3 && "Share your Brdge with others"}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
                       </div>
                     </div>
                   )}
                 </div>
               </div>
-            </Panel>
+            </div>
           )}
         </PanelGroup>
       </div>

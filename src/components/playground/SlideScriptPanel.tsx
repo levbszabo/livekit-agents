@@ -149,58 +149,63 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
     };
 
     return (
-        <div className="p-4 bg-gray-900 border-t border-gray-800">
-            <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-medium text-gray-400">
-                            Slide {currentSlide}
-                            {(!scripts || !scripts[currentSlide]) && (
-                                <span className="ml-2 text-gray-500">
-                                    {isGenerating ? 'Generating...' : '(No content available)'}
-                                </span>
-                            )}
-                        </h3>
-                        {isGenerating && (
-                            <div className="animate-pulse flex space-x-2">
-                                <div className="h-2 w-2 bg-cyan-400 rounded-full"></div>
-                                <div className="h-2 w-2 bg-cyan-400 rounded-full"></div>
-                                <div className="h-2 w-2 bg-cyan-400 rounded-full"></div>
-                            </div>
+        <div className="flex flex-col h-full bg-gray-900/50">
+            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800">
+                <div className="flex items-center gap-2">
+                    <h3 className="text-xs font-medium text-gray-400">
+                        Slide {currentSlide}
+                        {(!scripts || !scripts[currentSlide]) && (
+                            <span className="ml-2 text-gray-500">
+                                {isGenerating ? 'Generating...' : '(No content available)'}
+                            </span>
                         )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="flex items-center bg-gray-800 rounded-md overflow-hidden">
-                            <button
-                                onClick={() => setActiveTab('script')}
-                                className={`px-3 py-1 text-xs transition-colors ${activeTab === 'script'
-                                    ? 'bg-cyan-500/20 text-cyan-400'
-                                    : 'text-gray-400 hover:text-gray-300'
-                                    }`}
-                            >
-                                Script
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('agent')}
-                                className={`px-3 py-1 text-xs transition-colors ${activeTab === 'agent'
-                                    ? 'bg-cyan-500/20 text-cyan-400'
-                                    : 'text-gray-400 hover:text-gray-300'
-                                    }`}
-                            >
-                                Agent
-                            </button>
+                    </h3>
+                    {isGenerating && (
+                        <div className="animate-pulse flex space-x-1">
+                            <div className="h-1.5 w-1.5 bg-cyan-400 rounded-full"></div>
+                            <div className="h-1.5 w-1.5 bg-cyan-400 rounded-full"></div>
+                            <div className="h-1.5 w-1.5 bg-cyan-400 rounded-full"></div>
                         </div>
-                        {((activeTab === 'script' && hasScriptChanges) || (activeTab === 'agent' && hasAgentChanges)) && (
-                            <button
-                                onClick={activeTab === 'script' ? handleSaveScript : handleSaveAgent}
-                                disabled={activeTab === 'script' ? isSavingScript : isSavingAgent}
-                                className="px-3 py-1 text-sm bg-green-500/20 text-green-400 rounded-md hover:bg-green-500/30 disabled:opacity-50"
-                            >
-                                {(activeTab === 'script' ? isSavingScript : isSavingAgent) ? 'Saving...' : 'Save Changes'}
-                            </button>
-                        )}
-                    </div>
+                    )}
                 </div>
+                <div className="flex items-center gap-2">
+                    <div className="flex items-center bg-gray-800/80 rounded-lg overflow-hidden">
+                        <button
+                            onClick={() => setActiveTab('script')}
+                            className={`px-3 py-1.5 text-xs transition-colors ${activeTab === 'script'
+                                ? 'bg-cyan-500/20 text-cyan-400'
+                                : 'text-gray-400 hover:text-gray-300'
+                                }`}
+                        >
+                            Script
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('agent')}
+                            className={`px-3 py-1.5 text-xs transition-colors ${activeTab === 'agent'
+                                ? 'bg-cyan-500/20 text-cyan-400'
+                                : 'text-gray-400 hover:text-gray-300'
+                                }`}
+                        >
+                            Agent
+                        </button>
+                    </div>
+                    {((activeTab === 'script' && hasScriptChanges) || (activeTab === 'agent' && hasAgentChanges)) && (
+                        <button
+                            onClick={activeTab === 'script' ? handleSaveScript : handleSaveAgent}
+                            disabled={activeTab === 'script' ? isSavingScript : isSavingAgent}
+                            className="px-3 py-1.5 text-xs bg-green-500/20 text-green-400 rounded-lg 
+                                hover:bg-green-500/30 disabled:opacity-50 flex items-center gap-1.5"
+                        >
+                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M21 7L9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59 21 7z" />
+                            </svg>
+                            {(activeTab === 'script' ? isSavingScript : isSavingAgent) ? 'Saving...' : 'Save'}
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
                 <textarea
                     value={activeTab === 'script' ? editedScript : editedAgent}
                     onChange={(e) => handleContentChange(e.target.value, activeTab)}
@@ -210,9 +215,17 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                             ? "Enter script for this slide..."
                             : "Enter agent instructions for this slide..."
                     }
-                    className={`w-full h-24 bg-gray-800 text-gray-200 rounded-md px-3 py-2 resize-none placeholder:text-gray-600
+                    className={`w-full min-h-[400px] bg-gray-800/80 text-gray-200 rounded-lg px-4 py-3 resize-y
+                        text-[13px] font-mono leading-relaxed tracking-wide
+                        border border-gray-700/50
+                        focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50
+                        placeholder:text-gray-600
+                        shadow-[0_0_15px_rgba(255,255,255,0.03)]
                         ${isGenerating ? 'opacity-50 cursor-wait' : ''}`}
                     disabled={isGenerating || isSavingScript || isSavingAgent}
+                    style={{
+                        boxShadow: '0 0 15px rgba(255,255,255,0.03), inset 0 0 20px rgba(255,255,255,0.02)'
+                    }}
                 />
             </div>
         </div>

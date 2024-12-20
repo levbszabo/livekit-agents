@@ -483,62 +483,38 @@ function VoiceContent({
     selectedVoice,
     setSelectedVoice
 }: VoiceContentProps) {
-    console.log('Saved voices:', savedVoices); // Debug log
-
     return (
-        <div className="space-y-4">
-            <h3 className="text-[16px] font-semibold text-gray-200 tracking-tight">Voice Configuration</h3>
-
+        <div className="p-4 space-y-6">
             {/* Voice Selection */}
-            <div className="space-y-3">
-                <label className="text-sm text-gray-400">Select Voice</label>
+            <div className="space-y-2">
+                <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    Select Voice
+                </label>
                 <select
                     value={selectedVoice || ''}
                     onChange={(e) => setSelectedVoice(e.target.value)}
-                    className="w-full bg-gray-800 text-gray-200 rounded-md px-3 py-2"
+                    className="w-full bg-gray-800/50 border border-gray-700 rounded-lg
+                        px-3 py-2 text-sm text-gray-300
+                        focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
                 >
                     <option value="">Create new voice</option>
-                    {savedVoices && savedVoices.length > 0 && savedVoices.map(voice => (
+                    {savedVoices.map(voice => (
                         <option key={voice.id} value={voice.id}>
-                            {voice.name} ({new Date(voice.created_at).toLocaleDateString()})
+                            {voice.name}
                         </option>
                     ))}
                 </select>
             </div>
 
-            {/* Show selected voice details if one is selected */}
-            {selectedVoice && savedVoices.find(v => v.id === selectedVoice) && (
-                <div className="bg-gray-800/50 rounded-lg p-3 space-y-2">
-                    <h4 className="text-sm font-medium text-gray-300">Selected Voice Details</h4>
-                    {(() => {
-                        const voice = savedVoices.find(v => v.id === selectedVoice);
-                        return voice ? (
-                            <div className="space-y-1 text-[12px]">
-                                <p className="text-gray-400">Name: <span className="text-cyan-400">{voice.name}</span></p>
-                                <p className="text-gray-400">Created: <span className="text-cyan-400">
-                                    {new Date(voice.created_at).toLocaleString()}
-                                </span></p>
-                                {voice.language && (
-                                    <p className="text-gray-400">Language: <span className="text-cyan-400">{voice.language}</span></p>
-                                )}
-                                {voice.description && (
-                                    <p className="text-gray-400">Description: <span className="text-cyan-400">{voice.description}</span></p>
-                                )}
-                            </div>
-                        ) : null
-                    })()}
-                </div>
-            )}
-
-            {/* Only show recording controls if no voice is selected */}
+            {/* Create New Voice Section */}
             {!selectedVoice && (
                 <>
-                    {/* Voice Tips */}
-                    <div className="bg-gray-800/50 rounded-lg p-3 space-y-2">
-                        <p className="text-[12px] text-gray-300 leading-snug">
-                            Create a natural-sounding AI voice clone by following these tips:
+                    {/* Recording Tips */}
+                    <div className="bg-gray-800/30 rounded-lg p-3 space-y-2">
+                        <p className="text-[12px] text-gray-400 leading-relaxed">
+                            Tips for best results:
                         </p>
-                        <ul className="space-y-1.5 text-[12px] text-gray-400 leading-snug">
+                        <ul className="space-y-1 text-[12px] text-gray-400">
                             <li className="flex items-start gap-1.5">
                                 <span className="text-cyan-400 mt-0.5">•</span>
                                 Record 10-20 seconds of clear speech
@@ -549,42 +525,43 @@ function VoiceContent({
                             </li>
                             <li className="flex items-start gap-1.5">
                                 <span className="text-cyan-400 mt-0.5">•</span>
-                                You can read from your slides or speak freely
-                            </li>
-                            <li className="flex items-start gap-1.5">
-                                <span className="text-cyan-400 mt-0.5">•</span>
                                 Avoid background noise and echoes
                             </li>
                         </ul>
                     </div>
 
-                    {/* Voice Controls */}
-                    <div className="space-y-4">
-                        <div className="space-y-2">
-                            <label className="text-sm text-gray-400">Voice Name</label>
-                            <input
-                                type="text"
-                                value={voiceName}
-                                onChange={(e) => setVoiceName(e.target.value)}
-                                placeholder="Enter voice name"
-                                className="w-full bg-gray-800 text-gray-200 rounded-md px-3 py-2"
-                            />
-                        </div>
+                    {/* Voice Name Input */}
+                    <div className="space-y-2">
+                        <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+                            Voice Name
+                        </label>
+                        <input
+                            type="text"
+                            value={voiceName}
+                            onChange={(e) => setVoiceName(e.target.value)}
+                            placeholder="Enter a name for your voice"
+                            className="w-full bg-gray-800/50 border border-gray-700 rounded-lg
+                                px-3 py-2 text-sm text-gray-300
+                                focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                        />
+                    </div>
 
-                        <div className="flex items-center gap-4">
+                    {/* Recording Controls */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-3">
                             <button
                                 onClick={isRecording ? stopRecording : startRecording}
-                                className={`px-4 py-2 rounded-md flex items-center gap-2 ${isRecording
-                                    ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                                    : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
+                                className={`flex-1 px-4 py-2 rounded-lg flex items-center justify-center gap-2 
+                                    ${isRecording
+                                        ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                                        : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
                                     }`}
                             >
-                                <span className={`w-2 h-2 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-cyan-500'
-                                    }`} />
-                                {isRecording ? 'Stop Recording' : 'Record Voice'}
+                                <span className={`w-2 h-2 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-cyan-500'}`} />
+                                {isRecording ? 'Stop Recording' : 'Start Recording'}
                             </button>
                             {isRecording && (
-                                <span className="text-gray-400">
+                                <span className="text-sm text-gray-400 tabular-nums">
                                     {formatTime(recordingTime)}
                                 </span>
                             )}
@@ -595,12 +572,13 @@ function VoiceContent({
                                 <audio
                                     src={URL.createObjectURL(currentRecording)}
                                     controls
-                                    className="w-full"
+                                    className="w-full h-8"
                                 />
                                 <button
                                     onClick={handleCloneVoice}
                                     disabled={!voiceName || isCloning}
-                                    className="w-full px-4 py-2 bg-cyan-500/20 text-cyan-400 rounded-md hover:bg-cyan-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="w-full px-4 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg 
+                                        hover:bg-cyan-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {isCloning ? 'Creating Voice Clone...' : 'Create Voice Clone'}
                                 </button>
@@ -608,6 +586,29 @@ function VoiceContent({
                         )}
                     </div>
                 </>
+            )}
+
+            {/* Selected Voice Details */}
+            {selectedVoice && savedVoices.find(v => v.id === selectedVoice) && (
+                <div className="bg-gray-800/30 rounded-lg p-3 space-y-2">
+                    {(() => {
+                        const voice = savedVoices.find(v => v.id === selectedVoice);
+                        return voice ? (
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm text-gray-400">Name</span>
+                                    <span className="text-sm text-cyan-400">{voice.name}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm text-gray-400">Created</span>
+                                    <span className="text-sm text-cyan-400">
+                                        {new Date(voice.created_at).toLocaleDateString()}
+                                    </span>
+                                </div>
+                            </div>
+                        ) : null;
+                    })()}
+                </div>
             )}
         </div>
     );
