@@ -957,25 +957,33 @@ export default function Playground({
             }`}>
             <PanelGroup direction="vertical">
               {/* Slides Area */}
-              <Panel defaultSize={70} minSize={30}>
-                <div className="h-full overflow-auto bg-black">
-                  <div className="min-h-full flex items-center justify-center p-4">
+              <Panel defaultSize={isRightPanelCollapsed ? 85 : 70} minSize={30}>
+                <div className="h-full w-full overflow-hidden bg-black">
+                  <div className="h-full w-full flex items-center justify-center p-4">
                     {getSlideUrl() ? (
-                      <Image
-                        key={getSlideUrl()}
-                        src={getSlideUrl()}
-                        alt={`Slide ${params.currentSlide}`}
-                        className="max-w-full h-auto object-contain"
-                        priority={true}
-                        width={1920}
-                        height={1080}
-                        onError={(e) => {
-                          console.error('Error loading slide image:', getSlideUrl());
-                          const target = e.target as HTMLImageElement;
-                          target.onerror = null;
-                          target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="50%" y="50%" text-anchor="middle" fill="gray">Error loading slide</text></svg>';
-                        }}
-                      />
+                      <div className={`relative w-full h-full flex items-center justify-center transition-all duration-300 ease-in-out`}>
+                        <div className="relative w-full h-full" style={{
+                          maxWidth: isRightPanelCollapsed ? '100%' : 'calc(100vw - 432px)',
+                          maxHeight: isRightPanelCollapsed ? '95vh' : '70vh',
+                          aspectRatio: '16/9',
+                        }}>
+                          <Image
+                            key={getSlideUrl()}
+                            src={getSlideUrl()}
+                            alt={`Slide ${params.currentSlide}`}
+                            className="w-full h-full object-contain transition-all duration-300 ease-in-out"
+                            priority={true}
+                            width={1920}
+                            height={1080}
+                            onError={(e) => {
+                              console.error('Error loading slide image:', getSlideUrl());
+                              const target = e.target as HTMLImageElement;
+                              target.onerror = null;
+                              target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="50%" y="50%" text-anchor="middle" fill="gray">Error loading slide</text></svg>';
+                            }}
+                          />
+                        </div>
+                      </div>
                     ) : (
                       <div className="text-gray-500">No slide available</div>
                     )}
@@ -988,7 +996,7 @@ export default function Playground({
               </PanelResizeHandle>
 
               {/* Bottom Chat Panel */}
-              <Panel defaultSize={30} minSize={20}>
+              <Panel defaultSize={isRightPanelCollapsed ? 15 : 30} minSize={15}>
                 <div className="h-full flex flex-col bg-gray-900/50 backdrop-blur-md">
                   {/* Controls */}
                   <div className="border-b border-gray-800 bg-gray-900/80 backdrop-blur-md">
@@ -1203,8 +1211,8 @@ export default function Playground({
                             <button
                               onClick={isRecording ? stopRecording : startRecording}
                               className={`w-full px-4 py-2 ${isRecording
-                                  ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                                  : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
+                                ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                                : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
                                 } rounded-lg text-sm font-medium transition-colors
                               flex items-center justify-center gap-2`}
                             >
