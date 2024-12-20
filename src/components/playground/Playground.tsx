@@ -1,7 +1,7 @@
 "use client";
 
 import { LoadingSVG } from "@/components/button/LoadingSVG";
-import { ChatMessageType, ChatTile } from "@/components/chat/ChatTile";
+import { ChatMessageType } from "@/components/chat/ChatTile";
 import { ColorPicker } from "@/components/colorPicker/ColorPicker";
 import { AudioInputTile } from "@/components/config/AudioInputTile";
 import { ConfigurationPanelItem } from "@/components/config/ConfigurationPanelItem";
@@ -21,7 +21,7 @@ import {
   useLocalParticipant,
   useRoomInfo,
   useVoiceAssistant,
-  useChat
+  useChat,
 } from "@livekit/components-react";
 import { ConnectionState, LocalParticipant, Track, DataPacket_Kind } from "livekit-client";
 import { QRCodeSVG } from "qrcode.react";
@@ -33,26 +33,31 @@ import { API_BASE_URL } from '@/config';
 import { api } from '@/api';
 import { SlideScriptPanel } from './SlideScriptPanel';
 import { ViewerHeader } from './ViewerHeader';
-import { jwtDecode } from "jwt-decode";
+import jwtDecode from "jwt-decode";
 import Image from 'next/image';
 import { ChatMessageInput } from "@/components/chat/ChatMessageInput";
+import styles from '@/styles/animations.module.css';
+import {
+  Panel,
+  PanelGroup,
+  PanelResizeHandle
+} from 'react-resizable-panels';
 
 export interface PlaygroundProps {
   logo?: ReactNode;
   themeColors: string[];
   onConnect: (connect: boolean, opts?: { token: string; url: string }) => void;
+  onScriptsGenerated?: (scripts: Record<string, any>) => void;
 }
 
 const headerHeight = 56;
 
-// Add interface for metadata
 interface BrdgeMetadata {
   id: string;
   name: string;
   numSlides: number;
 }
 
-// Add interface for scripts
 interface SlideScripts {
   [key: string]: string;
 }
@@ -63,49 +68,104 @@ interface ScriptData {
   source_walkthrough_id: string;
 }
 
-// First, add this type near the top of the file
 type AgentType = 'edit' | 'view';
 
-// Add interface for JWT payload
 interface JWTPayload {
-  sub: string;  // subject (user id)
-  exp: number;  // expiration time
-  iat: number;  // issued at
+  sub: string;
+  exp: number;
+  iat: number;
 }
 
-// Add this at the top with other hooks
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     const checkIsMobile = () => {
-      setIsMobile(window.innerWidth < 640); // sm breakpoint
+      setIsMobile(window.innerWidth < 640);
     };
 
-    // Initial check
     checkIsMobile();
-
-    // Add event listener
     window.addEventListener('resize', checkIsMobile);
-
-    // Cleanup
     return () => window.removeEventListener('resize', checkIsMobile);
   }, []);
 
   return isMobile;
 };
 
-// Add mobile tab type
 type MobileTab = 'chat' | 'script' | 'voice' | 'info';
+
+const componentStyles = {
+  button: `
+    relative overflow-hidden
+    px-6 py-3 rounded-xl font-medium
+    transition-all duration-300 ease-out
+    hover:scale-[1.02] active:scale-[0.98]
+    disabled:opacity-50 disabled:cursor-not-allowed
+    bg-gradient-to-r from-cyan-500 to-cyan-600
+    hover:from-cyan-400 hover:to-cyan-500
+    text-white shadow-lg shadow-cyan-500/20
+    hover:shadow-xl hover:shadow-cyan-500/30
+    disabled:hover:scale-100 disabled:hover:shadow-lg
+  `,
+  tabButton: `
+    flex-1 px-4 py-3 text-sm font-medium
+    transition-all duration-300 ease-out
+    hover:bg-gray-800/50
+  `,
+  activeTab: `
+    bg-gradient-to-r from-cyan-500/20 to-cyan-400/20
+    border-b-2 border-cyan-500
+    text-cyan-400
+  `,
+  chatBubble: `
+    max-w-[70%] rounded-2xl p-3
+    backdrop-blur-sm shadow-lg
+    ${styles.fadeSlideUp}
+  `,
+  input: `
+    w-full bg-gray-900/50 backdrop-blur-sm
+    border border-gray-700 rounded-xl
+    px-4 py-3 text-gray-300
+    transition-all duration-300
+    focus:ring-2 focus:ring-cyan-500 focus:border-transparent
+    hover:border-gray-600
+  `,
+  scrollArea: `
+    scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent
+    hover:scrollbar-thumb-gray-600
+    scroll-smooth
+  `
+};
+
+const resizeHandleStyles = {
+  vertical: `
+    w-1.5 mx-1 my-2 rounded-full
+    bg-gray-800 hover:bg-gray-700
+    transition-colors duration-150
+    cursor-col-resize
+    flex items-center justify-center
+    group
+  `,
+  horizontal: `
+    h-1.5 my-1 mx-2 rounded-full
+    bg-gray-800 hover:bg-gray-700
+    transition-colors duration-150
+    cursor-row-resize
+    flex items-center justify-center
+    group
+  `
+};
 
 export default function Playground({
   logo,
   themeColors,
   onConnect,
+  onScriptsGenerated
 }: PlaygroundProps) {
+  const [currentStep, setCurrentStep] = useState(1);
+  const [configTab, setConfigTab] = useState<'agent' | 'voice' | 'workflow'>('agent');
   const isMobile = useIsMobile();
 
-  // URL parameters state
   const [params, setParams] = useState({
     brdgeId: null as string | null,
     numSlides: 0,
@@ -115,7 +175,6 @@ export default function Playground({
     userId: null as string | null
   });
 
-  // Update params setup to extract just the numeric ID
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
@@ -127,16 +186,14 @@ export default function Playground({
         coreApiUrl: API_BASE_URL,
         currentSlide: 1,
         userId: token ?
-          jwtDecode<JWTPayload>(token).sub : // Just use the numeric ID directly
+          (jwtDecode<JWTPayload>(token).sub) :
           `anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       };
 
-      console.log('Setting initial params:', newParams);
       setParams(newParams);
     }
   }, []);
 
-  // Rest of the state declarations
   const { config, setUserSettings } = useConfig();
   const { name } = useRoomInfo();
   const { localParticipant } = useLocalParticipant();
@@ -144,35 +201,19 @@ export default function Playground({
   const roomState = useConnectionState();
   const [transcripts, setTranscripts] = useState<ChatMessageType[]>([]);
   const [isConnecting, setIsConnecting] = useState(false);
-
-  // Refs
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSentSlide = useRef<number | null>(null);
-
-  // Data channel setup with DataPacket_Kind
-  const { send } = useDataChannel("slide_updates", {
-    onMessage: (message) => {
-      console.log("Received message on slide_updates channel:", message);
-      try {
-        const decoded = JSON.parse(new TextDecoder().decode(message));
-        if (decoded.type === "SCRIPTS_UPDATED") {
-          // Refresh scripts if needed
-          loadInitialScripts();
-        }
-      } catch (error) {
-        console.error("Error processing data channel message:", error);
-      }
-    },
-    reliable: true
-  });
-
-  // Add brdgeMetadata state
   const [brdgeMetadata, setBrdgeMetadata] = useState<BrdgeMetadata | null>(null);
-
-  // Add state for info visibility
   const [showInfo, setShowInfo] = useState(true);
+  const [currentAgentType, setCurrentAgentType] = useState<AgentType>('edit');
+  const [selectedWalkthrough, setSelectedWalkthrough] = useState<number | null>(null);
+  const [scripts, setScripts] = useState<Record<string, any> | null>(null);
+  const [isGeneratingScripts, setIsGeneratingScripts] = useState(false);
+  const [editedScripts, setEditedScripts] = useState<Record<string, string>>({});
+  const [hasScriptChanges, setHasScriptChanges] = useState(false);
+  const [walkthroughs, setWalkthroughs] = useState<any[]>([]);
+  const [rightPanelView, setRightPanelView] = useState<'chat' | 'info'>('info');
 
-  // Hide info when walkthrough starts
   useEffect(() => {
     if (roomState === ConnectionState.Connected) {
       setShowInfo(false);
@@ -181,32 +222,16 @@ export default function Playground({
     }
   }, [roomState]);
 
-  // Add state to track current agent type
-  const [currentAgentType, setCurrentAgentType] = useState<AgentType>('edit');
-
-  // Add useEffect to handle URL parameters
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
       const agentType = urlParams.get('agentType') as AgentType;
       if (agentType && (agentType === 'edit' || agentType === 'view')) {
         setCurrentAgentType(agentType);
-        console.log('Setting agent type:', agentType);
       }
     }
   }, []);
 
-  // Move state declarations to the top
-  const [selectedWalkthrough, setSelectedWalkthrough] = useState<number | null>(null);
-  const [scripts, setScripts] = useState<SlideScripts | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [editingSlide, setEditingSlide] = useState<string | null>(null);
-  const [editedScripts, setEditedScripts] = useState<Record<string, string>>({});
-  const [hasScriptChanges, setHasScriptChanges] = useState(false);
-  const [isGeneratingScripts, setIsGeneratingScripts] = useState(false);
-  const [walkthroughs, setWalkthroughs] = useState<any[]>([]);
-
-  // Add a function to load walkthroughs
   const loadWalkthroughs = useCallback(async () => {
     if (!params.brdgeId) return;
     try {
@@ -222,57 +247,84 @@ export default function Playground({
     }
   }, [params.brdgeId]);
 
-  // Single onDataReceived handler that handles both transcription and walkthrough completion
-  const onDataReceived = useCallback(
-    (msg: any) => {
-      if (msg.topic === "transcription") {
-        const decoded = JSON.parse(
-          new TextDecoder("utf-8").decode(msg.payload)
-        );
-        let timestamp = new Date().getTime();
-        if ("timestamp" in decoded && decoded.timestamp > 0) {
-          timestamp = decoded.timestamp;
+  const chat = useChat();
+
+  const handleChatMessage = useCallback(async (message: string) => {
+    if (!chat) return;
+
+    try {
+      await chat.send(message);
+      setTranscripts(prev => [...prev, {
+        name: "You",
+        message: message,
+        timestamp: Date.now(),
+        isSelf: true,
+      }]);
+    } catch (error) {
+      console.error('Error sending chat message:', error);
+    }
+  }, [chat]);
+
+  const { send } = useDataChannel("slide_updates", {
+    onMessage: (message) => {
+      try {
+        const decoded = JSON.parse(new TextDecoder().decode(message));
+        if (decoded.type === "SCRIPTS_UPDATED") {
+          loadInitialScripts();
         }
+      } catch (error) {
+        console.error("Error processing data channel message:", error);
+      }
+    },
+    reliable: true
+  });
+
+  const onDataReceived = useCallback((msg: any) => {
+    try {
+      if (msg.topic === "transcription") {
+        const decoded = JSON.parse(new TextDecoder().decode(msg.payload));
+        const timestamp = decoded.timestamp > 0 ? decoded.timestamp : Date.now();
+
         setTranscripts(prev => [...prev, {
           name: "You",
           message: decoded.text,
           timestamp: timestamp,
           isSelf: true,
         }]);
-      } else {
-        try {
-          const decoded = JSON.parse(new TextDecoder("utf-8").decode(msg.payload));
-          if (decoded.type === "WALKTHROUGH_COMPLETED") {
-            // Just reload the walkthroughs
-            loadWalkthroughs();
-          }
-        } catch (e) {
-          console.error("Error decoding message:", e);
-        }
+      } else if (msg.topic === "chat") {
+        const decoded = JSON.parse(new TextDecoder().decode(msg.payload));
+        setTranscripts(prev => [...prev, {
+          name: "Assistant",
+          message: decoded.text,
+          timestamp: Date.now(),
+          isSelf: false,
+        }]);
+      } else if (msg.topic === "walkthrough_completed") {
+        loadWalkthroughs();
       }
-    },
-    [loadWalkthroughs]  // Add loadWalkthroughs to dependencies
-  );
+    } catch (error) {
+      console.error("Error processing message:", error);
+    }
+  }, [loadWalkthroughs]);
 
-  // Use the data channel
   useDataChannel(onDataReceived);
 
-  // Initial load of walkthroughs
   useEffect(() => {
     loadWalkthroughs();
   }, [loadWalkthroughs]);
 
-  // Single handleWalkthroughClick implementation
   const handleWalkthroughClick = useCallback(async (agentType: AgentType = 'edit') => {
     try {
       setIsConnecting(true);
       setCurrentAgentType(agentType);
+
       if (roomState === ConnectionState.Disconnected) {
         await onConnect(true);
-        setRightPanelView('chat');
+        if (agentType === 'edit') {
+          setCurrentStep(1);
+        }
       } else {
         await onConnect(false);
-        // After disconnecting, refresh the page
         window.location.reload();
       }
     } catch (error) {
@@ -282,41 +334,47 @@ export default function Playground({
     }
   }, [roomState, onConnect]);
 
-  // Modify the handleGenerateClick function
-  const handleGenerateClick = async () => {
+  const handleStartWalkthrough = useCallback(() => {
+    setCurrentStep(1);
+    handleWalkthroughClick('edit');
+  }, [handleWalkthroughClick]);
+
+  const handleGenerateScripts = useCallback(async () => {
     if (!selectedWalkthrough) return;
 
+    setCurrentStep(2);
     setIsGeneratingScripts(true);
+
     try {
-      // Generate scripts
       const response = await api.post(`/brdges/${params.brdgeId}/generate-slide-scripts`, {
         walkthrough_id: selectedWalkthrough
       });
 
       if (response.data.scripts) {
-        // Update scripts state with new scripts
         setScripts(response.data.scripts);
-
-        // Notify parent of script update
-        onScriptsGenerated?.(response.data.scripts);
-
-        // Force a re-render of the script panel
-        setParams(prev => ({ ...prev, currentSlide: prev.currentSlide }));
-      } else {
-        console.error('No scripts returned from generation');
+        if (onScriptsGenerated) {
+          onScriptsGenerated(response.data.scripts);
+        }
+        setCurrentStep(3);
       }
     } catch (error) {
       console.error('Error generating scripts:', error);
     } finally {
       setIsGeneratingScripts(false);
     }
-  };
+  }, [selectedWalkthrough, params.brdgeId, onScriptsGenerated]);
 
-  // Add handler for script generation completion
+  const handleShareBrdge = useCallback(() => {
+    setCurrentStep(4);
+    // Implement sharing functionality
+  }, []);
+
   const handleScriptsGenerated = useCallback((newScripts: Record<string, any>) => {
     setScripts(newScripts);
+    if (onScriptsGenerated) {
+      onScriptsGenerated(newScripts);
+    }
 
-    // Only try to send if we have a valid data channel and are connected
     if (send && roomState === ConnectionState.Connected) {
       try {
         const message = {
@@ -325,14 +383,12 @@ export default function Playground({
           timestamp: Date.now()
         };
         send(new TextEncoder().encode(JSON.stringify(message)), { reliable: true });
-        console.log('Sent script update notification');
       } catch (error) {
         console.error('Error sending script update:', error);
       }
     }
-  }, [send, roomState, params.brdgeId]); // Add dependencies
+  }, [send, roomState, params.brdgeId, onScriptsGenerated]);
 
-  // Add loadInitialScripts as a named function
   const loadInitialScripts = useCallback(async () => {
     if (!params.brdgeId) return;
 
@@ -346,28 +402,23 @@ export default function Playground({
     }
   }, [params.brdgeId]);
 
-  // Update the initial scripts effect to use the named function
   useEffect(() => {
     loadInitialScripts();
   }, [loadInitialScripts]);
 
-  // Add the handler function
   const handleWalkthroughSelect = useCallback((walkthroughId: number) => {
     setSelectedWalkthrough(walkthroughId);
   }, []);
 
-  // Update sendSlideUpdate to use the stored agent type
   const sendSlideUpdate = useCallback(() => {
     if (!params.brdgeId || roomState !== ConnectionState.Connected) {
       return;
     }
 
-    // Clear any pending timeout
     if (updateTimeoutRef.current) {
       clearTimeout(updateTimeoutRef.current);
     }
 
-    // Only send if the slide has changed or hasn't been sent yet
     if (lastSentSlide.current !== params.currentSlide) {
       updateTimeoutRef.current = setTimeout(() => {
         try {
@@ -388,7 +439,6 @@ export default function Playground({
             const data = encoder.encode(JSON.stringify(message));
             send(data, { reliable: true });
             lastSentSlide.current = params.currentSlide;
-            console.log("Sent slide update:", message);
           }
         } catch (e) {
           console.error("Error sending slide update:", e);
@@ -397,27 +447,22 @@ export default function Playground({
     }
   }, [params, roomState, send, currentAgentType]);
 
-  // Simplify the connection effect
   useEffect(() => {
     if (roomState === ConnectionState.Connected && params.brdgeId) {
-      // Reset lastSentSlide to force an initial update
       lastSentSlide.current = null;
       sendSlideUpdate();
     }
   }, [roomState, params.brdgeId, sendSlideUpdate]);
 
-  // Clean up timeouts on unmount or disconnect
   useEffect(() => {
     return () => {
       if (updateTimeoutRef.current) {
         clearTimeout(updateTimeoutRef.current);
       }
-      // Reset the last sent slide
       lastSentSlide.current = null;
     };
   }, [roomState]);
 
-  // Handle slide navigation
   const handlePrevSlide = () => {
     if (params.currentSlide > 1) {
       setParams(prev => ({ ...prev, currentSlide: prev.currentSlide - 1 }));
@@ -430,7 +475,6 @@ export default function Playground({
     }
   };
 
-  // Validate required parameters
   const hasRequiredParams = useMemo(() => {
     const valid = Boolean(params.brdgeId && params.numSlides > 0 && params.apiBaseUrl);
     if (!valid) {
@@ -447,77 +491,23 @@ export default function Playground({
     setHasScriptChanges(true);
   }, []);
 
-  // We should also add a function to update the main scripts state
   const updateScripts = useCallback((newScripts: Record<string, string>) => {
     setScripts(newScripts);
-    setEditedScripts({}); // Clear edited scripts
+    setEditedScripts({});
     setHasScriptChanges(false);
   }, []);
 
-  // Function to save changes to the database
   const saveScriptChanges = async () => {
     try {
       await api.put(`/brdges/${params.brdgeId}/scripts/update`, {
         scripts: editedScripts,
       });
-      // Update the scripts state with the edited version
       setScripts(editedScripts);
       setHasScriptChanges(false);
-      console.log('Scripts updated successfully');
     } catch (error) {
       console.error('Error updating scripts:', error);
     }
   };
-
-  // Update the hook name
-  const chat = useChat();
-
-  const chatTileContent = useMemo(() => {
-    return (
-      <div className="flex flex-col h-full max-h-full overflow-hidden">
-        <div className="flex-grow overflow-y-auto min-h-0">
-          <ChatTile
-            messages={transcripts}
-            accentColor={config.settings.theme_color}
-            onSend={async (message) => {
-              if (chat) {
-                return chat.send(message);
-              }
-            }}
-          />
-          {voiceAssistant.audioTrack && (
-            <TranscriptionTile
-              agentAudioTrack={voiceAssistant.audioTrack}
-              accentColor={config.settings.theme_color}
-            />
-          )}
-        </div>
-        {/* Voice input controls */}
-        {localParticipant && !isMobile && (
-          <div className="border-t border-gray-700 p-4 flex-shrink-0">
-            <ConfigurationPanelItem
-              title="Voice Input"
-              deviceSelectorKind="audioinput"
-            >
-              <AudioInputTile
-                trackRef={{
-                  source: Track.Source.Microphone,
-                  participant: localParticipant
-                }}
-              />
-            </ConfigurationPanelItem>
-          </div>
-        )}
-      </div>
-    );
-  }, [
-    transcripts,
-    voiceAssistant.audioTrack,
-    config.settings.theme_color,
-    localParticipant,
-    chat,
-    isMobile
-  ]);
 
   const slideTileContent = useMemo(() => {
     if (!hasRequiredParams) {
@@ -544,7 +534,6 @@ export default function Playground({
     }
 
     const slideUrl = `${params.apiBaseUrl}/brdges/${params.brdgeId}/slides/${params.currentSlide}`;
-    console.log('Loading slide:', slideUrl);
 
     return (
       <div className="flex flex-col w-full h-full">
@@ -575,11 +564,9 @@ export default function Playground({
                 <button
                   onClick={() => {
                     if (roomState === ConnectionState.Connected) {
-                      // Stop the session
                       onConnect(false);
                       setRightPanelView('info');
                     } else {
-                      // Start the session
                       handleWalkthroughClick('view');
                     }
                   }}
@@ -631,21 +618,10 @@ export default function Playground({
             </div>
           </div>
         </div>
-        {/* FOR MOBILE ONLY: Replace script display with chat + transcription */}
-        {!isMobile && (
-          <SlideScriptPanel
-            currentSlide={params.currentSlide}
-            scripts={scripts}
-            onScriptChange={handleScriptChange}
-            onScriptsUpdate={updateScripts}
-            onScriptsGenerated={handleScriptsGenerated}
-            brdgeId={params.brdgeId}
-            isGenerating={isGeneratingScripts}
-          />
-        )}
+        {/* No additional chat/transcription here; it's moved to the bottom panel only */}
       </div>
     );
-  }, [params, roomState, hasRequiredParams, scripts, isGenerating, currentAgentType, handleScriptChange, updateScripts]);
+  }, [params, roomState, hasRequiredParams, scripts, handlePrevSlide, handleNextSlide, onConnect, handleWalkthroughClick]);
 
   useEffect(() => {
     document.body.style.setProperty(
@@ -779,55 +755,6 @@ export default function Playground({
     setUserSettings,
   ]);
 
-  let mobileTabs: PlaygroundTab[] = [];
-
-  mobileTabs.push({
-    title: "Slides",
-    content: (
-      <PlaygroundTile
-        className="w-full h-full grow"
-        childrenClassName="justify-center"
-      >
-        {slideTileContent}
-      </PlaygroundTile>
-    ),
-  });
-
-  if (config.settings.outputs.audio) {
-    mobileTabs.push({
-      title: "Audio",
-      content: (
-        <PlaygroundTile
-          className="w-full h-full grow"
-          childrenClassName="justify-center"
-        >
-          {audioTileContent}
-        </PlaygroundTile>
-      ),
-    });
-  }
-
-  if (config.settings.chat) {
-    mobileTabs.push({
-      title: "Chat",
-      content: chatTileContent,
-    });
-  }
-
-  mobileTabs.push({
-    title: "Settings",
-    content: (
-      <PlaygroundTile
-        padding={false}
-        backgroundColor="gray-950"
-        className="h-full w-full basis-1/4 items-start overflow-y-auto flex"
-        childrenClassName="h-full grow items-start"
-      >
-        {settingsTileContent}
-      </PlaygroundTile>
-    ),
-  });
-
   const THEME = {
     primary: 'cyan',
     bgDark: 'gray-900',
@@ -876,23 +803,12 @@ export default function Playground({
   }, [params.brdgeId, params.apiBaseUrl, params.numSlides]);
 
   useEffect(() => {
-    console.log('Current params:', params);
-  }, [params]);
-
-  useEffect(() => {
     const checkExistingScripts = async () => {
-      if (!params.brdgeId) {
-        console.log('No brdgeId available');
-        return;
-      }
+      if (!params.brdgeId) return;
 
       try {
-        console.log('Fetching scripts from:', `/brdges/${params.brdgeId}/scripts`);
-
         const response = await api.get(`/brdges/${params.brdgeId}/scripts`);
-
         if (response.data.has_scripts) {
-          console.log('Found existing scripts:', response.data.scripts);
           setScripts(response.data.scripts);
           setEditedScripts(response.data.scripts);
 
@@ -900,38 +816,18 @@ export default function Playground({
           if (walkthrough_id) {
             setSelectedWalkthrough(walkthrough_id);
           }
-        } else {
-          console.log('No existing scripts found');
         }
       } catch (error) {
-        console.error('Error checking for existing scripts:', error, {
-          brdgeId: params.brdgeId,
-          url: `/brdges/${params.brdgeId}/scripts`
-        });
+        console.error('Error checking for existing scripts:', error);
       }
     };
 
     checkExistingScripts();
   }, [params.brdgeId]);
 
-  const [rightPanelView, setRightPanelView] = useState<'chat' | 'info'>('info');
-
   const renderRightPanelContent = () => {
     return (
       <div className="flex-1 overflow-hidden">
-        <div className={`h-full flex flex-col ${rightPanelView === 'chat' ? 'block' : 'hidden'}`}>
-          <div className="flex-1 overflow-y-auto">
-            <div className="p-4">
-              {voiceAssistant?.audioTrack && (
-                <TranscriptionTile
-                  agentAudioTrack={voiceAssistant.audioTrack}
-                  accentColor="cyan"
-                />
-              )}
-            </div>
-          </div>
-        </div>
-
         <div className={`h-full ${rightPanelView === 'info' ? 'block' : 'hidden'}`}>
           <InfoPanel
             walkthroughCount={walkthroughs.length}
@@ -945,213 +841,137 @@ export default function Playground({
     );
   };
 
-  const walkthroughSelectorRef = useRef<{ refreshWalkthroughs: () => void }>(null);
-
   return (
     <div className="h-[calc(100vh-1px)] flex flex-col bg-[#121212] relative overflow-hidden">
-      {currentAgentType === 'edit' ? (
-        <PlaygroundHeader
-          title={brdgeMetadata?.name || params.brdgeId || 'Loading...'}
-          height={headerHeight}
-          connectionState={roomState}
-          walkthroughCount={walkthroughs.length}
-          brdgeId={params.brdgeId}
-          apiBaseUrl={params.coreApiUrl}
-          selectedWalkthrough={selectedWalkthrough}
-          onWalkthroughClick={handleWalkthroughClick}
-          onGenerateClick={handleGenerateClick}
-          onWalkthroughSelect={handleWalkthroughSelect}
-          showEditControls={true}
-          isGenerating={isGeneratingScripts}
-          walkthroughSelectorRef={walkthroughSelectorRef}
-        />
-      ) : (
-        <ViewerHeader
-          title={brdgeMetadata?.name || params.brdgeId || 'Loading...'}
-          height={headerHeight}
-          currentSlide={params.currentSlide}
-          totalSlides={params.numSlides}
-          connectionState={roomState}
-        />
-      )}
+      {/* Minimal Header */}
+      <div className="flex-shrink-0 h-[48px] border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm flex items-center px-6">
+        <h1 className="text-lg font-medium text-gray-200">
+          {brdgeMetadata?.name || params.brdgeId || 'Loading...'}
+        </h1>
+      </div>
 
+      {/* Main Content Area with Resizable Panels */}
       <div className="flex-1 flex overflow-hidden">
-        <div className={`
-          flex-1 
-          ${currentAgentType === 'view' ? 'w-full' : ''}
-          ${isMobile ? 'flex flex-col p-0 h-[calc(100vh-57px)]' : 'p-6'}
-          overflow-y-auto
-        `}>
-          <div className={`
-            flex flex-col
-            ${isMobile ? 'h-[35vh] min-h-[250px]' : 'h-full'}
-          `}>
-            <div className="flex-1 relative bg-black overflow-hidden">
-              {getSlideUrl() ? (
-                <Image
-                  key={getSlideUrl()}
-                  src={getSlideUrl()}
-                  alt={`Slide ${params.currentSlide}`}
-                  className="w-full h-full object-contain"
-                  priority={true}
-                  width={1920}
-                  height={1080}
-                  onError={(e) => {
-                    console.error('Error loading slide image:', getSlideUrl());
-                    const target = e.target as HTMLImageElement;
-                    target.onerror = null;
-                    target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="50%" y="50%" text-anchor="middle" fill="gray">Error loading slide</text></svg>';
-                  }}
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gray-900 text-gray-500">
-                  No slide available
+        {/* Left Content Area */}
+        <PanelGroup direction="horizontal">
+          <Panel defaultSize={75} minSize={30}>
+            <PanelGroup direction="vertical">
+              {/* Slides Area - Scrollable */}
+              <Panel defaultSize={70} minSize={30}>
+                <div className="h-full overflow-auto bg-black">
+                  <div className="min-h-full flex items-center justify-center p-4">
+                    {getSlideUrl() ? (
+                      <Image
+                        key={getSlideUrl()}
+                        src={getSlideUrl()}
+                        alt={`Slide ${params.currentSlide}`}
+                        className="max-w-full h-auto object-contain"
+                        priority={true}
+                        width={1920}
+                        height={1080}
+                        onError={(e) => {
+                          console.error('Error loading slide image:', getSlideUrl());
+                          const target = e.target as HTMLImageElement;
+                          target.onerror = null;
+                          target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="50%" y="50%" text-anchor="middle" fill="gray">Error loading slide</text></svg>';
+                        }}
+                      />
+                    ) : (
+                      <div className="text-gray-500">No slide available</div>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
+              </Panel>
 
-            <div className="flex-shrink-0 h-[60px] bg-gray-900 border-t border-gray-800">
-              <div className="h-full px-4 flex justify-between items-center">
-                <span className="text-gray-400 text-sm">
-                  Slide {params.currentSlide} of {params.numSlides}
-                </span>
-                <div className="flex gap-2">
-                  {scripts && (
-                    <button
-                      onClick={() => {
-                        if (roomState === ConnectionState.Connected) {
-                          onConnect(false);
-                          setRightPanelView('info');
-                        } else {
-                          handleWalkthroughClick('view');
-                        }
-                      }}
-                      className={`px-3 py-1.5 ${roomState === ConnectionState.Connected
-                        ? 'bg-red-600 hover:bg-red-700'
-                        : 'bg-green-600 hover:bg-green-700'
-                        } text-white rounded-md transition-colors flex items-center gap-1 text-sm whitespace-nowrap`}
-                    >
-                      {roomState === ConnectionState.Connected ? (
-                        <>
-                          <svg
-                            className="w-4 h-4"
-                            viewBox="0 0 24 24"
-                            fill="currentColor"
-                          >
-                            <path d="M6 6h12v12H6z" />
+              <PanelResizeHandle className={resizeHandleStyles.horizontal}>
+                <div className="w-8 h-0.5 bg-gray-700 group-hover:bg-cyan-500 transition-colors duration-150" />
+              </PanelResizeHandle>
+
+              {/* Bottom Chat Panel */}
+              <Panel defaultSize={30} minSize={20}>
+                <div className="h-full flex flex-col bg-gray-900/50 backdrop-blur-md">
+                  {/* Controls */}
+                  <div className="border-b border-gray-800 bg-gray-900/80 backdrop-blur-md">
+                    <div className="px-4 py-2 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {/* Play/Stop Button */}
+                        <button
+                          onClick={() => {
+                            if (roomState === ConnectionState.Connected) {
+                              onConnect(false);
+                            } else {
+                              handleWalkthroughClick('view');
+                            }
+                          }}
+                          className={`p-2 rounded-lg transition-colors ${roomState === ConnectionState.Connected
+                              ? 'bg-red-500/20 text-red-300 hover:bg-red-500/30'
+                              : 'bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30'
+                            }`}
+                        >
+                          {roomState === ConnectionState.Connected ? (
+                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M6 6h12v12H6z" />
+                            </svg>
+                          ) : (
+                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M8 5v14l11-7z" />
+                            </svg>
+                          )}
+                        </button>
+
+                        {/* Mic Toggle */}
+                        <button
+                          onClick={() => {
+                            if (roomState === ConnectionState.Connected) {
+                              localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
+                            }
+                          }}
+                          className={`p-2 rounded-lg transition-colors ${localParticipant?.isMicrophoneEnabled
+                              ? 'bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30'
+                              : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                            }`}
+                          disabled={roomState !== ConnectionState.Connected}
+                        >
+                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5z" />
+                            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
                           </svg>
-                          <span>Stop</span>
-                        </>
-                      ) : (
-                        <>
-                          <svg
-                            className="w-4 h-4"
-                            viewBox="0 0 24 24"
-                            fill="currentColor"
-                          >
-                            <path d="M8 5v14l11-7z" />
+                        </button>
+                      </div>
+
+                      {/* Slide Navigation */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handlePrevSlide}
+                          disabled={params.currentSlide === 1}
+                          className="p-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed
+                            bg-gray-800/50 text-gray-400 hover:bg-gray-700 hover:text-white"
+                        >
+                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
                           </svg>
-                          <span>Play</span>
-                        </>
-                      )}
-                    </button>
-                  )}
+                        </button>
 
-                  <button
-                    onClick={handlePrevSlide}
-                    disabled={params.currentSlide === 1}
-                    className="px-3 py-1.5 bg-gray-800 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm whitespace-nowrap"
-                  >
-                    Previous
-                  </button>
-                  <button
-                    onClick={handleNextSlide}
-                    disabled={params.currentSlide === params.numSlides}
-                    className="px-3 py-1.5 bg-gray-800 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm whitespace-nowrap"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+                        <span className="text-sm font-medium text-gray-400 select-none">
+                          {params.currentSlide} / {params.numSlides}
+                        </span>
 
-          {/* Add back the desktop script panel */}
-          {!isMobile && currentAgentType === 'edit' && (
-            <div className="border-t border-gray-800">
-              <SlideScriptPanel
-                currentSlide={params.currentSlide}
-                scripts={scripts}
-                onScriptChange={handleScriptChange}
-                onScriptsUpdate={updateScripts}
-                onScriptsGenerated={handleScriptsGenerated}
-                brdgeId={params.brdgeId}
-                isGenerating={isGeneratingScripts}
-              />
-            </div>
-          )}
+                        <button
+                          onClick={handleNextSlide}
+                          disabled={params.currentSlide === params.numSlides}
+                          className="p-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed
+                            bg-gray-800/50 text-gray-400 hover:bg-gray-700 hover:text-white"
+                        >
+                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
 
-          {isMobile && roomState === ConnectionState.Connected && currentAgentType === 'edit' && (
-            <div className="flex-1 min-h-[45vh] border-t border-gray-800 bg-gray-900 flex flex-col">
-              <SlideScriptPanel
-                currentSlide={params.currentSlide}
-                scripts={scripts}
-                onScriptChange={handleScriptChange}
-                onScriptsUpdate={updateScripts}
-                onScriptsGenerated={handleScriptsGenerated}
-                brdgeId={params.brdgeId}
-                isGenerating={isGeneratingScripts}
-              />
-            </div>
-          )}
-        </div>
-
-        {!isMobile && (
-          <div className="w-[320px] border-l border-gray-800 flex flex-col overflow-hidden">
-            <div className="p-4 border-b border-gray-800 flex items-center gap-4">
-              <button
-                onClick={() => {
-                  if (roomState === ConnectionState.Connected) {
-                    localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
-                  }
-                }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors flex-shrink-0
-                  ${localParticipant.isMicrophoneEnabled
-                    ? 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
-              >
-                <span className={`w-2 h-2 rounded-full ${localParticipant.isMicrophoneEnabled ? 'bg-cyan-500 animate-pulse' : 'bg-gray-600'}`} />
-                <span className="text-sm font-medium">
-                  {localParticipant.isMicrophoneEnabled ? 'Mic On' : 'Mic Off'}
-                </span>
-              </button>
-
-              {roomState === ConnectionState.Connected && (
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setRightPanelView('chat')}
-                    className={`px-3 py-2 text-sm rounded-md transition-colors ${rightPanelView === 'chat'
-                      ? 'bg-cyan-500/20 text-cyan-400'
-                      : 'text-gray-400 hover:text-gray-300'}`}
-                  >
-                    Chat
-                  </button>
-                  <button
-                    onClick={() => setRightPanelView('info')}
-                    className={`px-3 py-2 text-sm rounded-md transition-colors ${rightPanelView === 'info'
-                      ? 'bg-cyan-500/20 text-cyan-400'
-                      : 'text-gray-400 hover:text-gray-300'}`}
-                  >
-                    Info
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="flex-1 overflow-hidden">
-              <div className={`h-full flex flex-col ${rightPanelView === 'chat' ? 'block' : 'hidden'}`}>
-                <div className="flex-1 overflow-y-auto">
-                  <div className="p-4">
+                  {/* Chat Messages and Transcription */}
+                  <div className="flex-1 overflow-hidden">
                     {voiceAssistant?.audioTrack && (
                       <TranscriptionTile
                         agentAudioTrack={voiceAssistant.audioTrack}
@@ -1160,37 +980,162 @@ export default function Playground({
                     )}
                   </div>
                 </div>
-              </div>
+              </Panel>
+            </PanelGroup>
+          </Panel>
 
-              <div className={`h-full ${rightPanelView === 'info' ? 'block' : 'hidden'}`}>
-                <InfoPanel
-                  walkthroughCount={walkthroughs.length}
-                  agentType={currentAgentType}
-                  brdgeId={params.brdgeId!}
-                  scripts={scripts}
-                  isGenerating={isGeneratingScripts}
-                />
-              </div>
-            </div>
+          <PanelResizeHandle className={resizeHandleStyles.vertical}>
+            <div className="h-8 w-0.5 bg-gray-700 group-hover:bg-cyan-500 transition-colors duration-150" />
+          </PanelResizeHandle>
 
-            <div className="p-3 bg-gray-900 border-t border-gray-800">
-              <div className="flex items-center justify-between text-sm text-gray-400">
-                <span>
-                  {currentAgentType === 'edit' && walkthroughs.length > 0 && `Walkthrough #${walkthroughs.length}`}
-                  {currentAgentType === 'view' && 'View Mode'}
-                </span>
-                <span className="flex items-center gap-2">
-                  {roomState === ConnectionState.Connected && (
-                    <>
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
-                      {currentAgentType === 'edit' ? 'Walkthrough in Progress' : 'Viewing'}
-                    </>
+          {/* Right Configuration Panel */}
+          {!isMobile && (
+            <Panel defaultSize={25} minSize={20}>
+              <div className="h-full flex flex-col bg-gray-900/50 backdrop-blur-md">
+                <div className="flex border-b border-gray-800">
+                  {['Agent', 'Voice', 'Workflow'].map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setConfigTab(tab.toLowerCase() as any)}
+                      className={`${componentStyles.tabButton} ${configTab === tab.toLowerCase()
+                        ? componentStyles.activeTab
+                        : 'text-gray-400 hover:text-gray-300'
+                        }`}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
+
+                <div className={`flex-1 overflow-y-auto ${componentStyles.scrollArea}`}>
+                  {configTab === 'agent' && (
+                    <div className="p-4 h-full">
+                      <SlideScriptPanel
+                        currentSlide={params.currentSlide}
+                        scripts={scripts}
+                        onScriptChange={handleScriptChange}
+                        onScriptsUpdate={updateScripts}
+                        onScriptsGenerated={handleScriptsGenerated}
+                        brdgeId={params.brdgeId}
+                        isGenerating={isGeneratingScripts}
+                      />
+                    </div>
                   )}
-                </span>
+
+                  {configTab === 'voice' && (
+                    <div className="p-4 space-y-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-2">
+                          Voice Selection
+                        </label>
+                        <select className={componentStyles.input}>
+                          <option value="default">Default Voice</option>
+                          <option value="clone">Voice Clone</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-3">
+                          Speed
+                        </label>
+                        <input
+                          type="range"
+                          min="0.5"
+                          max="2"
+                          step="0.1"
+                          defaultValue="1"
+                          className="w-full accent-cyan-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-3">
+                          Pitch
+                        </label>
+                        <input
+                          type="range"
+                          min="0.5"
+                          max="2"
+                          step="0.1"
+                          defaultValue="1"
+                          className="w-full accent-cyan-500"
+                        />
+                      </div>
+
+                      <button className={componentStyles.button}>
+                        Record Voice Clone
+                      </button>
+                    </div>
+                  )}
+
+                  {configTab === 'workflow' && (
+                    <div className="p-4">
+                      {/* Walkthrough Controls */}
+                      <div className="mb-8 space-y-4">
+                        <select
+                          className={componentStyles.input}
+                          value={selectedWalkthrough || ''}
+                          onChange={(e) => handleWalkthroughSelect(Number(e.target.value))}
+                        >
+                          <option value="">Select Walkthrough</option>
+                          {walkthroughs.map((w, index) => (
+                            <option key={w.id} value={w.id}>
+                              Walkthrough #{index + 1}
+                            </option>
+                          ))}
+                        </select>
+
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => handleWalkthroughClick('edit')}
+                            className={componentStyles.button}
+                          >
+                            Start Walkthrough
+                          </button>
+                          <button
+                            onClick={handleGenerateScripts}
+                            disabled={!selectedWalkthrough || isGeneratingScripts}
+                            className={componentStyles.button}
+                          >
+                            {isGeneratingScripts ? 'Generating...' : 'Generate Brdge'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Progress Steps */}
+                      <div className="space-y-6">
+                        {['Record walkthrough', 'Generate script + agent', 'Configure', 'Share'].map((step, index) => (
+                          <div key={step} className="flex items-start gap-4">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0
+                              ${index + 1 <= currentStep
+                                ? 'bg-gradient-to-br from-cyan-500 to-cyan-600 text-white shadow-lg shadow-cyan-500/30'
+                                : 'bg-gray-800 text-gray-400'
+                              }`}
+                            >
+                              {index + 1}
+                            </div>
+                            <div className="flex-1">
+                              <h3 className={`text-sm font-medium ${index + 1 <= currentStep ? 'text-gray-200' : 'text-gray-400'
+                                }`}>
+                                {step}
+                              </h3>
+                              <p className="mt-1 text-sm text-gray-500">
+                                {index === 0 && "Record your presentation walkthrough"}
+                                {index === 1 && "AI generates script and configures agent"}
+                                {index === 2 && "Fine-tune agent settings and voice"}
+                                {index === 3 && "Share your Brdge with others"}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          </div>
-        )}
+            </Panel>
+          )}
+        </PanelGroup>
       </div>
     </div>
   );
