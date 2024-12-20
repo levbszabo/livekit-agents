@@ -6,11 +6,17 @@ import { MicrophoneIcon, DocumentTextIcon, InformationCircleIcon } from '@heroic
 // Since there's a linter error about types, let's define it inline
 type AgentType = 'edit' | 'view';
 
+// Add the ScriptContent interface
+interface ScriptContent {
+    script: string;
+    agent: string;
+}
+
 interface InfoPanelProps {
     walkthroughCount: number;
     agentType: AgentType;
-    brdgeId: string | number;
-    scripts?: Record<string, string> | null;
+    brdgeId: string;
+    scripts: Record<string, ScriptContent> | null;
     isGenerating: boolean;
 }
 
@@ -189,7 +195,7 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts, isGen
         }));
     };
 
-    const [editedScripts, setEditedScripts] = useState<Record<string, string>>({});
+    const [editedScripts, setEditedScripts] = useState<Record<string, ScriptContent>>({});
     const [hasChanges, setHasChanges] = useState(false);
 
     // Initialize editedScripts when scripts prop changes
@@ -202,7 +208,10 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts, isGen
     const handleScriptChange = (slideNumber: string, content: string) => {
         setEditedScripts(prev => ({
             ...prev,
-            [slideNumber]: content
+            [slideNumber]: {
+                script: content,
+                agent: prev[slideNumber]?.agent || ''
+            }
         }));
         setHasChanges(true);
     };
@@ -615,7 +624,7 @@ function VoiceContent({
 }
 
 interface ScriptsContentProps {
-    scripts: Record<string, string> | null | undefined;
+    scripts: Record<string, ScriptContent> | null | undefined;
 }
 
 function ScriptsContent({ scripts }: ScriptsContentProps) {

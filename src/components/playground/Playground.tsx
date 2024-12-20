@@ -168,11 +168,17 @@ const resizeHandleStyles = {
   `
 };
 
-// Add this interface
-interface DataMessage {
+// Update the DataChannelMessage interface to match LiveKit's ReceivedDataMessage type
+interface DataChannelMessage {
   payload: Uint8Array;
   topic?: string;
   kind?: DataPacket_Kind;
+}
+
+// Add this interface near the top with other interfaces
+interface ScriptContent {
+  script: string;
+  agent: string;
 }
 
 export default function Playground({
@@ -226,9 +232,9 @@ export default function Playground({
   const [showInfo, setShowInfo] = useState(true);
   const [currentAgentType, setCurrentAgentType] = useState<AgentType>('edit');
   const [selectedWalkthrough, setSelectedWalkthrough] = useState<number | null>(null);
-  const [scripts, setScripts] = useState<Record<string, any> | null>(null);
+  const [scripts, setScripts] = useState<Record<string, ScriptContent> | null>(null);
   const [isGeneratingScripts, setIsGeneratingScripts] = useState(false);
-  const [editedScripts, setEditedScripts] = useState<Record<string, string>>({});
+  const [editedScripts, setEditedScripts] = useState<Record<string, ScriptContent>>({});
   const [hasScriptChanges, setHasScriptChanges] = useState(false);
   const [walkthroughs, setWalkthroughs] = useState<any[]>([]);
   const [rightPanelView, setRightPanelView] = useState<'chat' | 'info'>('info');
@@ -297,18 +303,15 @@ export default function Playground({
     }
   }, [chat]);
 
-  const { send } = useDataChannel("slide_updates", {
-    onMessage: (message) => {
-      try {
-        const decoded = JSON.parse(new TextDecoder().decode(message));
-        if (decoded.type === "SCRIPTS_UPDATED") {
-          loadInitialScripts();
-        }
-      } catch (error) {
-        console.error("Error processing data channel message:", error);
+  const { send } = useDataChannel("slide_updates", (message: DataChannelMessage) => {
+    try {
+      const decoded = JSON.parse(new TextDecoder().decode(message.payload));
+      if (decoded.type === "SCRIPTS_UPDATED") {
+        loadInitialScripts();
       }
-    },
-    reliable: true
+    } catch (error) {
+      console.error("Error processing data channel message:", error);
+    }
   });
 
   const onDataReceived = useCallback((msg: any) => {
@@ -597,12 +600,15 @@ export default function Playground({
   const handleScriptChange = useCallback((slideId: string, newScript: string) => {
     setEditedScripts((prevScripts) => ({
       ...prevScripts,
-      [slideId]: newScript,
+      [slideId]: {
+        script: newScript,
+        agent: (prevScripts[slideId]?.agent || '')
+      }
     }));
     setHasScriptChanges(true);
   }, []);
 
-  const updateScripts = useCallback((newScripts: Record<string, string>) => {
+  const updateScripts = useCallback((newScripts: Record<string, ScriptContent>) => {
     setScripts(newScripts);
     setEditedScripts({});
     setHasScriptChanges(false);
@@ -1294,17 +1300,18 @@ export default function Playground({
                     ${isMobile ? 'p-0.5 pb-1' : 'p-2'}
                   `}>
                     {voiceAssistant?.audioTrack && (
-                      <TranscriptionTile
-                        agentAudioTrack={voiceAssistant.audioTrack}
-                        accentColor="cyan"
-                        className={`
-                          transition-all duration-300
-                          hover:border-cyan-500/30
-                          shadow-[0_0_20px_rgba(0,255,255,0.05)]
-                          hover:shadow-[0_0_30px_rgba(0,255,255,0.1)]
-                          ${isMobile ? 'mx-0.5 rounded-lg' : ''}
-                        `}
-                      />
+                      <div className={`
+                        transition-all duration-300
+                        hover:border-cyan-500/30
+                        shadow-[0_0_20px_rgba(0,255,255,0.05)]
+                        hover:shadow-[0_0_30px_rgba(0,255,255,0.1)]
+                        ${isMobile ? 'mx-0.5 rounded-lg' : ''}
+                      `}>
+                        <TranscriptionTile
+                          agentAudioTrack={voiceAssistant.audioTrack}
+                          accentColor="cyan"
+                        />
+                      </div>
                     )}
                   </div>
                 </div>
@@ -1362,21 +1369,22 @@ export default function Playground({
                   {/* Agent Tab */}
                   {configTab === 'agent' && (
                     <div className="relative">
-                      <SlideScriptPanel
-                        currentSlide={params.currentSlide}
-                        scripts={scripts}
-                        onScriptChange={handleScriptChange}
-                        onScriptsUpdate={updateScripts}
-                        onScriptsGenerated={handleScriptsGenerated}
-                        brdgeId={params.brdgeId}
-                        isGenerating={isGeneratingScripts}
-                        className="
-                          transition-all duration-300
-                          hover:border-cyan-500/30
-                          shadow-[0_0_20px_rgba(0,255,255,0.05)]
-                          hover:shadow-[0_0_30px_rgba(0,255,255,0.1)]
-                        "
-                      />
+                      <div className="
+                        transition-all duration-300
+                        hover:border-cyan-500/30
+                        shadow-[0_0_20px_rgba(0,255,255,0.05)]
+                        hover:shadow-[0_0_30px_rgba(0,255,255,0.1)]
+                      ">
+                        <SlideScriptPanel
+                          currentSlide={params.currentSlide}
+                          scripts={scripts}
+                          onScriptChange={handleScriptChange}
+                          onScriptsUpdate={updateScripts}
+                          onScriptsGenerated={handleScriptsGenerated}
+                          brdgeId={params.brdgeId}
+                          isGenerating={isGeneratingScripts}
+                        />
+                      </div>
                       {isGeneratingScripts && (
                         <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm
                           flex items-center justify-center
@@ -1692,15 +1700,39 @@ export default function Playground({
           setConfigTab={setConfigTab}
         >
           {configTab === 'agent' && (
-            <SlideScriptPanel
-              currentSlide={params.currentSlide}
-              scripts={scripts}
-              onScriptChange={handleScriptChange}
-              onScriptsUpdate={updateScripts}
-              onScriptsGenerated={handleScriptsGenerated}
-              brdgeId={params.brdgeId}
-              isGenerating={isGeneratingScripts}
-            />
+            <div className="relative">
+              <div className="
+                transition-all duration-300
+                hover:border-cyan-500/30
+                shadow-[0_0_20px_rgba(0,255,255,0.05)]
+                hover:shadow-[0_0_30px_rgba(0,255,255,0.1)]
+              ">
+                <SlideScriptPanel
+                  currentSlide={params.currentSlide}
+                  scripts={scripts}
+                  onScriptChange={handleScriptChange}
+                  onScriptsUpdate={updateScripts}
+                  onScriptsGenerated={handleScriptsGenerated}
+                  brdgeId={params.brdgeId}
+                  isGenerating={isGeneratingScripts}
+                />
+              </div>
+              {isGeneratingScripts && (
+                <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm
+                  flex items-center justify-center
+                  animate-[fadeIn_0.3s_ease-out]
+                ">
+                  <div className="text-cyan-400 flex flex-col items-center gap-3">
+                    <div className="w-8 h-8 border-2 border-current border-t-transparent
+                      rounded-full animate-spin
+                    "/>
+                    <div className="animate-[glow_2s_ease-in-out_infinite]">
+                      Generating Scripts...
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
           {configTab === 'voice' && (
             <div className="p-4 space-y-6">

@@ -1,14 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '@/api';
 
+// Add this interface to define the script content structure
+interface ScriptContent {
+    script: string;
+    agent: string;
+}
+
 interface SlideScriptPanelProps {
     currentSlide: number;
-    scripts: Record<string, string> | null;
+    scripts: Record<string, ScriptContent> | null;
     onScriptChange?: (slideNumber: string, content: string) => void;
-    onScriptsUpdate?: (scripts: Record<string, string>) => void;
+    onScriptsUpdate?: (scripts: Record<string, ScriptContent>) => void;
     brdgeId?: string | number | null;
     isGenerating?: boolean;
-    onScriptsGenerated?: (newScripts: Record<string, any>) => void;
+    onScriptsGenerated?: (newScripts: Record<string, ScriptContent>) => void;
 }
 
 type TabType = 'script' | 'agent';
@@ -65,14 +71,13 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
 
         setIsSavingScript(true);
         try {
-            // Create a new scripts object that includes all existing scripts
             const updatedScripts = { ...scripts };
 
-            // Update or add the current slide's content
+            // Now TypeScript knows this can be a ScriptContent object
             updatedScripts[currentSlide] = {
                 script: editedScript,
                 agent: (typeof scripts[currentSlide] === 'object'
-                    ? scripts[currentSlide].agent
+                    ? (scripts[currentSlide] as ScriptContent).agent
                     : '') || editedAgent
             };
 
@@ -85,19 +90,13 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
             }
 
             setHasScriptChanges(false);
-            console.log('Script updated successfully');
         } catch (error) {
             console.error('Error updating script:', error);
-            // Revert to previous script if update fails
             if (scripts[currentSlide]) {
-                try {
-                    const content = typeof scripts[currentSlide] === 'object'
-                        ? scripts[currentSlide]
-                        : JSON.parse(scripts[currentSlide]);
-                    setEditedScript(content.script || '');
-                } catch {
-                    setEditedScript(scripts[currentSlide]);
-                }
+                const content = typeof scripts[currentSlide] === 'object'
+                    ? (scripts[currentSlide] as ScriptContent).script
+                    : scripts[currentSlide];
+                setEditedScript(content || '');
             }
         } finally {
             setIsSavingScript(false);
@@ -109,13 +108,11 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
 
         setIsSavingAgent(true);
         try {
-            // Create a new scripts object that includes all existing scripts
             const updatedScripts = { ...scripts };
 
-            // Update or add the current slide's content
             updatedScripts[currentSlide] = {
                 script: (typeof scripts[currentSlide] === 'object'
-                    ? scripts[currentSlide].script
+                    ? (scripts[currentSlide] as ScriptContent).script
                     : scripts[currentSlide]) || editedScript,
                 agent: editedAgent
             };
@@ -129,19 +126,13 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
             }
 
             setHasAgentChanges(false);
-            console.log('Agent instructions updated successfully');
         } catch (error) {
             console.error('Error updating agent instructions:', error);
-            // Revert to previous agent text if update fails
             if (scripts[currentSlide]) {
-                try {
-                    const content = typeof scripts[currentSlide] === 'object'
-                        ? scripts[currentSlide]
-                        : JSON.parse(scripts[currentSlide]);
-                    setEditedAgent(content.agent || '');
-                } catch {
-                    setEditedAgent('');
-                }
+                const content = typeof scripts[currentSlide] === 'object'
+                    ? (scripts[currentSlide] as ScriptContent).agent
+                    : '';
+                setEditedAgent(content || '');
             }
         } finally {
             setIsSavingAgent(false);
