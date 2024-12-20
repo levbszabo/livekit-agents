@@ -44,6 +44,7 @@ import {
 } from 'react-resizable-panels';
 import { useRouter } from 'next/router';
 import { MobileConfigDrawer } from './MobileConfigDrawer';
+import { WalkthroughSelector, WalkthroughSelectorRef } from './WalkthroughSelector';
 
 export interface PlaygroundProps {
   logo?: ReactNode;
@@ -244,6 +245,8 @@ export default function Playground({
   const [forceRefresh, setForceRefresh] = useState(Date.now());
   const [isConfigDrawerOpen, setIsConfigDrawerOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>('chat');
+  const [forceWalkthroughRefresh, setForceWalkthroughRefresh] = useState(0);
+  const walkthroughSelectorRef = useRef<WalkthroughSelectorRef>(null);
 
   useEffect(() => {
     if (roomState === ConnectionState.Connected) {
@@ -335,25 +338,31 @@ export default function Playground({
           isSelf: false,
         }]);
       } else if (msg.topic === "walkthrough_completed") {
-        // Start polling for the new walkthrough
+        console.log("Walkthrough completed, refreshing...");
+        // Immediate refresh
+        setForceWalkthroughRefresh(prev => prev + 1);
+        walkthroughSelectorRef.current?.refreshWalkthroughs();
+
+        // Start polling with shorter intervals initially
         let attempts = 0;
         const maxAttempts = 10;
-        const pollInterval = 1000; // 1 second
+        const pollInterval = 500; // 500ms
 
         const pollForNewWalkthrough = async () => {
           try {
+            console.log("Polling for new walkthrough...");
             const response = await api.get(`/brdges/${params.brdgeId}/walkthrough-list`);
             if (response.data.has_walkthroughs) {
               const sortedWalkthroughs = response.data.walkthroughs.sort(
                 (a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
               );
 
-              // Check if we have a new walkthrough (length increased)
+              // Check if we have a new walkthrough
               if (sortedWalkthroughs.length > walkthroughs.length) {
+                console.log("New walkthrough found, updating state...");
                 setWalkthroughs(sortedWalkthroughs);
-                if (sortedWalkthroughs.length > 0) {
-                  setSelectedWalkthrough(sortedWalkthroughs[0].id);
-                }
+                setSelectedWalkthrough(sortedWalkthroughs[0].id);
+                setConfigTab('workflow');
                 return true;
               }
             }
@@ -366,8 +375,12 @@ export default function Playground({
 
         const poll = async () => {
           while (attempts < maxAttempts) {
+            console.log(`Polling attempt ${attempts + 1}/${maxAttempts}`);
             const found = await pollForNewWalkthrough();
-            if (found) break;
+            if (found) {
+              console.log("Successfully found and updated new walkthrough");
+              break;
+            }
 
             attempts++;
             if (attempts < maxAttempts) {
@@ -389,9 +402,6 @@ export default function Playground({
     loadWalkthroughs();
   }, [loadWalkthroughs, forceUpdate]);
 
-  // Add walkthroughSelectorRef
-  const walkthroughSelectorRef = useRef<any>(null);
-
   const handleWalkthroughClick = useCallback(async (agentType: AgentType = 'edit') => {
     try {
       setIsConnecting(true);
@@ -401,40 +411,18 @@ export default function Playground({
         // First stop the connection
         await onConnect(false);
 
-        // Force immediate refresh
-        setForceRefresh(Date.now());
-        setWalkthroughs([]); // Clear existing walkthroughs
-        setSelectedWalkthrough(null); // Clear selection
+        // Force immediate refresh of walkthroughs
+        console.log("Forcing walkthrough refresh...");
+        setForceWalkthroughRefresh(prev => prev + 1);
+        await walkthroughSelectorRef.current?.refreshWalkthroughs();
 
         // Wait a bit for the backend
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 500));
 
-        // Fetch latest walkthroughs
-        try {
-          const response = await api.get(`/brdges/${params.brdgeId}/walkthrough-list`);
-          if (response.data.has_walkthroughs) {
-            const sortedWalkthroughs = response.data.walkthroughs.sort(
-              (a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-            );
+        // Try to force a complete refresh by navigating to the same URL
+        const currentUrl = window.location.href;
+        window.location.href = currentUrl;
 
-            // Force update everything
-            setWalkthroughs(sortedWalkthroughs);
-            if (sortedWalkthroughs.length > 0) {
-              setSelectedWalkthrough(sortedWalkthroughs[0].id);
-            }
-            setConfigTab('workflow');
-
-            // Force another refresh
-            setForceRefresh(Date.now());
-
-            // Force React to re-render the entire component tree
-            setTimeout(() => {
-              setForceRefresh(Date.now());
-            }, 100);
-          }
-        } catch (error) {
-          console.error('Error fetching walkthroughs:', error);
-        }
       } else {
         await onConnect(true);
         if (agentType === 'edit') {
@@ -446,7 +434,7 @@ export default function Playground({
     } finally {
       setIsConnecting(false);
     }
-  }, [roomState, onConnect, params.brdgeId]);
+  }, [roomState, onConnect]);
 
   const handleStartWalkthrough = useCallback(() => {
     setCurrentStep(1);

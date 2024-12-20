@@ -18,6 +18,7 @@ interface InfoPanelProps {
     brdgeId: string;
     scripts: Record<string, ScriptContent> | null;
     isGenerating: boolean;
+    onWalkthroughStop?: () => void;
 }
 
 interface VoiceConfig {
@@ -67,7 +68,7 @@ interface VoiceContentProps {
     setSelectedVoice: (id: string | null) => void;
 }
 
-export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts, isGenerating }: InfoPanelProps) {
+export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts, isGenerating, onWalkthroughStop }: InfoPanelProps) {
     const [currentStep, setCurrentStep] = useState(1);
     const [agentIntent, setAgentIntent] = useState<AgentIntent>({
         prompt: '',
@@ -296,6 +297,7 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts, isGen
                             walkthroughCount={walkthroughCount}
                             isGenerating={isGenerating}
                             agentType={agentType}
+                            onWalkthroughStop={onWalkthroughStop}
                         />
                     )}
                     {activeTab === 'voice' && (
@@ -328,10 +330,11 @@ export function InfoPanel({ walkthroughCount, agentType, brdgeId, scripts, isGen
 }
 
 // Split content into separate components for better organization
-function GuideContent({ walkthroughCount, isGenerating, agentType }: {
+function GuideContent({ walkthroughCount, isGenerating, agentType, onWalkthroughStop }: {
     walkthroughCount: number;
     isGenerating: boolean;
     agentType: 'edit' | 'view';
+    onWalkthroughStop?: () => void;
 }) {
     if (agentType === 'view') {
         return (
@@ -441,12 +444,27 @@ function GuideContent({ walkthroughCount, isGenerating, agentType }: {
                 <div className="bg-gray-800/50 rounded-lg p-3">
                     <div className="flex items-center justify-between text-[12px]">
                         <span className="text-gray-400">Walkthrough Progress</span>
-                        <span className="text-cyan-400">
+                        <span className={`text-cyan-400 ${isGenerating ? 'animate-pulse' : ''}`}>
                             {isGenerating ? 'Processing...' : `${walkthroughCount} recordings`}
                         </span>
                     </div>
                 </div>
             </div>
+
+            {/* Recording Controls */}
+            {agentType === 'edit' && (
+                <div className="space-y-2">
+                    <button
+                        onClick={onWalkthroughStop}
+                        className="w-full px-4 py-2 bg-cyan-500/20 text-cyan-400 
+                            rounded-lg hover:bg-cyan-500/30 transition-colors
+                            flex items-center justify-center gap-2"
+                    >
+                        <span className="w-2 h-2 rounded-full bg-cyan-500" />
+                        Start New Recording
+                    </button>
+                </div>
+            )}
         </div>
     );
 }
