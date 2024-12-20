@@ -33,7 +33,7 @@ import { API_BASE_URL } from '@/config';
 import { api } from '@/api';
 import { SlideScriptPanel } from './SlideScriptPanel';
 import { ViewerHeader } from './ViewerHeader';
-import jwtDecode from "jwt-decode";
+import { jwtDecode } from "jwt-decode";
 import Image from 'next/image';
 import { ChatMessageInput } from "@/components/chat/ChatMessageInput";
 import styles from '@/styles/animations.module.css';
@@ -107,21 +107,30 @@ const componentStyles = {
     text-white shadow-lg shadow-cyan-500/20
     hover:shadow-xl hover:shadow-cyan-500/30
     disabled:hover:scale-100 disabled:hover:shadow-lg
+    transform hover:-translate-y-0.5
   `,
   tabButton: `
     flex-1 px-4 py-3 text-sm font-medium
     transition-all duration-300 ease-out
     hover:bg-gray-800/50
+    border border-transparent
+    hover:border-cyan-500/30
+    hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]
   `,
   activeTab: `
     bg-gradient-to-r from-cyan-500/20 to-cyan-400/20
     border-b-2 border-cyan-500
     text-cyan-400
+    shadow-[0_0_10px_rgba(0,255,255,0.2)]
   `,
   chatBubble: `
     max-w-[70%] rounded-2xl p-3
     backdrop-blur-sm shadow-lg
-    ${styles.fadeSlideUp}
+    animate-[fadeIn_0.3s_ease-out]
+    bg-gray-900/50
+    border border-gray-800/50
+    hover:border-cyan-500/20
+    transition-all duration-300
   `,
   input: `
     w-full bg-gray-900/50 backdrop-blur-sm
@@ -129,7 +138,8 @@ const componentStyles = {
     px-4 py-3 text-gray-300
     transition-all duration-300
     focus:ring-2 focus:ring-cyan-500 focus:border-transparent
-    hover:border-gray-600
+    hover:border-cyan-500/50
+    hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]
   `,
   scrollArea: `
     scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent
@@ -187,7 +197,7 @@ export default function Playground({
         coreApiUrl: API_BASE_URL,
         currentSlide: 1,
         userId: token ?
-          (jwtDecode<JWTPayload>(token).sub) :
+          jwtDecode<JWTPayload>(token).sub :
           `anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       };
 
@@ -1034,30 +1044,71 @@ export default function Playground({
     loadVoices();
   }, [params.brdgeId]);
 
+  // Update the chat message rendering
+  const renderChatMessage = (message: ChatMessageType) => (
+    <div
+      className={`
+        ${message.isSelf ? 'ml-auto bg-cyan-950/30' : 'mr-auto bg-gray-800/30'} 
+        max-w-[70%] rounded-2xl p-4 
+        backdrop-blur-sm
+        border border-gray-700/50
+        transition-all duration-300
+        hover:border-cyan-500/30
+        animate-[fadeIn_0.3s_ease-out]
+        shadow-lg hover:shadow-[0_0_20px_rgba(0,255,255,0.1)]
+        group
+      `}
+    >
+      <div
+        className={`
+          text-sm leading-relaxed
+          ${message.isSelf
+            ? 'text-cyan-300 group-hover:text-cyan-200'
+            : 'text-gray-300 group-hover:text-cyan-100'
+          }
+          ${!message.isSelf && 'animate-[glow_2s_ease-in-out_infinite]'}
+          transition-all duration-300
+        `}
+        style={{
+          textShadow: message.isSelf
+            ? '0 0 10px rgba(34,211,238,0.3)'
+            : '0 0 15px rgba(34,211,238,0.2)'
+        }}
+      >
+        {message.message}
+      </div>
+    </div>
+  );
+
   return (
     <div key={forceRefresh} className="h-[calc(100vh-1px)] flex flex-col bg-[#121212] relative overflow-hidden">
-      {/* Minimal Header */}
+      {/* Minimal Header with glow effect */}
       <div className="flex-shrink-0 h-[48px] border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm flex items-center px-6">
-        <h1 className="text-lg font-medium text-gray-200">
+        <h1 className="text-lg font-medium text-cyan-400 transition-all duration-300 hover:text-cyan-300 hover:shadow-[0_0_10px_rgba(0,255,255,0.3)]">
           {brdgeMetadata?.name || params.brdgeId || 'Loading...'}
         </h1>
       </div>
 
       {/* Main Content Area with Resizable Panels */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Content Area */}
+        {/* Left Content Area - Full width in view mode */}
         <PanelGroup direction="horizontal">
-          <div className={`flex-1 transition-all duration-300 ${isRightPanelCollapsed ? 'mr-0' : 'mr-[400px]'
+          <div className={`flex-1 transition-all duration-300 ${currentAgentType === 'view' ? 'mr-0' : // No margin in view mode
+            isRightPanelCollapsed ? 'mr-0' : 'mr-[400px]' // Normal margin logic in edit mode
             }`}>
             <PanelGroup direction="vertical">
               {/* Slides Area */}
               <Panel defaultSize={isRightPanelCollapsed ? 85 : 70} minSize={30}>
                 <div className="h-full w-full overflow-hidden bg-black">
-                  <div className="h-full w-full flex items-center justify-center p-4">
+                  <div className="h-full w-full flex items-center justify-center p-2">
                     {getSlideUrl() ? (
                       <div className={`relative w-full h-full flex items-center justify-center transition-all duration-300 ease-in-out`}>
                         <div className="relative w-full h-full" style={{
-                          maxWidth: isRightPanelCollapsed ? '100%' : 'calc(100vw - 432px)',
+                          maxWidth: currentAgentType === 'view'
+                            ? 'calc(100vw - 32px)' // 16px padding on each side in view mode
+                            : isRightPanelCollapsed
+                              ? 'calc(100vw - 32px)'
+                              : 'calc(100vw - 416px)', // 400px panel + 16px padding
                           maxHeight: isRightPanelCollapsed ? '95vh' : '70vh',
                           aspectRatio: '16/9',
                         }}>
@@ -1146,8 +1197,13 @@ export default function Playground({
                         <button
                           onClick={handlePrevSlide}
                           disabled={params.currentSlide === 1}
-                          className="p-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed
-                            bg-gray-800/50 text-gray-400 hover:bg-gray-700 hover:text-white"
+                          className="p-2 rounded-lg transition-all duration-300
+                            disabled:opacity-50 disabled:cursor-not-allowed
+                            bg-gray-800/50 text-gray-400 
+                            hover:bg-gray-700 hover:text-cyan-400
+                            hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]
+                            transform hover:-translate-y-0.5
+                            disabled:hover:transform-none"
                         >
                           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
@@ -1161,8 +1217,13 @@ export default function Playground({
                         <button
                           onClick={handleNextSlide}
                           disabled={params.currentSlide === params.numSlides}
-                          className="p-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed
-                            bg-gray-800/50 text-gray-400 hover:bg-gray-700 hover:text-white"
+                          className="p-2 rounded-lg transition-all duration-300
+                            disabled:opacity-50 disabled:cursor-not-allowed
+                            bg-gray-800/50 text-gray-400 
+                            hover:bg-gray-700 hover:text-cyan-400
+                            hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]
+                            transform hover:-translate-y-0.5
+                            disabled:hover:transform-none"
                         >
                           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z" />
@@ -1178,6 +1239,12 @@ export default function Playground({
                       <TranscriptionTile
                         agentAudioTrack={voiceAssistant.audioTrack}
                         accentColor="cyan"
+                        className="
+                          transition-all duration-300
+                          hover:border-cyan-500/30
+                          shadow-[0_0_20px_rgba(0,255,255,0.05)]
+                          hover:shadow-[0_0_30px_rgba(0,255,255,0.1)]
+                        "
                       />
                     )}
                   </div>
@@ -1186,8 +1253,8 @@ export default function Playground({
             </PanelGroup>
           </div>
 
-          {/* Collapsible Right Panel */}
-          {!isMobile && (
+          {/* Right Panel - Only show in edit mode */}
+          {!isMobile && currentAgentType === 'edit' && (
             <div className={`fixed right-0 top-[48px] bottom-0 w-[400px] transition-all duration-300 ${isRightPanelCollapsed ? 'translate-x-full' : 'translate-x-0'
               }`}>
               {/* Collapse Toggle Button */}
@@ -1235,15 +1302,38 @@ export default function Playground({
                 <div className="flex-1 overflow-y-auto">
                   {/* Agent Tab */}
                   {configTab === 'agent' && (
-                    <SlideScriptPanel
-                      currentSlide={params.currentSlide}
-                      scripts={scripts}
-                      onScriptChange={handleScriptChange}
-                      onScriptsUpdate={updateScripts}
-                      onScriptsGenerated={handleScriptsGenerated}
-                      brdgeId={params.brdgeId}
-                      isGenerating={isGeneratingScripts}
-                    />
+                    <div className="relative">
+                      <SlideScriptPanel
+                        currentSlide={params.currentSlide}
+                        scripts={scripts}
+                        onScriptChange={handleScriptChange}
+                        onScriptsUpdate={updateScripts}
+                        onScriptsGenerated={handleScriptsGenerated}
+                        brdgeId={params.brdgeId}
+                        isGenerating={isGeneratingScripts}
+                        className="
+                          transition-all duration-300
+                          hover:border-cyan-500/30
+                          shadow-[0_0_20px_rgba(0,255,255,0.05)]
+                          hover:shadow-[0_0_30px_rgba(0,255,255,0.1)]
+                        "
+                      />
+                      {isGeneratingScripts && (
+                        <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm
+                          flex items-center justify-center
+                          animate-[fadeIn_0.3s_ease-out]
+                        ">
+                          <div className="text-cyan-400 flex flex-col items-center gap-3">
+                            <div className="w-8 h-8 border-2 border-current border-t-transparent
+                              rounded-full animate-spin
+                            "/>
+                            <div className="animate-[glow_2s_ease-in-out_infinite]">
+                              Generating Scripts...
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   )}
 
                   {/* Voice Tab */}
@@ -1256,7 +1346,10 @@ export default function Playground({
                         <select
                           className="w-full bg-gray-800/50 border border-gray-700 rounded-lg
                             px-3 py-2 text-sm text-gray-300
-                            focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                            transition-all duration-300
+                            focus:ring-2 focus:ring-cyan-500 focus:border-transparent
+                            hover:border-cyan-500/50
+                            hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]"
                           value={selectedVoice || ''}
                           onChange={(e) => setSelectedVoice(e.target.value)}
                         >
@@ -1300,17 +1393,31 @@ export default function Playground({
                               placeholder="Enter voice name"
                               className="w-full bg-gray-800/50 border border-gray-700 rounded-lg
                                 px-3 py-2 text-sm text-gray-300
-                                focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                                transition-all duration-300
+                                focus:ring-2 focus:ring-cyan-500 focus:border-transparent
+                                hover:border-cyan-500/50
+                                hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]"
                             />
                             <button
                               onClick={isRecording ? stopRecording : startRecording}
-                              className={`w-full px-4 py-2 ${isRecording
-                                ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                                : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
-                                } rounded-lg text-sm font-medium transition-colors
-                              flex items-center justify-center gap-2`}
+                              className={`
+                                w-full px-4 py-2 rounded-lg text-sm font-medium
+                                transition-all duration-300
+                                flex items-center justify-center gap-2
+                                transform hover:-translate-y-0.5
+                                ${isRecording
+                                  ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 shadow-[0_0_15px_rgba(255,0,0,0.1)]'
+                                  : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 shadow-[0_0_15px_rgba(0,255,255,0.1)]'
+                                }
+                              `}
                             >
-                              <span className={`w-2 h-2 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-cyan-500'}`} />
+                              <span className={`
+                                w-2 h-2 rounded-full 
+                                ${isRecording
+                                  ? 'bg-red-500 animate-[pulse_1s_ease-in-out_infinite]'
+                                  : 'bg-cyan-500'
+                                }
+                              `} />
                               {isRecording ? (
                                 <>Stop Recording ({formatTime(recordingTime)})</>
                               ) : (
@@ -1328,8 +1435,16 @@ export default function Playground({
                                 <button
                                   onClick={handleCloneVoice}
                                   disabled={!voiceName || isCloning}
-                                  className="w-full px-4 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg 
-                                    hover:bg-cyan-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  className={`
+                                    w-full px-4 py-2 rounded-lg text-sm font-medium
+                                    transition-all duration-300
+                                    transform hover:-translate-y-0.5
+                                    bg-cyan-500/20 text-cyan-400 
+                                    hover:bg-cyan-500/30 
+                                    shadow-[0_0_15px_rgba(0,255,255,0.1)]
+                                    disabled:opacity-50 disabled:cursor-not-allowed
+                                    disabled:hover:transform-none
+                                  `}
                                 >
                                   {isCloning ? 'Creating Voice Clone...' : 'Create Voice Clone'}
                                 </button>
