@@ -42,6 +42,7 @@ import {
   PanelGroup,
   PanelResizeHandle
 } from 'react-resizable-panels';
+import { useRouter } from 'next/router';
 
 export interface PlaygroundProps {
   logo?: ReactNode;
@@ -214,6 +215,9 @@ export default function Playground({
   const [walkthroughs, setWalkthroughs] = useState<any[]>([]);
   const [rightPanelView, setRightPanelView] = useState<'chat' | 'info'>('info');
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [forceUpdate, setForceUpdate] = useState(0);
+  const [forceRefresh, setForceRefresh] = useState(Date.now());
 
   useEffect(() => {
     if (roomState === ConnectionState.Connected) {
@@ -242,11 +246,18 @@ export default function Playground({
           (a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
         );
         setWalkthroughs(sortedWalkthroughs);
+
+        if (!selectedWalkthrough && sortedWalkthroughs.length > 0) {
+          const latestWalkthrough = sortedWalkthroughs[0];
+          setSelectedWalkthrough(latestWalkthrough.id);
+        }
+
+        setConfigTab(prev => prev === 'workflow' ? 'workflow' : 'workflow');
       }
     } catch (error) {
       console.error('Error loading walkthroughs:', error);
     }
-  }, [params.brdgeId]);
+  }, [params.brdgeId, selectedWalkthrough]);
 
   const chat = useChat();
 
@@ -301,39 +312,118 @@ export default function Playground({
           isSelf: false,
         }]);
       } else if (msg.topic === "walkthrough_completed") {
-        loadWalkthroughs();
+        // Start polling for the new walkthrough
+        let attempts = 0;
+        const maxAttempts = 10;
+        const pollInterval = 1000; // 1 second
+
+        const pollForNewWalkthrough = async () => {
+          try {
+            const response = await api.get(`/brdges/${params.brdgeId}/walkthrough-list`);
+            if (response.data.has_walkthroughs) {
+              const sortedWalkthroughs = response.data.walkthroughs.sort(
+                (a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+              );
+
+              // Check if we have a new walkthrough (length increased)
+              if (sortedWalkthroughs.length > walkthroughs.length) {
+                setWalkthroughs(sortedWalkthroughs);
+                if (sortedWalkthroughs.length > 0) {
+                  setSelectedWalkthrough(sortedWalkthroughs[0].id);
+                }
+                return true;
+              }
+            }
+            return false;
+          } catch (error) {
+            console.error('Error polling walkthroughs:', error);
+            return false;
+          }
+        };
+
+        const poll = async () => {
+          while (attempts < maxAttempts) {
+            const found = await pollForNewWalkthrough();
+            if (found) break;
+
+            attempts++;
+            if (attempts < maxAttempts) {
+              await new Promise(resolve => setTimeout(resolve, pollInterval));
+            }
+          }
+        };
+
+        poll();
       }
     } catch (error) {
       console.error("Error processing message:", error);
     }
-  }, [loadWalkthroughs]);
+  }, [params.brdgeId, walkthroughs.length]);
 
   useDataChannel(onDataReceived);
 
   useEffect(() => {
     loadWalkthroughs();
-  }, [loadWalkthroughs]);
+  }, [loadWalkthroughs, forceUpdate]);
+
+  // Add walkthroughSelectorRef
+  const walkthroughSelectorRef = useRef<any>(null);
 
   const handleWalkthroughClick = useCallback(async (agentType: AgentType = 'edit') => {
     try {
       setIsConnecting(true);
       setCurrentAgentType(agentType);
 
-      if (roomState === ConnectionState.Disconnected) {
+      if (roomState === ConnectionState.Connected) {
+        // First stop the connection
+        await onConnect(false);
+
+        // Force immediate refresh
+        setForceRefresh(Date.now());
+        setWalkthroughs([]); // Clear existing walkthroughs
+        setSelectedWalkthrough(null); // Clear selection
+
+        // Wait a bit for the backend
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Fetch latest walkthroughs
+        try {
+          const response = await api.get(`/brdges/${params.brdgeId}/walkthrough-list`);
+          if (response.data.has_walkthroughs) {
+            const sortedWalkthroughs = response.data.walkthroughs.sort(
+              (a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+            );
+
+            // Force update everything
+            setWalkthroughs(sortedWalkthroughs);
+            if (sortedWalkthroughs.length > 0) {
+              setSelectedWalkthrough(sortedWalkthroughs[0].id);
+            }
+            setConfigTab('workflow');
+
+            // Force another refresh
+            setForceRefresh(Date.now());
+
+            // Force React to re-render the entire component tree
+            setTimeout(() => {
+              setForceRefresh(Date.now());
+            }, 100);
+          }
+        } catch (error) {
+          console.error('Error fetching walkthroughs:', error);
+        }
+      } else {
         await onConnect(true);
         if (agentType === 'edit') {
           setCurrentStep(1);
         }
-      } else {
-        await onConnect(false);
-        window.location.reload();
       }
     } catch (error) {
-      console.error('Connection error:', error);
+      console.error('Error in handleWalkthroughClick:', error);
     } finally {
       setIsConnecting(false);
     }
-  }, [roomState, onConnect]);
+  }, [roomState, onConnect, params.brdgeId]);
 
   const handleStartWalkthrough = useCallback(() => {
     setCurrentStep(1);
@@ -852,6 +942,7 @@ export default function Playground({
   const [savedVoices, setSavedVoices] = useState<Array<{ id: string; name: string; created_at: string }>>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const router = useRouter();
 
   // Add voice-related handlers
   const startRecording = async () => {
@@ -885,6 +976,9 @@ export default function Playground({
         clearInterval(timerRef.current);
         setRecordingTime(0);
       }
+
+      // Refresh the page by re-navigating to current URL
+      router.replace(router.asPath);
     }
   };
 
@@ -941,7 +1035,7 @@ export default function Playground({
   }, [params.brdgeId]);
 
   return (
-    <div className="h-[calc(100vh-1px)] flex flex-col bg-[#121212] relative overflow-hidden">
+    <div key={forceRefresh} className="h-[calc(100vh-1px)] flex flex-col bg-[#121212] relative overflow-hidden">
       {/* Minimal Header */}
       <div className="flex-shrink-0 h-[48px] border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm flex items-center px-6">
         <h1 className="text-lg font-medium text-gray-200">
@@ -1284,23 +1378,32 @@ export default function Playground({
                               {
                                 step: 1,
                                 title: "Present",
-                                subtitle: "Natural Explanation",
-                                description: "Walk through your slides naturally"
+                                description: [
+                                  "Walk through your slides",
+                                  "Explain naturally",
+                                  "Take your time"
+                                ]
                               },
                               {
                                 step: 2,
                                 title: "Interact",
-                                subtitle: "AI Learning",
-                                description: "Answer AI's clarifying questions"
+                                description: [
+                                  "Answer AI questions",
+                                  "Provide context",
+                                  "Clarify details"
+                                ]
                               },
                               {
                                 step: 3,
                                 title: "Review",
-                                subtitle: "Verify Content",
-                                description: "Ensure accuracy"
+                                description: [
+                                  "Check accuracy",
+                                  "Verify content",
+                                  "Approve scripts"
+                                ]
                               }
-                            ].map(({ step, title, subtitle, description }) => (
-                              <div key={step} className="flex flex-col items-center">
+                            ].map(({ step, title, description }) => (
+                              <div key={step} className="flex flex-col items-center w-1/3">
                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-3
                                   ${step <= currentStep
                                     ? 'bg-cyan-500/20 text-cyan-400'
@@ -1308,10 +1411,13 @@ export default function Playground({
                                   }`}>
                                   {step}
                                 </div>
-                                <div className="text-center space-y-1">
+                                <div className="text-center space-y-2">
                                   <p className="text-sm font-medium text-gray-300">{title}</p>
-                                  <p className="text-xs text-gray-500">{subtitle}</p>
-                                  <p className="text-xs text-gray-400">{description}</p>
+                                  <div className="space-y-1">
+                                    {description.map((text, idx) => (
+                                      <p key={idx} className="text-xs text-gray-400 font-light">{text}</p>
+                                    ))}
+                                  </div>
                                 </div>
                               </div>
                             ))}
@@ -1322,6 +1428,8 @@ export default function Playground({
                       {/* Walkthrough Controls */}
                       <div className="space-y-4">
                         <select
+                          key={`walkthrough-selector-${forceRefresh}`}
+                          ref={walkthroughSelectorRef}
                           className="w-full bg-gray-800/50 border border-gray-700 rounded-lg
                             px-3 py-2 text-sm text-gray-300
                             focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
@@ -1330,19 +1438,39 @@ export default function Playground({
                         >
                           <option value="">Select a walkthrough</option>
                           {walkthroughs.map((w, index) => (
-                            <option key={w.id} value={w.id}>
-                              Walkthrough #{index + 1}
+                            <option
+                              key={`${w.id}-${forceRefresh}`}
+                              value={w.id}
+                            >
+                              Walkthrough #{walkthroughs.length - index}
                             </option>
                           ))}
                         </select>
 
                         <div className="flex gap-2">
                           <button
-                            onClick={() => handleWalkthroughClick('edit')}
-                            className="flex-1 px-3 py-2 bg-cyan-500/20 text-cyan-400
-                              rounded-lg text-sm font-medium hover:bg-cyan-500/30 transition-colors"
+                            onClick={() => {
+                              if (roomState === ConnectionState.Connected) {
+                                onConnect(false);
+                              } else {
+                                handleWalkthroughClick('edit');
+                              }
+                            }}
+                            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium 
+                              transition-colors flex items-center justify-center gap-2
+                              ${roomState === ConnectionState.Connected
+                                ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                                : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
+                              }`}
                           >
-                            Record Walkthrough
+                            {roomState === ConnectionState.Connected ? (
+                              <>
+                                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                                Stop Walkthrough
+                              </>
+                            ) : (
+                              'Record Walkthrough'
+                            )}
                           </button>
                           <button
                             onClick={handleGenerateScripts}

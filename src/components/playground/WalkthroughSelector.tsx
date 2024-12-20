@@ -18,9 +18,8 @@ interface WalkthroughSelectorProps {
     onWalkthroughsLoaded?: (walkthroughs: any[]) => void;
 }
 
-// Define the ref type
 export interface WalkthroughSelectorRef {
-    refreshWalkthroughs: () => void;
+    refreshWalkthroughs: () => Promise<void>;
 }
 
 export const WalkthroughSelector = forwardRef<WalkthroughSelectorRef, WalkthroughSelectorProps>(({
@@ -31,6 +30,7 @@ export const WalkthroughSelector = forwardRef<WalkthroughSelectorRef, Walkthroug
     onWalkthroughsLoaded
 }, ref) => {
     const [walkthroughs, setWalkthroughs] = useState<any[]>([]);
+    const [refreshCounter, setRefreshCounter] = useState(0);
 
     const loadWalkthroughs = useCallback(async () => {
         if (!brdgeId) return;
@@ -45,8 +45,7 @@ export const WalkthroughSelector = forwardRef<WalkthroughSelectorRef, Walkthroug
                 onWalkthroughsLoaded?.(sortedWalkthroughs);
 
                 if (sortedWalkthroughs.length > 0) {
-                    const latestWalkthrough = sortedWalkthroughs[0];
-                    onWalkthroughSelect(latestWalkthrough.id);
+                    onWalkthroughSelect(sortedWalkthroughs[0].id);
                 }
             }
         } catch (error) {
@@ -54,29 +53,33 @@ export const WalkthroughSelector = forwardRef<WalkthroughSelectorRef, Walkthroug
         }
     }, [brdgeId, onWalkthroughsLoaded, onWalkthroughSelect]);
 
-    // Expose the refresh function via ref
     useImperativeHandle(ref, () => ({
-        refreshWalkthroughs: loadWalkthroughs
+        refreshWalkthroughs: async () => {
+            await loadWalkthroughs();
+            setRefreshCounter(prev => prev + 1);
+        }
     }));
 
     useEffect(() => {
         loadWalkthroughs();
-    }, [loadWalkthroughs]);
+    }, [loadWalkthroughs, refreshCounter]);
 
     return (
         <select
+            key={refreshCounter}
             value={selectedWalkthrough || ''}
             onChange={(e) => onWalkthroughSelect(Number(e.target.value))}
-            className="bg-gray-800 text-gray-200 rounded-md px-3 py-2"
+            className="w-full bg-gray-800/50 border border-gray-700 rounded-lg
+                px-3 py-2 text-sm text-gray-300
+                focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
         >
-            <option value="">Select Walkthrough</option>
+            <option value="">Select a walkthrough</option>
             {walkthroughs.map((walkthrough, index) => (
                 <option
-                    key={walkthrough.id}
+                    key={`${walkthrough.id}-${refreshCounter}`}
                     value={walkthrough.id}
-                    selected={index === 0}
                 >
-                    {`Walkthrough ${walkthroughs.length - index}`}
+                    {`Walkthrough #${walkthroughs.length - index}`}
                 </option>
             ))}
         </select>
