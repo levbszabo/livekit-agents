@@ -43,6 +43,7 @@ import {
   PanelResizeHandle
 } from 'react-resizable-panels';
 import { useRouter } from 'next/router';
+import { MobileConfigDrawer } from './MobileConfigDrawer';
 
 export interface PlaygroundProps {
   logo?: ReactNode;
@@ -167,6 +168,13 @@ const resizeHandleStyles = {
   `
 };
 
+// Add this interface
+interface DataMessage {
+  payload: Uint8Array;
+  topic?: string;
+  kind?: DataPacket_Kind;
+}
+
 export default function Playground({
   logo,
   themeColors,
@@ -228,6 +236,8 @@ export default function Playground({
   const [refreshKey, setRefreshKey] = useState(0);
   const [forceUpdate, setForceUpdate] = useState(0);
   const [forceRefresh, setForceRefresh] = useState(Date.now());
+  const [isConfigDrawerOpen, setIsConfigDrawerOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState<MobileTab>('chat');
 
   useEffect(() => {
     if (roomState === ConnectionState.Connected) {
@@ -1044,8 +1054,8 @@ export default function Playground({
     loadVoices();
   }, [params.brdgeId]);
 
-  // Update the chat message rendering
-  const renderChatMessage = (message: ChatMessageType) => (
+  // Move renderChatMessage inside the component
+  const renderChatMessage = useCallback((message: ChatMessageType) => (
     <div
       className={`
         ${message.isSelf ? 'ml-auto bg-cyan-950/30' : 'mr-auto bg-gray-800/30'} 
@@ -1078,45 +1088,71 @@ export default function Playground({
         {message.message}
       </div>
     </div>
-  );
+  ), []);
 
   return (
-    <div key={forceRefresh} className="h-[calc(100vh-1px)] flex flex-col bg-[#121212] relative overflow-hidden">
+    <div key={forceRefresh} className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
       {/* Minimal Header with glow effect */}
-      <div className="flex-shrink-0 h-[48px] border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm flex items-center px-6">
-        <h1 className="text-lg font-medium text-cyan-400 transition-all duration-300 hover:text-cyan-300 hover:shadow-[0_0_10px_rgba(0,255,255,0.3)]">
+      <div className={`
+        flex-shrink-0 
+        ${isMobile ? 'h-[36px]' : 'h-[48px]'} 
+        border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm 
+        flex items-center 
+        ${isMobile ? 'px-3' : 'px-6'}
+      `}>
+        <h1 className={`
+          ${isMobile ? 'text-base' : 'text-lg'} 
+          font-medium text-cyan-400 transition-all duration-300 
+          hover:text-cyan-300 hover:shadow-[0_0_10px_rgba(0,255,255,0.3)]
+        `}>
           {brdgeMetadata?.name || params.brdgeId || 'Loading...'}
         </h1>
       </div>
 
       {/* Main Content Area with Resizable Panels */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Content Area - Full width in view mode */}
         <PanelGroup direction="horizontal">
-          <div className={`flex-1 transition-all duration-300 ${currentAgentType === 'view' ? 'mr-0' : // No margin in view mode
-            isRightPanelCollapsed ? 'mr-0' : 'mr-[400px]' // Normal margin logic in edit mode
-            }`}>
+          <div className={`
+            flex-1 transition-all duration-300
+            ${isMobile ? 'w-full' : currentAgentType === 'view' ? 'mr-0' :
+              isRightPanelCollapsed ? 'mr-0' : 'mr-[400px]'}
+          `}>
             <PanelGroup direction="vertical">
               {/* Slides Area */}
-              <Panel defaultSize={isRightPanelCollapsed ? 85 : 70} minSize={30}>
+              <Panel
+                defaultSize={isMobile ? 85 : isRightPanelCollapsed ? 85 : 70}
+                minSize={isMobile ? 70 : 30}
+              >
                 <div className="h-full w-full overflow-hidden bg-black">
-                  <div className="h-full w-full flex items-center justify-center p-2">
+                  <div className="h-full w-full flex items-center justify-center p-0">
                     {getSlideUrl() ? (
-                      <div className={`relative w-full h-full flex items-center justify-center transition-all duration-300 ease-in-out`}>
+                      <div className={`
+                        relative w-full h-full flex items-center justify-center 
+                        transition-all duration-300 ease-in-out
+                        ${isMobile ? 'p-0.5' : 'p-2'}
+                      `}>
                         <div className="relative w-full h-full" style={{
-                          maxWidth: currentAgentType === 'view'
-                            ? 'calc(100vw - 32px)' // 16px padding on each side in view mode
-                            : isRightPanelCollapsed
+                          maxWidth: isMobile
+                            ? '100%'
+                            : currentAgentType === 'view'
                               ? 'calc(100vw - 32px)'
-                              : 'calc(100vw - 416px)', // 400px panel + 16px padding
-                          maxHeight: isRightPanelCollapsed ? '95vh' : '70vh',
+                              : isRightPanelCollapsed
+                                ? 'calc(100vw - 32px)'
+                                : 'calc(100vw - 416px)',
+                          maxHeight: isMobile
+                            ? 'calc(75vh - 36px)'
+                            : isRightPanelCollapsed ? '95vh' : '70vh',
                           aspectRatio: '16/9',
+                          margin: isMobile ? '0' : '0 auto',
                         }}>
                           <Image
                             key={getSlideUrl()}
                             src={getSlideUrl()}
                             alt={`Slide ${params.currentSlide}`}
-                            className="w-full h-full object-contain transition-all duration-300 ease-in-out"
+                            className={`
+                              w-full h-full object-contain 
+                              transition-all duration-300 ease-in-out
+                            `}
                             priority={true}
                             width={1920}
                             height={1080}
@@ -1136,16 +1172,28 @@ export default function Playground({
                 </div>
               </Panel>
 
-              <PanelResizeHandle className={resizeHandleStyles.horizontal}>
+              <PanelResizeHandle
+                className={`${isMobile ? 'hidden' : ''} ${resizeHandleStyles.horizontal}`}
+              >
                 <div className="w-8 h-0.5 bg-gray-700 group-hover:bg-cyan-500 transition-colors duration-150" />
               </PanelResizeHandle>
 
               {/* Bottom Chat Panel */}
-              <Panel defaultSize={isRightPanelCollapsed ? 15 : 30} minSize={15}>
+              <Panel
+                defaultSize={isMobile ? 15 : isRightPanelCollapsed ? 15 : 30}
+                minSize={isMobile ? 8 : 15}
+              >
                 <div className="h-full flex flex-col bg-gray-900/50 backdrop-blur-md">
                   {/* Controls */}
-                  <div className="border-b border-gray-800 bg-gray-900/80 backdrop-blur-md">
-                    <div className="px-4 py-2 flex items-center justify-between">
+                  <div className={`
+                    border-b border-gray-800 bg-gray-900/80 backdrop-blur-md
+                    ${isMobile ? 'sticky top-0 z-10 py-0' : ''}
+                  `}>
+                    <div className={`
+                      ${isMobile ? 'px-0.5 py-0.5' : 'px-4 py-2'} 
+                      flex items-center justify-between
+                      ${isMobile ? 'gap-0.5' : 'gap-2'}
+                    `}>
                       <div className="flex items-center gap-3">
                         {/* Play/Stop Button */}
                         <button
@@ -1156,10 +1204,14 @@ export default function Playground({
                               handleWalkthroughClick('view');
                             }
                           }}
-                          className={`p-2 rounded-lg transition-colors ${roomState === ConnectionState.Connected
-                            ? 'bg-red-500/20 text-red-300 hover:bg-red-500/30'
-                            : 'bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30'
-                            }`}
+                          className={`
+                            ${isMobile ? 'p-1 scale-90' : 'p-2'} 
+                            rounded-lg transition-colors
+                            ${roomState === ConnectionState.Connected
+                              ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 shadow-[0_0_15px_rgba(255,0,0,0.1)]'
+                              : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 shadow-[0_0_15px_rgba(0,255,255,0.1)]'
+                            }
+                          `}
                         >
                           {roomState === ConnectionState.Connected ? (
                             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -1210,7 +1262,10 @@ export default function Playground({
                           </svg>
                         </button>
 
-                        <span className="text-sm font-medium text-gray-400 select-none">
+                        <span className={`
+                          ${isMobile ? 'text-xs' : 'text-sm'} 
+                          font-medium text-gray-400 select-none
+                        `}>
                           {params.currentSlide} / {params.numSlides}
                         </span>
 
@@ -1234,17 +1289,21 @@ export default function Playground({
                   </div>
 
                   {/* Chat Messages and Transcription */}
-                  <div className="flex-1 overflow-hidden">
+                  <div className={`
+                    flex-1 overflow-y-auto 
+                    ${isMobile ? 'p-0.5 pb-1' : 'p-2'}
+                  `}>
                     {voiceAssistant?.audioTrack && (
                       <TranscriptionTile
                         agentAudioTrack={voiceAssistant.audioTrack}
                         accentColor="cyan"
-                        className="
+                        className={`
                           transition-all duration-300
                           hover:border-cyan-500/30
                           shadow-[0_0_20px_rgba(0,255,255,0.05)]
                           hover:shadow-[0_0_30px_rgba(0,255,255,0.1)]
-                        "
+                          ${isMobile ? 'mx-0.5 rounded-lg' : ''}
+                        `}
                       />
                     )}
                   </div>
@@ -1253,7 +1312,7 @@ export default function Playground({
             </PanelGroup>
           </div>
 
-          {/* Right Panel - Only show in edit mode */}
+          {/* Right Panel - Only show on desktop in edit mode */}
           {!isMobile && currentAgentType === 'edit' && (
             <div className={`fixed right-0 top-[48px] bottom-0 w-[400px] transition-all duration-300 ${isRightPanelCollapsed ? 'translate-x-full' : 'translate-x-0'
               }`}>
@@ -1606,6 +1665,81 @@ export default function Playground({
           )}
         </PanelGroup>
       </div>
+
+      {isMobile && currentAgentType === 'edit' && (
+        <button
+          onClick={() => setIsConfigDrawerOpen(true)}
+          className="fixed right-2 top-[40px] z-40 p-1.5 rounded-lg 
+            bg-gray-800/80 backdrop-blur-sm text-gray-400
+            hover:text-cyan-400 transition-colors
+            scale-90
+          "
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </button>
+      )}
+
+      {isMobile && (
+        <MobileConfigDrawer
+          isOpen={isConfigDrawerOpen}
+          onClose={() => setIsConfigDrawerOpen(false)}
+          configTab={configTab}
+          setConfigTab={setConfigTab}
+        >
+          {configTab === 'agent' && (
+            <SlideScriptPanel
+              currentSlide={params.currentSlide}
+              scripts={scripts}
+              onScriptChange={handleScriptChange}
+              onScriptsUpdate={updateScripts}
+              onScriptsGenerated={handleScriptsGenerated}
+              brdgeId={params.brdgeId}
+              isGenerating={isGeneratingScripts}
+            />
+          )}
+          {configTab === 'voice' && (
+            <div className="p-4 space-y-6">
+              {/* Voice Configuration Content */}
+              <div className="space-y-4">
+                <select
+                  value={selectedVoice || ''}
+                  onChange={(e) => setSelectedVoice(e.target.value)}
+                  className="w-full bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2"
+                >
+                  <option value="">Select Voice</option>
+                  {savedVoices.map(voice => (
+                    <option key={voice.id} value={voice.id}>{voice.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+          {configTab === 'workflow' && (
+            <div className="p-4 space-y-6">
+              {/* Workflow Configuration Content */}
+              <div className="space-y-4">
+                <select
+                  value={selectedWalkthrough || ''}
+                  onChange={(e) => handleWalkthroughSelect(Number(e.target.value))}
+                  className="w-full bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2"
+                >
+                  <option value="">Select Walkthrough</option>
+                  {walkthroughs.map((w, index) => (
+                    <option key={w.id} value={w.id}>
+                      Walkthrough #{walkthroughs.length - index}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+        </MobileConfigDrawer>
+      )}
     </div>
   );
 }
