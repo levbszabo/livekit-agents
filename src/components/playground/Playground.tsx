@@ -242,10 +242,13 @@ export default function Playground({
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [forceUpdate, setForceUpdate] = useState(0);
-  const [forceRefresh, setForceRefresh] = useState(Date.now());
   const [isConfigDrawerOpen, setIsConfigDrawerOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>('chat');
-  const [forceWalkthroughRefresh, setForceWalkthroughRefresh] = useState(0);
+  const [isCloning, setIsCloning] = useState(false);
+  const [savedVoices, setSavedVoices] = useState<Array<{ id: string; name: string; created_at: string }>>([]);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const router = useRouter();
   const walkthroughSelectorRef = useRef<WalkthroughSelectorRef>(null);
 
   useEffect(() => {
@@ -265,28 +268,6 @@ export default function Playground({
       }
     }
   }, []);
-
-  const loadWalkthroughs = useCallback(async () => {
-    if (!params.brdgeId) return;
-    try {
-      const response = await api.get(`/brdges/${params.brdgeId}/walkthrough-list`);
-      if (response.data.has_walkthroughs) {
-        const sortedWalkthroughs = response.data.walkthroughs.sort(
-          (a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-        );
-        setWalkthroughs(sortedWalkthroughs);
-
-        if (!selectedWalkthrough && sortedWalkthroughs.length > 0) {
-          const latestWalkthrough = sortedWalkthroughs[0];
-          setSelectedWalkthrough(latestWalkthrough.id);
-        }
-
-        setConfigTab(prev => prev === 'workflow' ? 'workflow' : 'workflow');
-      }
-    } catch (error) {
-      console.error('Error loading walkthroughs:', error);
-    }
-  }, [params.brdgeId, selectedWalkthrough]);
 
   const chat = useChat();
 
@@ -338,69 +319,15 @@ export default function Playground({
           isSelf: false,
         }]);
       } else if (msg.topic === "walkthrough_completed") {
-        console.log("Walkthrough completed, refreshing...");
-        // Immediate refresh
-        setForceWalkthroughRefresh(prev => prev + 1);
-        walkthroughSelectorRef.current?.refreshWalkthroughs();
-
-        // Start polling with shorter intervals initially
-        let attempts = 0;
-        const maxAttempts = 10;
-        const pollInterval = 500; // 500ms
-
-        const pollForNewWalkthrough = async () => {
-          try {
-            console.log("Polling for new walkthrough...");
-            const response = await api.get(`/brdges/${params.brdgeId}/walkthrough-list`);
-            if (response.data.has_walkthroughs) {
-              const sortedWalkthroughs = response.data.walkthroughs.sort(
-                (a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-              );
-
-              // Check if we have a new walkthrough
-              if (sortedWalkthroughs.length > walkthroughs.length) {
-                console.log("New walkthrough found, updating state...");
-                setWalkthroughs(sortedWalkthroughs);
-                setSelectedWalkthrough(sortedWalkthroughs[0].id);
-                setConfigTab('workflow');
-                return true;
-              }
-            }
-            return false;
-          } catch (error) {
-            console.error('Error polling walkthroughs:', error);
-            return false;
-          }
-        };
-
-        const poll = async () => {
-          while (attempts < maxAttempts) {
-            console.log(`Polling attempt ${attempts + 1}/${maxAttempts}`);
-            const found = await pollForNewWalkthrough();
-            if (found) {
-              console.log("Successfully found and updated new walkthrough");
-              break;
-            }
-
-            attempts++;
-            if (attempts < maxAttempts) {
-              await new Promise(resolve => setTimeout(resolve, pollInterval));
-            }
-          }
-        };
-
-        poll();
+        console.log("Walkthrough completed, checking for new walkthrough...");
+        walkthroughSelectorRef.current?.checkForNewWalkthrough();
       }
     } catch (error) {
       console.error("Error processing message:", error);
     }
-  }, [params.brdgeId, walkthroughs.length]);
+  }, []);
 
   useDataChannel(onDataReceived);
-
-  useEffect(() => {
-    loadWalkthroughs();
-  }, [loadWalkthroughs, forceUpdate]);
 
   const handleWalkthroughClick = useCallback(async (agentType: AgentType = 'edit') => {
     try {
@@ -408,21 +335,13 @@ export default function Playground({
       setCurrentAgentType(agentType);
 
       if (roomState === ConnectionState.Connected) {
-        // First stop the connection
         await onConnect(false);
 
-        // Force immediate refresh of walkthroughs
-        console.log("Forcing walkthrough refresh...");
-        setForceWalkthroughRefresh(prev => prev + 1);
-        await walkthroughSelectorRef.current?.refreshWalkthroughs();
+        // Wait a bit for the backend to process
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
-        // Wait a bit for the backend
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        // Try to force a complete refresh by navigating to the same URL
-        const currentUrl = window.location.href;
-        window.location.href = currentUrl;
-
+        // Try to get the new walkthrough
+        await walkthroughSelectorRef.current?.checkForNewWalkthrough();
       } else {
         await onConnect(true);
         if (agentType === 'edit') {
@@ -952,11 +871,6 @@ export default function Playground({
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [currentRecording, setCurrentRecording] = useState<Blob | null>(null);
-  const [isCloning, setIsCloning] = useState(false);
-  const [savedVoices, setSavedVoices] = useState<Array<{ id: string; name: string; created_at: string }>>([]);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const router = useRouter();
 
   // Add voice-related handlers
   const startRecording = async () => {
@@ -1085,7 +999,7 @@ export default function Playground({
   ), []);
 
   return (
-    <div key={forceRefresh} className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
+    <div key={refreshKey} className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
       {/* Minimal Header with glow effect */}
       <div className={`
         flex-shrink-0 
@@ -1597,25 +1511,14 @@ export default function Playground({
 
                       {/* Walkthrough Controls */}
                       <div className="space-y-4">
-                        <select
-                          key={`walkthrough-selector-${forceRefresh}`}
+                        <WalkthroughSelector
                           ref={walkthroughSelectorRef}
-                          className="w-full bg-gray-800/50 border border-gray-700 rounded-lg
-                            px-3 py-2 text-sm text-gray-300
-                            focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
-                          value={selectedWalkthrough || ''}
-                          onChange={(e) => handleWalkthroughSelect(Number(e.target.value))}
-                        >
-                          <option value="">Select a walkthrough</option>
-                          {walkthroughs.map((w, index) => (
-                            <option
-                              key={`${w.id}-${forceRefresh}`}
-                              value={w.id}
-                            >
-                              Walkthrough #{walkthroughs.length - index}
-                            </option>
-                          ))}
-                        </select>
+                          brdgeId={params.brdgeId}
+                          apiBaseUrl={params.apiBaseUrl}
+                          selectedWalkthrough={selectedWalkthrough}
+                          onWalkthroughSelect={handleWalkthroughSelect}
+                          onWalkthroughsLoaded={(walkthroughs) => setWalkthroughs(walkthroughs)}
+                        />
 
                         <div className="flex gap-2">
                           <button
@@ -1743,18 +1646,14 @@ export default function Playground({
             <div className="p-4 space-y-6">
               {/* Workflow Configuration Content */}
               <div className="space-y-4">
-                <select
-                  value={selectedWalkthrough || ''}
-                  onChange={(e) => handleWalkthroughSelect(Number(e.target.value))}
-                  className="w-full bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2"
-                >
-                  <option value="">Select Walkthrough</option>
-                  {walkthroughs.map((w, index) => (
-                    <option key={w.id} value={w.id}>
-                      Walkthrough #{walkthroughs.length - index}
-                    </option>
-                  ))}
-                </select>
+                <WalkthroughSelector
+                  ref={walkthroughSelectorRef}
+                  brdgeId={params.brdgeId}
+                  apiBaseUrl={params.apiBaseUrl}
+                  selectedWalkthrough={selectedWalkthrough}
+                  onWalkthroughSelect={handleWalkthroughSelect}
+                  onWalkthroughsLoaded={(walkthroughs) => setWalkthroughs(walkthroughs)}
+                />
               </div>
             </div>
           )}

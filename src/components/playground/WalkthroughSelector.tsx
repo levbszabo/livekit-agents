@@ -1,16 +1,7 @@
-import { useEffect, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
-import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ChevronIcon } from './icons';
+import React, { forwardRef, useImperativeHandle, useRef, useEffect, useState, useCallback } from 'react';
 import { api } from '@/api';
 
-interface Walkthrough {
-    id: number;
-    label: string;
-    timestamp: string;
-    slide_count: number;
-}
-
-interface WalkthroughSelectorProps {
+export interface WalkthroughSelectorProps {
     brdgeId: string | null;
     apiBaseUrl: string | null;
     selectedWalkthrough: number | null;
@@ -21,114 +12,114 @@ interface WalkthroughSelectorProps {
 
 export interface WalkthroughSelectorRef {
     refreshWalkthroughs: () => Promise<void>;
+    checkForNewWalkthrough: () => Promise<void>;
 }
 
-export const WalkthroughSelector = forwardRef<WalkthroughSelectorRef, WalkthroughSelectorProps>(({
-    brdgeId,
-    apiBaseUrl,
-    selectedWalkthrough,
-    onWalkthroughSelect,
-    onWalkthroughsLoaded,
-    forceRefresh = 0
-}, ref) => {
-    const [walkthroughs, setWalkthroughs] = useState<any[]>([]);
-    const [refreshCounter, setRefreshCounter] = useState(0);
-    const [isLoading, setIsLoading] = useState(false);
-    const [lastRefreshTime, setLastRefreshTime] = useState(Date.now());
-    const [consecutiveErrors, setConsecutiveErrors] = useState(0);
+export const WalkthroughSelector = forwardRef<WalkthroughSelectorRef, WalkthroughSelectorProps>(
+    ({ brdgeId, apiBaseUrl, selectedWalkthrough, onWalkthroughSelect, onWalkthroughsLoaded, forceRefresh }, ref) => {
+        const [walkthroughs, setWalkthroughs] = useState<any[]>([]);
+        const isMountedRef = useRef(true);
+        const initialLoadDoneRef = useRef(false);
 
-    const loadWalkthroughs = useCallback(async (force = false) => {
-        // Don't refresh if we've refreshed recently (within 500ms) unless forced
-        if (!force && Date.now() - lastRefreshTime < 500) {
-            console.log("Skipping refresh - too soon");
-            return;
-        }
+        useEffect(() => {
+            isMountedRef.current = true;
+            return () => {
+                isMountedRef.current = false;
+            };
+        }, []);
 
-        if (!brdgeId || (isLoading && !force)) return;
+        const loadWalkthroughs = useCallback(async () => {
+            if (!brdgeId || !isMountedRef.current) return;
 
-        try {
-            console.log("Loading walkthroughs...");
-            setIsLoading(true);
-            const response = await api.get(`/brdges/${params.brdgeId}/walkthrough-list`);
+            try {
+                const response = await api.get(`/brdges/${brdgeId}/walkthrough-list`);
 
-            if (response.data.has_walkthroughs) {
-                const sortedWalkthroughs = response.data.walkthroughs.sort(
-                    (a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-                );
+                if (!isMountedRef.current) return;
 
-                console.log("New walkthroughs loaded:", sortedWalkthroughs.length);
-                setWalkthroughs(sortedWalkthroughs);
-                onWalkthroughsLoaded?.(sortedWalkthroughs);
+                if (response.data.has_walkthroughs) {
+                    const sortedWalkthroughs = response.data.walkthroughs.sort(
+                        (a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+                    );
 
-                // Only auto-select if no walkthrough is currently selected
-                if (!selectedWalkthrough && sortedWalkthroughs.length > 0) {
-                    console.log("Auto-selecting latest walkthrough");
-                    onWalkthroughSelect(sortedWalkthroughs[0].id);
+                    setWalkthroughs(sortedWalkthroughs);
+                    onWalkthroughsLoaded?.(sortedWalkthroughs);
+
+                    if (!initialLoadDoneRef.current && sortedWalkthroughs.length > 0) {
+                        onWalkthroughSelect(sortedWalkthroughs[0].id);
+                        initialLoadDoneRef.current = true;
+                    }
                 }
-
-                setConsecutiveErrors(0);
+            } catch (error) {
+                console.error('Error loading walkthroughs:', error);
             }
-        } catch (error) {
-            console.error('Error loading walkthroughs:', error);
-            setConsecutiveErrors(prev => prev + 1);
-        } finally {
-            setIsLoading(false);
-            setLastRefreshTime(Date.now());
-        }
-    }, [brdgeId, onWalkthroughsLoaded, onWalkthroughSelect, selectedWalkthrough, isLoading, lastRefreshTime]);
+        }, [brdgeId, onWalkthroughsLoaded, onWalkthroughSelect]);
 
-    // Expose refresh method to parent
-    useImperativeHandle(ref, () => ({
-        refreshWalkthroughs: async () => {
-            console.log("Manual refresh triggered");
-            setRefreshCounter(prev => prev + 1);
-            await loadWalkthroughs(true); // Force refresh
-        }
-    }));
+        // Function to check for new walkthrough after recording stops
+        const checkForNewWalkthrough = useCallback(async () => {
+            if (!brdgeId) return;
 
-    // Load walkthroughs on mount and when dependencies change
-    useEffect(() => {
-        console.log("Dependency-triggered refresh");
-        loadWalkthroughs();
-    }, [loadWalkthroughs, refreshCounter, forceRefresh]);
+            const maxAttempts = 5;
+            const delayBetweenAttempts = 2000;
+            const currentCount = walkthroughs.length;
 
-    // Add polling for updates with dynamic interval
-    useEffect(() => {
-        // Adjust polling interval based on error count
-        const pollInterval = Math.min(1000 + (consecutiveErrors * 1000), 5000);
+            for (let attempt = 0; attempt < maxAttempts; attempt++) {
+                try {
+                    const response = await api.get(`/brdges/${brdgeId}/walkthrough-list`);
 
-        const pollTimer = setInterval(() => {
-            if (!isLoading) {
-                console.log("Poll-triggered refresh");
-                loadWalkthroughs();
+                    if (response.data.has_walkthroughs) {
+                        const sortedWalkthroughs = response.data.walkthroughs.sort(
+                            (a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+                        );
+
+                        if (sortedWalkthroughs.length > currentCount) {
+                            setWalkthroughs(sortedWalkthroughs);
+                            onWalkthroughsLoaded?.(sortedWalkthroughs);
+                            onWalkthroughSelect(sortedWalkthroughs[0].id);
+                            break;
+                        }
+                    }
+
+                    if (attempt < maxAttempts - 1) {
+                        await new Promise(resolve => setTimeout(resolve, delayBetweenAttempts));
+                    }
+                } catch (error) {
+                    console.error('Error checking for new walkthrough:', error);
+                }
             }
-        }, pollInterval);
+        }, [brdgeId, walkthroughs.length, onWalkthroughsLoaded, onWalkthroughSelect]);
 
-        return () => clearInterval(pollTimer);
-    }, [loadWalkthroughs, isLoading, consecutiveErrors]);
+        useImperativeHandle(ref, () => ({
+            refreshWalkthroughs: loadWalkthroughs,
+            checkForNewWalkthrough
+        }));
 
-    return (
-        <select
-            key={`${refreshCounter}-${forceRefresh}-${walkthroughs.length}`}
-            value={selectedWalkthrough || ''}
-            onChange={(e) => onWalkthroughSelect(Number(e.target.value))}
-            className="w-full bg-gray-800/50 border border-gray-700 rounded-lg
-                px-3 py-2 text-sm text-gray-300
-                focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500
-                disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isLoading}
-        >
-            <option value="">Select a walkthrough</option>
-            {walkthroughs.map((walkthrough, index) => (
-                <option
-                    key={`${walkthrough.id}-${refreshCounter}-${forceRefresh}`}
-                    value={walkthrough.id}
-                >
-                    {`Walkthrough #${walkthroughs.length - index}`}
-                </option>
-            ))}
-        </select>
-    );
-});
+        // Only load walkthroughs on initial mount
+        useEffect(() => {
+            loadWalkthroughs();
+        }, [loadWalkthroughs]);
+
+        return (
+            <select
+                className="w-full bg-gray-800/50 border border-gray-700 rounded-lg
+                    px-3 py-2 text-sm text-gray-300
+                    focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500
+                    transition-colors duration-150
+                    hover:border-cyan-500/50"
+                value={selectedWalkthrough || ''}
+                onChange={(e) => onWalkthroughSelect(Number(e.target.value))}
+            >
+                <option value="">Select a walkthrough</option>
+                {walkthroughs.map((w, index) => (
+                    <option
+                        key={w.id}
+                        value={w.id}
+                    >
+                        Walkthrough #{walkthroughs.length - index}
+                    </option>
+                ))}
+            </select>
+        );
+    }
+);
 
 WalkthroughSelector.displayName = 'WalkthroughSelector'; 
