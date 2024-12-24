@@ -594,33 +594,53 @@ export default function Playground({
                       handleWalkthroughClick('view');
                     }
                   }}
-                  className={`px-4 py-2 ${roomState === ConnectionState.Connected
-                    ? 'bg-red-600 hover:bg-red-700'
-                    : 'bg-green-600 hover:bg-green-700'
-                    } text-white rounded-md transition-colors flex items-center gap-2`}
+                  className={`
+                    ${isMobile ? 'p-1 scale-90' : 'p-2'} 
+                    rounded-lg transition-all duration-300
+                    ${roomState === ConnectionState.Connected
+                      ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 shadow-[0_0_15px_rgba(255,0,0,0.1)]'
+                      : `
+                        bg-cyan-500/20 text-cyan-400 
+                        hover:bg-cyan-500/30 
+                        shadow-[0_0_15px_rgba(0,255,255,0.1)]
+                        relative
+                        after:content-['']
+                        after:absolute after:inset-0
+                        after:rounded-lg
+                        after:bg-cyan-500/20
+                        after:animate-[glowPulse_2s_ease-in-out_infinite]
+                        after:-z-10
+                        after:transform
+                        after:origin-center
+                        hover:after:bg-cyan-500/30
+                        hover:shadow-[0_0_25px_rgba(0,255,255,0.2)]
+                        before:content-['']
+                        before:absolute before:inset-0
+                        before:rounded-lg
+                        before:bg-cyan-500/10
+                        before:animate-[glowPulse_2s_ease-in-out_infinite]
+                        before:-z-20
+                        before:transform
+                        before:scale-110
+                        before:origin-center
+                        before:blur-[8px]
+                        group
+                      `
+                    }
+                  `}
                 >
                   {roomState === ConnectionState.Connected ? (
-                    <>
-                      <svg
-                        className="w-4 h-4"
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                      >
-                        <path d="M6 6h12v12H6z" />
-                      </svg>
-                      Stop
-                    </>
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M6 6h12v12H6z" />
+                    </svg>
                   ) : (
-                    <>
-                      <svg
-                        className="w-4 h-4"
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                      >
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                      Play
-                    </>
+                    <svg
+                      className="w-5 h-5 relative z-10 transition-transform duration-300 group-hover:scale-110"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
                   )}
                 </button>
               )}
@@ -1108,16 +1128,43 @@ export default function Playground({
                           onClick={() => {
                             if (roomState === ConnectionState.Connected) {
                               onConnect(false);
+                              setRightPanelView('info');
                             } else {
                               handleWalkthroughClick('view');
                             }
                           }}
                           className={`
                             ${isMobile ? 'p-1 scale-90' : 'p-2'} 
-                            rounded-lg transition-colors
+                            rounded-lg transition-all duration-300
                             ${roomState === ConnectionState.Connected
                               ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 shadow-[0_0_15px_rgba(255,0,0,0.1)]'
-                              : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 shadow-[0_0_15px_rgba(0,255,255,0.1)]'
+                              : `
+                                bg-cyan-500/20 text-cyan-400 
+                                hover:bg-cyan-500/30 
+                                shadow-[0_0_15px_rgba(0,255,255,0.1)]
+                                relative
+                                after:content-['']
+                                after:absolute after:inset-0
+                                after:rounded-lg
+                                after:bg-cyan-500/20
+                                after:animate-[glowPulse_2s_ease-in-out_infinite]
+                                after:-z-10
+                                after:transform
+                                after:origin-center
+                                hover:after:bg-cyan-500/30
+                                hover:shadow-[0_0_25px_rgba(0,255,255,0.2)]
+                                before:content-['']
+                                before:absolute before:inset-0
+                                before:rounded-lg
+                                before:bg-cyan-500/10
+                                before:animate-[glowPulse_2s_ease-in-out_infinite]
+                                before:-z-20
+                                before:transform
+                                before:scale-110
+                                before:origin-center
+                                before:blur-[8px]
+                                group
+                              `
                             }
                           `}
                         >
@@ -1126,7 +1173,11 @@ export default function Playground({
                               <path d="M6 6h12v12H6z" />
                             </svg>
                           ) : (
-                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                            <svg
+                              className="w-5 h-5 relative z-10 transition-transform duration-300 group-hover:scale-110"
+                              viewBox="0 0 24 24"
+                              fill="currentColor"
+                            >
                               <path d="M8 5v14l11-7z" />
                             </svg>
                           )}

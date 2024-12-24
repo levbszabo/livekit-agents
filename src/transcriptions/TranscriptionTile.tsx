@@ -11,7 +11,7 @@ import {
   Track,
   TranscriptionSegment,
 } from "livekit-client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 export function TranscriptionTile({
   agentAudioTrack,
@@ -33,6 +33,18 @@ export function TranscriptionTile({
   );
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
   const { chatMessages, send: sendChat } = useChat();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
+  // Auto-scroll when messages change
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   // store transcripts
   useEffect(() => {
@@ -99,6 +111,7 @@ export function TranscriptionTile({
         onSend={sendChat}
         className="h-full"
       />
+      <div ref={messagesEndRef} style={{ height: 0 }} /> {/* Invisible element for scrolling */}
     </div>
   );
 }
