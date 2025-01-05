@@ -569,7 +569,7 @@ export default function Playground({
 
     return (
       <div className="flex flex-col w-full h-full">
-        <div className="flex-1 relative bg-gray-900 flex items-center justify-center">
+        <div className={`flex-1 relative bg-gray-900 flex items-center justify-center transition-all duration-300 ${isRightPanelCollapsed ? 'mr-0' : 'mr-[400px]'}`}>
           <Image
             key={slideUrl}
             src={slideUrl}
@@ -1088,12 +1088,11 @@ export default function Playground({
       </div>
 
       {/* Main Content Area with Resizable Panels */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden transition-all duration-300">
         <PanelGroup direction="horizontal">
           <div className={`
             flex-1 transition-all duration-300
-            ${isMobile ? 'w-full' : currentAgentType === 'view' ? 'mr-0' :
-              isRightPanelCollapsed ? 'mr-0' : 'mr-[400px]'}
+            ${!isMobile && isEditPage ? (isRightPanelCollapsed ? 'mr-0' : 'mr-[400px]') : 'mr-0'}
           `}>
             <PanelGroup direction="vertical">
               {/* Slides Area */}
@@ -1104,44 +1103,22 @@ export default function Playground({
                 <div className="h-full w-full overflow-hidden bg-black">
                   <div className="h-full w-full flex items-center justify-center p-0">
                     {getSlideUrl() ? (
-                      <div className={`
-                        relative w-full h-full flex items-center justify-center 
-                        transition-all duration-300 ease-in-out
-                        ${isMobile ? 'p-0.5' : 'p-2'}
-                      `}>
-                        <div className="relative w-full h-full" style={{
-                          maxWidth: isMobile
-                            ? '100%'
-                            : currentAgentType === 'view'
-                              ? 'calc(100vw - 32px)'
-                              : isRightPanelCollapsed
-                                ? 'calc(100vw - 32px)'
-                                : 'calc(100vw - 416px)',
-                          maxHeight: isMobile
-                            ? 'calc(75vh - 36px)'
-                            : isRightPanelCollapsed ? '95vh' : '70vh',
-                          aspectRatio: '16/9',
-                          margin: isMobile ? '0' : '0 auto',
-                        }}>
-                          <Image
-                            key={getSlideUrl()}
-                            src={getSlideUrl()}
-                            alt={`Slide ${params.currentSlide}`}
-                            className={`
-                              w-full h-full object-contain 
-                              transition-all duration-300 ease-in-out
-                            `}
-                            priority={true}
-                            width={1920}
-                            height={1080}
-                            onError={(e) => {
-                              console.error('Error loading slide image:', getSlideUrl());
-                              const target = e.target as HTMLImageElement;
-                              target.onerror = null;
-                              target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="50%" y="50%" text-anchor="middle" fill="gray">Error loading slide</text></svg>';
-                            }}
-                          />
-                        </div>
+                      <div className="relative w-full h-full flex items-center justify-center">
+                        <Image
+                          key={getSlideUrl()}
+                          src={getSlideUrl()}
+                          alt={`Slide ${params.currentSlide}`}
+                          className="max-w-full max-h-full object-contain"
+                          priority={true}
+                          width={1920}
+                          height={1080}
+                          onError={(e) => {
+                            console.error('Error loading slide image:', getSlideUrl());
+                            const target = e.target as HTMLImageElement;
+                            target.onerror = null;
+                            target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="50%" y="50%" text-anchor="middle" fill="gray">Error loading slide</text></svg>';
+                          }}
+                        />
                       </div>
                     ) : (
                       <div className="text-gray-500">No slide available</div>
@@ -1322,8 +1299,7 @@ export default function Playground({
 
           {/* Right Panel - Only show on desktop in edit mode */}
           {!isMobile && isEditPage && (
-            <div className={`fixed right-0 top-[48px] bottom-0 w-[400px] transition-all duration-300 ${isRightPanelCollapsed ? 'translate-x-full' : 'translate-x-0'
-              }`}>
+            <div className={`fixed right-0 top-[48px] bottom-0 w-[400px] transition-all duration-300 ${isRightPanelCollapsed ? 'translate-x-full' : 'translate-x-0'}`}>
               {/* Collapse Toggle Button */}
               <button
                 onClick={() => setIsRightPanelCollapsed(!isRightPanelCollapsed)}
