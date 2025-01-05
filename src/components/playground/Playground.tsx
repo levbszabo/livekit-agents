@@ -250,6 +250,14 @@ export default function Playground({
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
   const walkthroughSelectorRef = useRef<WalkthroughSelectorRef>(null);
+  const [isEditPage, setIsEditPage] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      setIsEditPage(window.location.pathname.includes('/edit') || urlParams.get('agentType') === 'edit');
+    }
+  }, []);
 
   useEffect(() => {
     if (roomState === ConnectionState.Connected) {
@@ -589,8 +597,8 @@ export default function Playground({
                   onClick={() => {
                     if (roomState === ConnectionState.Connected) {
                       onConnect(false);
-                      setRightPanelView('info');
                     } else {
+                      setIsRightPanelCollapsed(true);
                       handleWalkthroughClick('view');
                     }
                   }}
@@ -648,16 +656,58 @@ export default function Playground({
               <button
                 onClick={handlePrevSlide}
                 disabled={params.currentSlide === 1}
-                className="px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="p-2 rounded-lg transition-all duration-300
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                  bg-gray-800/50 text-gray-400 
+                  hover:bg-gray-700 hover:text-cyan-400
+                  hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]
+                  transform hover:-translate-y-0.5
+                  disabled:hover:transform-none"
               >
-                Previous
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
+                </svg>
               </button>
+
+              <span className={`
+                ${isMobile ? 'text-xs' : 'text-sm'} 
+                font-medium text-gray-400 select-none
+              `}>
+                {params.currentSlide} / {params.numSlides}
+              </span>
+
               <button
                 onClick={handleNextSlide}
                 disabled={params.currentSlide === params.numSlides}
-                className="px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="p-2 rounded-lg transition-all duration-300
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                  bg-gray-800/50 text-gray-400 
+                  hover:bg-gray-700 hover:text-cyan-400
+                  hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]
+                  transform hover:-translate-y-0.5
+                  disabled:hover:transform-none"
               >
-                Next
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z" />
+                </svg>
+              </button>
+
+              <button
+                onClick={() => {
+                  if (roomState === ConnectionState.Connected) {
+                    localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
+                  }
+                }}
+                className={`p-2 rounded-lg transition-colors ${localParticipant?.isMicrophoneEnabled
+                  ? 'bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30'
+                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                  }`}
+                disabled={roomState !== ConnectionState.Connected}
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5z" />
+                  <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+                </svg>
               </button>
             </div>
           </div>
@@ -665,7 +715,7 @@ export default function Playground({
         {/* No additional chat/transcription here; it's moved to the bottom panel only */}
       </div>
     );
-  }, [params, roomState, hasRequiredParams, scripts, handlePrevSlide, handleNextSlide, onConnect, handleWalkthroughClick]);
+  }, [params, roomState, hasRequiredParams, scripts, handlePrevSlide, handleNextSlide, onConnect, handleWalkthroughClick, currentAgentType]);
 
   useEffect(() => {
     document.body.style.setProperty(
@@ -1128,8 +1178,8 @@ export default function Playground({
                           onClick={() => {
                             if (roomState === ConnectionState.Connected) {
                               onConnect(false);
-                              setRightPanelView('info');
                             } else {
+                              setIsRightPanelCollapsed(true);
                               handleWalkthroughClick('view');
                             }
                           }}
@@ -1183,28 +1233,7 @@ export default function Playground({
                           )}
                         </button>
 
-                        {/* Mic Toggle */}
-                        <button
-                          onClick={() => {
-                            if (roomState === ConnectionState.Connected) {
-                              localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
-                            }
-                          }}
-                          className={`p-2 rounded-lg transition-colors ${localParticipant?.isMicrophoneEnabled
-                            ? 'bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30'
-                            : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                            }`}
-                          disabled={roomState !== ConnectionState.Connected}
-                        >
-                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5z" />
-                            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
-                          </svg>
-                        </button>
-                      </div>
-
-                      {/* Slide Navigation */}
-                      <div className="flex items-center gap-2">
+                        {/* Slide Navigation - Moved here */}
                         <button
                           onClick={handlePrevSlide}
                           disabled={params.currentSlide === 1}
@@ -1243,6 +1272,25 @@ export default function Playground({
                             <path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z" />
                           </svg>
                         </button>
+
+                        {/* Mic Toggle */}
+                        <button
+                          onClick={() => {
+                            if (roomState === ConnectionState.Connected) {
+                              localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
+                            }
+                          }}
+                          className={`p-2 rounded-lg transition-colors ${localParticipant?.isMicrophoneEnabled
+                            ? 'bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30'
+                            : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                            }`}
+                          disabled={roomState !== ConnectionState.Connected}
+                        >
+                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5z" />
+                            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+                          </svg>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -1273,7 +1321,7 @@ export default function Playground({
           </div>
 
           {/* Right Panel - Only show on desktop in edit mode */}
-          {!isMobile && currentAgentType === 'edit' && (
+          {!isMobile && isEditPage && (
             <div className={`fixed right-0 top-[48px] bottom-0 w-[400px] transition-all duration-300 ${isRightPanelCollapsed ? 'translate-x-full' : 'translate-x-0'
               }`}>
               {/* Collapse Toggle Button */}
@@ -1577,7 +1625,8 @@ export default function Playground({
                               if (roomState === ConnectionState.Connected) {
                                 onConnect(false);
                               } else {
-                                handleWalkthroughClick('edit');
+                                setIsRightPanelCollapsed(true);
+                                handleWalkthroughClick('view');
                               }
                             }}
                             className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium 
@@ -1616,7 +1665,7 @@ export default function Playground({
         </PanelGroup>
       </div>
 
-      {isMobile && currentAgentType === 'edit' && (
+      {isMobile && isEditPage && (
         <button
           onClick={() => setIsConfigDrawerOpen(true)}
           className="fixed right-2 top-[40px] z-40 p-1.5 rounded-lg 
