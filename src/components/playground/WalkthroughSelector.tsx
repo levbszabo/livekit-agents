@@ -8,6 +8,7 @@ export interface WalkthroughSelectorProps {
     onWalkthroughSelect: (walkthroughId: number) => void;
     onWalkthroughsLoaded?: (walkthroughs: any[]) => void;
     forceRefresh?: number;
+    agentType?: 'edit' | 'view';
 }
 
 export interface WalkthroughSelectorRef {
@@ -16,7 +17,7 @@ export interface WalkthroughSelectorRef {
 }
 
 export const WalkthroughSelector = forwardRef<WalkthroughSelectorRef, WalkthroughSelectorProps>(
-    ({ brdgeId, apiBaseUrl, selectedWalkthrough, onWalkthroughSelect, onWalkthroughsLoaded, forceRefresh }, ref) => {
+    ({ brdgeId, apiBaseUrl, selectedWalkthrough, onWalkthroughSelect, onWalkthroughsLoaded, forceRefresh, agentType = 'edit' }, ref) => {
         const [walkthroughs, setWalkthroughs] = useState<any[]>([]);
         const isMountedRef = useRef(true);
         const initialLoadDoneRef = useRef(false);
@@ -97,6 +98,11 @@ export const WalkthroughSelector = forwardRef<WalkthroughSelectorRef, Walkthroug
         useEffect(() => {
             loadWalkthroughs();
         }, [loadWalkthroughs]);
+
+        const startWalkthrough = useCallback(async () => {
+            // ... any walkthrough start logic ...
+            // Make sure it uses 'edit' mode
+        }, []);
 
         return (
             <select
