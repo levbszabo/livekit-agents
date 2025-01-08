@@ -1377,6 +1377,123 @@ export default function Playground({
                           </div>
                         </div>
                       )}
+
+                      {/* AI Chat Input Form - Only show on edit page */}
+                      {isEditPage && (
+                        <div className="mt-6 px-4">
+                          <div className="relative bg-gray-800/30 rounded-xl p-4 border border-gray-700/50
+                            transition-all duration-300 hover:border-cyan-500/30
+                            hover:shadow-[0_0_30px_rgba(0,255,255,0.1)]
+                            group
+                          ">
+                            {/* Title */}
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 
+                                group-hover:animate-[pulse_2s_ease-in-out_infinite]
+                              "/>
+                              <h3 className="text-sm font-medium text-gray-300 tracking-tight
+                                group-hover:text-cyan-400 transition-colors duration-300
+                              ">
+                                AI Script Editor
+                              </h3>
+                            </div>
+
+                            {/* Form */}
+                            <form
+                              onSubmit={(e) => {
+                                e.preventDefault();
+                                const input = e.currentTarget.elements.namedItem('aiEdit') as HTMLInputElement;
+                                if (input.value.trim()) {
+                                  console.log('AI Edit Request:', input.value);
+                                  input.value = '';
+                                }
+                              }}
+                              className="relative"
+                            >
+                              <div className="relative group/input">
+                                <input
+                                  type="text"
+                                  name="aiEdit"
+                                  placeholder="Type instructions like 'Make this longer' or 'Simplify the language'..."
+                                  className="w-full bg-gray-900/50 border border-gray-700/50 rounded-lg
+                                    px-4 py-2.5 pr-12 text-[13px] text-gray-300
+                                    placeholder:text-gray-500 placeholder:text-[12px]
+                                    transition-all duration-300
+                                    focus:ring-2 focus:ring-cyan-500 focus:border-transparent
+                                    hover:border-cyan-500/30
+                                    hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]
+                                    group-hover/input:border-cyan-500/20
+                                  "
+                                />
+                                <button
+                                  type="submit"
+                                  className="absolute right-2 top-1/2 -translate-y-1/2
+                                    p-2 rounded-lg
+                                    text-gray-400 
+                                    transition-all duration-300
+                                    hover:text-cyan-400
+                                    hover:scale-110
+                                    active:scale-95
+                                    focus:outline-none focus:ring-2 focus:ring-cyan-500/50
+                                  "
+                                >
+                                  <svg
+                                    className="w-5 h-5 transform transition-transform duration-300
+                                      group-hover/input:translate-x-0.5
+                                    "
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M13 5l7 7-7 7M5 5l7 7-7 7"
+                                    />
+                                  </svg>
+                                </button>
+                              </div>
+                            </form>
+
+                            {/* Help Text with Examples */}
+                            <div className="mt-3 space-y-2">
+                              <div className="text-xs text-gray-500">
+                                Use natural language to request changes to the script:
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {[
+                                  'Make it longer',
+                                  'Simplify language',
+                                  'More formal tone',
+                                  'Add examples',
+                                  'More technical'
+                                ].map((example) => (
+                                  <button
+                                    key={example}
+                                    onClick={() => {
+                                      const input = document.querySelector('input[name="aiEdit"]') as HTMLInputElement;
+                                      if (input) input.value = example;
+                                    }}
+                                    className="px-2.5 py-1.5 text-[11px] rounded-md 
+                                      bg-gray-800/80 backdrop-blur-sm
+                                      text-gray-300 border border-gray-600/50
+                                      transition-all duration-300
+                                      hover:text-cyan-400 hover:border-cyan-500/50
+                                      hover:shadow-[0_0_15px_rgba(0,255,255,0.15)]
+                                      hover:scale-105
+                                      active:scale-95
+                                      focus:outline-none focus:ring-2 focus:ring-cyan-500/50
+                                    "
+                                  >
+                                    {example}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -1695,6 +1812,123 @@ export default function Playground({
                     "/>
                     <div className="animate-[glow_2s_ease-in-out_infinite]">
                       Generating Scripts...
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* AI Chat Input Form - Only show on edit page */}
+              {isEditPage && (
+                <div className="mt-6 px-4">
+                  <div className="relative bg-gray-800/30 rounded-xl p-4 border border-gray-700/50
+                    transition-all duration-300 hover:border-cyan-500/30
+                    hover:shadow-[0_0_30px_rgba(0,255,255,0.1)]
+                    group
+                  ">
+                    {/* Title */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 
+                        group-hover:animate-[pulse_2s_ease-in-out_infinite]
+                      "/>
+                      <h3 className="text-sm font-medium text-gray-300 tracking-tight
+                        group-hover:text-cyan-400 transition-colors duration-300
+                      ">
+                        AI Script Editor
+                      </h3>
+                    </div>
+
+                    {/* Form */}
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const input = e.currentTarget.elements.namedItem('aiEdit') as HTMLInputElement;
+                        if (input.value.trim()) {
+                          console.log('AI Edit Request:', input.value);
+                          input.value = '';
+                        }
+                      }}
+                      className="relative"
+                    >
+                      <div className="relative group/input">
+                        <input
+                          type="text"
+                          name="aiEdit"
+                          placeholder="Type instructions like 'Make this longer' or 'Simplify the language'..."
+                          className="w-full bg-gray-900/50 border border-gray-700/50 rounded-lg
+                            px-4 py-2.5 pr-12 text-[13px] text-gray-300
+                            placeholder:text-gray-500 placeholder:text-[12px]
+                            transition-all duration-300
+                            focus:ring-2 focus:ring-cyan-500 focus:border-transparent
+                            hover:border-cyan-500/30
+                            hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]
+                            group-hover/input:border-cyan-500/20
+                          "
+                        />
+                        <button
+                          type="submit"
+                          className="absolute right-2 top-1/2 -translate-y-1/2
+                            p-2 rounded-lg
+                            text-gray-400 
+                            transition-all duration-300
+                            hover:text-cyan-400
+                            hover:scale-110
+                            active:scale-95
+                            focus:outline-none focus:ring-2 focus:ring-cyan-500/50
+                          "
+                        >
+                          <svg
+                            className="w-5 h-5 transform transition-transform duration-300
+                              group-hover/input:translate-x-0.5
+                            "
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M13 5l7 7-7 7M5 5l7 7-7 7"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    </form>
+
+                    {/* Help Text with Examples */}
+                    <div className="mt-3 space-y-2">
+                      <div className="text-xs text-gray-500">
+                        Use natural language to request changes to the script:
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          'Make it longer',
+                          'Simplify language',
+                          'More formal tone',
+                          'Add examples',
+                          'More technical'
+                        ].map((example) => (
+                          <button
+                            key={example}
+                            onClick={() => {
+                              const input = document.querySelector('input[name="aiEdit"]') as HTMLInputElement;
+                              if (input) input.value = example;
+                            }}
+                            className="px-2.5 py-1.5 text-[11px] rounded-md 
+                              bg-gray-800/80 backdrop-blur-sm
+                              text-gray-300 border border-gray-600/50
+                              transition-all duration-300
+                              hover:text-cyan-400 hover:border-cyan-500/50
+                              hover:shadow-[0_0_15px_rgba(0,255,255,0.15)]
+                              hover:scale-105
+                              active:scale-95
+                              focus:outline-none focus:ring-2 focus:ring-cyan-500/50
+                            "
+                          >
+                            {example}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -206,7 +206,7 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                             ? "Enter script for this slide..."
                             : "Enter agent instructions for this slide..."
                     }
-                    className={`w-full min-h-[400px] bg-gray-800/80 text-gray-200 rounded-lg px-4 py-3 resize-y
+                    className={`w-full min-h-[280px] max-h-[400px] bg-gray-800/80 text-gray-200 rounded-lg px-4 py-3 resize-y
                         text-[13px] font-mono leading-relaxed tracking-wide
                         border border-gray-700/50
                         focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50
