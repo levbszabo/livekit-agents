@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { api } from '@/api';
 
 // Add this interface to define the script content structure
@@ -49,6 +49,8 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
         agent: ''
     });
     const streamTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const [streamingContent, setStreamingContent] = useState('');
+    const [isStreaming, setIsStreaming] = useState(false);
 
     useEffect(() => {
         // Skip effect if no scripts or during generation
@@ -183,12 +185,11 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
             streamContent: '',
             error: null
         }));
+        setIsStreaming(true);
 
-        // Initialize accumulated content with current values
-        accumulatedContentRef.current = {
-            script: editedScript || '',
-            agent: editedAgent || ''
-        };
+        // Initialize streaming with empty content
+        setStreamingContent('');
+        let currentJsonStr = '';
 
         try {
             const params = new URLSearchParams({
@@ -205,9 +206,6 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                 `${api.defaults.baseURL}/brdges/${brdgeId}/scripts/ai-edit?${params.toString()}`
             );
 
-            let lastUpdateTime = Date.now();
-            const updateDebounceMs = 50; // Debounce time for UI updates
-
             eventSource.onmessage = (event) => {
                 if (event.data === '[DONE]') {
                     console.log('Stream complete. Final content:', accumulatedContentRef.current);
@@ -218,28 +216,23 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                         agent: accumulatedContentRef.current.agent
                     };
 
-                    // Batch state updates
-                    Promise.resolve().then(() => {
-                        // Update local state
-                        setEditedScript(finalContent.script);
-                        setEditedAgent(finalContent.agent);
-                        setHasScriptChanges(true);
-                        setHasAgentChanges(true);
+                    // Update parent component's state
+                    if (scripts && typeof scripts === 'object') {
+                        const updatedScripts = {
+                            ...scripts,
+                            [currentSlide]: finalContent
+                        };
+                        onScriptsUpdate?.(updatedScripts);
+                    }
 
-                        // Update parent component's state
-                        if (scripts && typeof scripts === 'object') {
-                            const updatedScripts = {
-                                ...scripts,
-                                [currentSlide]: finalContent
-                            };
-                            onScriptsUpdate?.(updatedScripts);
-                        }
-
-                        setAIEditState(prev => ({
-                            ...prev,
-                            isProcessing: false
-                        }));
-                    });
+                    setAIEditState(prev => ({
+                        ...prev,
+                        isProcessing: false
+                    }));
+                    setIsStreaming(false);
+                    setStreamingContent('');
+                    setEditedScript(finalContent.script);
+                    setEditedAgent(finalContent.agent);
 
                     // Clean up
                     eventSource.close();
@@ -248,7 +241,7 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
 
                 try {
                     const parsed = JSON.parse(event.data);
-                    console.log('Received SSE data:', parsed);
+                    console.log('Received token:', parsed);
 
                     if (parsed.error) {
                         console.error('Error from server:', parsed.error);
@@ -257,46 +250,39 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                             isProcessing: false,
                             error: parsed.error
                         }));
+                        setIsStreaming(false);
                         eventSource.close();
                         return;
                     }
 
-                    if (parsed.content) {
-                        try {
-                            const content = JSON.parse(parsed.content);
-                            console.log('Parsed streaming content:', content);
+                    if (parsed.token) {
+                        // Accumulate JSON string
+                        currentJsonStr += parsed.token;
+                        console.log('Current JSON string:', currentJsonStr);
 
-                            // Update accumulated content
+                        try {
+                            // Try to parse the accumulated JSON
+                            const content = JSON.parse(currentJsonStr);
+                            console.log('Parsed content:', content);
+
+                            // Update the streaming content in real-time
                             if (content.script !== undefined) {
+                                setStreamingContent(content.script);
                                 accumulatedContentRef.current.script = content.script;
                             }
                             if (content.agent !== undefined) {
                                 accumulatedContentRef.current.agent = content.agent;
                             }
-
-                            // Debounce UI updates
-                            const now = Date.now();
-                            if (now - lastUpdateTime >= updateDebounceMs) {
-                                lastUpdateTime = now;
-
-                                // Clear any pending timeout
-                                if (streamTimeoutRef.current) {
-                                    clearTimeout(streamTimeoutRef.current);
-                                }
-
-                                // Schedule immediate update
-                                streamTimeoutRef.current = setTimeout(() => {
-                                    console.log('Updating UI with:', accumulatedContentRef.current);
-                                    setEditedScript(accumulatedContentRef.current.script);
-                                    setEditedAgent(accumulatedContentRef.current.agent);
-                                }, 0);
-                            }
                         } catch (e) {
-                            console.error('Error parsing streaming content:', e);
+                            // Not valid JSON yet, just show the accumulated tokens
+                            const scriptMatch = currentJsonStr.match(/"script"\s*:\s*"([^"]*)/);
+                            if (scriptMatch && scriptMatch[1]) {
+                                setStreamingContent(scriptMatch[1]);
+                            }
                         }
                     }
                 } catch (e) {
-                    console.error('Error processing event:', e);
+                    console.error('Error processing token:', e);
                 }
             };
 
@@ -307,6 +293,7 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                     isProcessing: false,
                     error: 'Connection error occurred'
                 }));
+                setIsStreaming(false);
                 eventSource.close();
             };
 
@@ -320,6 +307,7 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                 isProcessing: false,
                 error: 'Failed to process AI edit'
             }));
+            setIsStreaming(false);
         }
     }, [
         brdgeId,
@@ -329,6 +317,14 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
         scripts,
         onScriptsUpdate
     ]);
+
+    // Update the textarea value based on streaming state
+    const textareaValue = useMemo(() => {
+        if (isStreaming) {
+            return streamingContent;
+        }
+        return activeTab === 'script' ? editedScript : editedAgent;
+    }, [isStreaming, streamingContent, activeTab, editedScript, editedAgent]);
 
     // Cleanup EventSource on unmount or when changing slides
     useEffect(() => {
@@ -428,17 +424,17 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
 
             <div className="flex-1 overflow-y-auto p-4">
                 <textarea
-                    value={activeTab === 'script' ? editedScript : editedAgent}
-                    onChange={(e) => handleContentChange(e.target.value, activeTab)}
+                    value={textareaValue}
+                    onChange={(e) => !isStreaming && handleContentChange(e.target.value, activeTab)}
                     placeholder={
-                        aiEditState.isProcessing
-                            ? "AI is editing content..."
+                        isStreaming
+                            ? "AI is rewriting content..."
                             : activeTab === 'script'
                                 ? "Enter script for this slide..."
                                 : "Enter agent instructions for this slide..."
                     }
                     className={`w-full min-h-[280px] max-h-[400px] bg-gray-800/80 
-                        ${aiEditState.isProcessing ? 'opacity-50' : ''}
+                        ${isStreaming ? 'cursor-not-allowed' : ''}
                         ${aiEditState.error ? 'border-red-500' : ''}
                         text-gray-200 rounded-lg px-4 py-3 resize-y
                         text-[13px] font-mono leading-relaxed tracking-wide
@@ -446,8 +442,9 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                         focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50
                         placeholder:text-gray-600
                         shadow-[0_0_15px_rgba(255,255,255,0.03)]
+                        transition-colors duration-150
                     `}
-                    disabled={aiEditState.isProcessing}
+                    disabled={isStreaming}
                     style={{
                         boxShadow: '0 0 15px rgba(255,255,255,0.03), inset 0 0 20px rgba(255,255,255,0.02)'
                     }}
