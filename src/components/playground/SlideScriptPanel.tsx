@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '@/api';
 
 // Add this interface to define the script content structure
@@ -15,11 +15,19 @@ interface SlideScriptPanelProps {
     brdgeId?: string | number | null;
     isGenerating?: boolean;
     onScriptsGenerated?: (newScripts: Record<string, ScriptContent>) => void;
+    onAIEdit: (fn: (instruction: string) => Promise<void>) => void;
 }
 
 type TabType = 'script' | 'agent';
 
-export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScriptsUpdate, onScriptsGenerated, brdgeId, isGenerating = false }: SlideScriptPanelProps) => {
+// Add new interface for AI editing state
+interface AIEditState {
+    isProcessing: boolean;
+    streamContent: string;
+    error: string | null;
+}
+
+export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScriptsUpdate, onScriptsGenerated, brdgeId, isGenerating = false, onAIEdit }: SlideScriptPanelProps) => {
     const [activeTab, setActiveTab] = useState<TabType>('script');
     const [editedScript, setEditedScript] = useState('');
     const [editedAgent, setEditedAgent] = useState('');
@@ -27,36 +35,63 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
     const [hasAgentChanges, setHasAgentChanges] = useState(false);
     const [isSavingScript, setIsSavingScript] = useState(false);
     const [isSavingAgent, setIsSavingAgent] = useState(false);
+    const [aiEditState, setAIEditState] = useState<AIEditState>({
+        isProcessing: false,
+        streamContent: '',
+        error: null
+    });
+    const eventSourceRef = useRef<EventSource | null>(null);
+    const accumulatedContentRef = useRef<{
+        script: string;
+        agent: string;
+    }>({
+        script: '',
+        agent: ''
+    });
+    const streamTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
-        if (scripts && !isGenerating) {
-            try {
-                // Check if the content is already in the new format
-                const content = typeof scripts[currentSlide] === 'object'
-                    ? scripts[currentSlide]
-                    : { script: scripts[currentSlide], agent: '' };
-
-                // Always update the state with the latest content
-                setEditedScript(content.script || '');
-                setEditedAgent(content.agent || '');
-                setHasScriptChanges(false);
-                setHasAgentChanges(false);
-
-                // Log for debugging
-                console.log('Updated script content:', content);
-            } catch (error) {
-                console.error('Error parsing script content:', error);
+        // Skip effect if no scripts or during generation
+        if (!scripts || isGenerating) {
+            if (isGenerating) {
                 setEditedScript('');
                 setEditedAgent('');
             }
-        } else if (isGenerating) {
-            // Clear content while generating
+            return;
+        }
+
+        const currentContent = scripts[currentSlide];
+        if (!currentContent) {
             setEditedScript('');
             setEditedAgent('');
+            return;
         }
+
+        // Only update if content actually changed
+        const newScript = typeof currentContent === 'object' ? currentContent.script : currentContent;
+        const newAgent = typeof currentContent === 'object' ? currentContent.agent : '';
+
+        setEditedScript(prev => {
+            if (prev !== (newScript || '')) {
+                return newScript || '';
+            }
+            return prev;
+        });
+
+        setEditedAgent(prev => {
+            if (prev !== (newAgent || '')) {
+                return newAgent || '';
+            }
+            return prev;
+        });
+
+        // Reset change flags only when slide changes or new content is loaded
+        setHasScriptChanges(false);
+        setHasAgentChanges(false);
+
     }, [scripts, currentSlide, isGenerating]);
 
-    const handleContentChange = (content: string, type: TabType) => {
+    const handleContentChange = useCallback((content: string, type: TabType) => {
         if (type === 'script') {
             setEditedScript(content);
             setHasScriptChanges(true);
@@ -64,16 +99,14 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
             setEditedAgent(content);
             setHasAgentChanges(true);
         }
-    };
+    }, []);
 
-    const handleSaveScript = async () => {
+    const handleSaveScript = useCallback(async () => {
         if (!brdgeId || !scripts) return;
 
         setIsSavingScript(true);
         try {
             const updatedScripts = { ...scripts };
-
-            // Now TypeScript knows this can be a ScriptContent object
             updatedScripts[currentSlide] = {
                 script: editedScript,
                 agent: (typeof scripts[currentSlide] === 'object'
@@ -101,15 +134,14 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
         } finally {
             setIsSavingScript(false);
         }
-    };
+    }, [brdgeId, scripts, currentSlide, editedScript, editedAgent, onScriptsUpdate]);
 
-    const handleSaveAgent = async () => {
+    const handleSaveAgent = useCallback(async () => {
         if (!brdgeId || !scripts) return;
 
         setIsSavingAgent(true);
         try {
             const updatedScripts = { ...scripts };
-
             updatedScripts[currentSlide] = {
                 script: (typeof scripts[currentSlide] === 'object'
                     ? (scripts[currentSlide] as ScriptContent).script
@@ -137,10 +169,208 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
         } finally {
             setIsSavingAgent(false);
         }
-    };
+    }, [brdgeId, scripts, currentSlide, editedScript, editedAgent, onScriptsUpdate]);
+
+    const handleAIEdit = useCallback(async (instruction: string) => {
+        if (!brdgeId || !currentSlide || aiEditState.isProcessing || !instruction) return;
+
+        console.log('Starting AI edit with instruction:', instruction);
+
+        // Reset state and refs
+        setAIEditState(prev => ({
+            ...prev,
+            isProcessing: true,
+            streamContent: '',
+            error: null
+        }));
+
+        // Initialize accumulated content with current values
+        accumulatedContentRef.current = {
+            script: editedScript || '',
+            agent: editedAgent || ''
+        };
+
+        try {
+            const params = new URLSearchParams({
+                slideNumber: currentSlide.toString(),
+                instruction: instruction,
+                currentContent: JSON.stringify({
+                    script: editedScript || '',
+                    agent: editedAgent || ''
+                })
+            });
+
+            // Create EventSource for SSE connection
+            const eventSource = new EventSource(
+                `${api.defaults.baseURL}/brdges/${brdgeId}/scripts/ai-edit?${params.toString()}`
+            );
+
+            let lastUpdateTime = Date.now();
+            const updateDebounceMs = 50; // Debounce time for UI updates
+
+            eventSource.onmessage = (event) => {
+                if (event.data === '[DONE]') {
+                    console.log('Stream complete. Final content:', accumulatedContentRef.current);
+
+                    // Final update
+                    const finalContent = {
+                        script: accumulatedContentRef.current.script,
+                        agent: accumulatedContentRef.current.agent
+                    };
+
+                    // Batch state updates
+                    Promise.resolve().then(() => {
+                        // Update local state
+                        setEditedScript(finalContent.script);
+                        setEditedAgent(finalContent.agent);
+                        setHasScriptChanges(true);
+                        setHasAgentChanges(true);
+
+                        // Update parent component's state
+                        if (scripts && typeof scripts === 'object') {
+                            const updatedScripts = {
+                                ...scripts,
+                                [currentSlide]: finalContent
+                            };
+                            onScriptsUpdate?.(updatedScripts);
+                        }
+
+                        setAIEditState(prev => ({
+                            ...prev,
+                            isProcessing: false
+                        }));
+                    });
+
+                    // Clean up
+                    eventSource.close();
+                    return;
+                }
+
+                try {
+                    const parsed = JSON.parse(event.data);
+                    console.log('Received SSE data:', parsed);
+
+                    if (parsed.error) {
+                        console.error('Error from server:', parsed.error);
+                        setAIEditState(prev => ({
+                            ...prev,
+                            isProcessing: false,
+                            error: parsed.error
+                        }));
+                        eventSource.close();
+                        return;
+                    }
+
+                    if (parsed.content) {
+                        try {
+                            const content = JSON.parse(parsed.content);
+                            console.log('Parsed streaming content:', content);
+
+                            // Update accumulated content
+                            if (content.script !== undefined) {
+                                accumulatedContentRef.current.script = content.script;
+                            }
+                            if (content.agent !== undefined) {
+                                accumulatedContentRef.current.agent = content.agent;
+                            }
+
+                            // Debounce UI updates
+                            const now = Date.now();
+                            if (now - lastUpdateTime >= updateDebounceMs) {
+                                lastUpdateTime = now;
+
+                                // Clear any pending timeout
+                                if (streamTimeoutRef.current) {
+                                    clearTimeout(streamTimeoutRef.current);
+                                }
+
+                                // Schedule immediate update
+                                streamTimeoutRef.current = setTimeout(() => {
+                                    console.log('Updating UI with:', accumulatedContentRef.current);
+                                    setEditedScript(accumulatedContentRef.current.script);
+                                    setEditedAgent(accumulatedContentRef.current.agent);
+                                }, 0);
+                            }
+                        } catch (e) {
+                            console.error('Error parsing streaming content:', e);
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error processing event:', e);
+                }
+            };
+
+            eventSource.onerror = (error) => {
+                console.error('EventSource error:', error);
+                setAIEditState(prev => ({
+                    ...prev,
+                    isProcessing: false,
+                    error: 'Connection error occurred'
+                }));
+                eventSource.close();
+            };
+
+            // Store EventSource reference for cleanup
+            eventSourceRef.current = eventSource;
+
+        } catch (error) {
+            console.error('Error in AI edit:', error);
+            setAIEditState(prev => ({
+                ...prev,
+                isProcessing: false,
+                error: 'Failed to process AI edit'
+            }));
+        }
+    }, [
+        brdgeId,
+        currentSlide,
+        editedScript,
+        editedAgent,
+        scripts,
+        onScriptsUpdate
+    ]);
+
+    // Cleanup EventSource on unmount or when changing slides
+    useEffect(() => {
+        return () => {
+            if (eventSourceRef.current) {
+                eventSourceRef.current.close();
+            }
+            if (streamTimeoutRef.current) {
+                clearTimeout(streamTimeoutRef.current);
+            }
+        };
+    }, [currentSlide]);
+
+    // Add effect to monitor script changes
+    useEffect(() => {
+        console.log('Script/Agent content updated:', {
+            script: editedScript,
+            agent: editedAgent,
+            currentSlide,
+            hasScriptChanges,
+            hasAgentChanges
+        });
+    }, [editedScript, editedAgent, currentSlide, hasScriptChanges, hasAgentChanges]);
+
+    const handleAIEditSubmit = useCallback((e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        const input = e.currentTarget.elements.namedItem('aiEdit') as HTMLInputElement;
+        if (input.value.trim()) {
+            handleAIEdit(input.value.trim());
+            input.value = '';
+        }
+    }, [handleAIEdit]);
+
+    // Pass the handleAIEdit function to parent on mount
+    useEffect(() => {
+        if (onAIEdit) {
+            onAIEdit(handleAIEdit);
+        }
+    }, [onAIEdit, handleAIEdit]);
 
     return (
-        <div className="flex flex-col h-full bg-gray-900/50">
+        <div className="flex flex-col h-full bg-gray-900/50" role="tabpanel">
             <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800">
                 <div className="flex items-center gap-2">
                     <h3 className="text-xs font-medium text-gray-400">
@@ -200,24 +430,34 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                 <textarea
                     value={activeTab === 'script' ? editedScript : editedAgent}
                     onChange={(e) => handleContentChange(e.target.value, activeTab)}
-                    placeholder={isGenerating
-                        ? "Generating content..."
-                        : activeTab === 'script'
-                            ? "Enter script for this slide..."
-                            : "Enter agent instructions for this slide..."
+                    placeholder={
+                        aiEditState.isProcessing
+                            ? "AI is editing content..."
+                            : activeTab === 'script'
+                                ? "Enter script for this slide..."
+                                : "Enter agent instructions for this slide..."
                     }
-                    className={`w-full min-h-[280px] max-h-[400px] bg-gray-800/80 text-gray-200 rounded-lg px-4 py-3 resize-y
+                    className={`w-full min-h-[280px] max-h-[400px] bg-gray-800/80 
+                        ${aiEditState.isProcessing ? 'opacity-50' : ''}
+                        ${aiEditState.error ? 'border-red-500' : ''}
+                        text-gray-200 rounded-lg px-4 py-3 resize-y
                         text-[13px] font-mono leading-relaxed tracking-wide
                         border border-gray-700/50
                         focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50
                         placeholder:text-gray-600
                         shadow-[0_0_15px_rgba(255,255,255,0.03)]
-                        ${isGenerating ? 'opacity-50 cursor-wait' : ''}`}
-                    disabled={isGenerating || isSavingScript || isSavingAgent}
+                    `}
+                    disabled={aiEditState.isProcessing}
                     style={{
                         boxShadow: '0 0 15px rgba(255,255,255,0.03), inset 0 0 20px rgba(255,255,255,0.02)'
                     }}
                 />
+
+                {aiEditState.error && (
+                    <div className="text-red-500 text-sm mt-2">
+                        {aiEditState.error}
+                    </div>
+                )}
             </div>
         </div>
     );

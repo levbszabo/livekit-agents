@@ -251,6 +251,7 @@ export default function Playground({
   const router = useRouter();
   const walkthroughSelectorRef = useRef<WalkthroughSelectorRef>(null);
   const [isEditPage, setIsEditPage] = useState(false);
+  const [handleAIEdit, setHandleAIEdit] = useState<((instruction: string) => Promise<void>) | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -1360,6 +1361,9 @@ export default function Playground({
                           onScriptsGenerated={handleScriptsGenerated}
                           brdgeId={params.brdgeId}
                           isGenerating={isGeneratingScripts}
+                          onAIEdit={(fn) => {
+                            setHandleAIEdit(() => fn); // Wrap the function setting in a callback
+                          }}
                         />
                       </div>
                       {isGeneratingScripts && (
@@ -1400,12 +1404,16 @@ export default function Playground({
 
                             {/* Form */}
                             <form
-                              onSubmit={(e) => {
+                              onSubmit={async (e) => {
                                 e.preventDefault();
                                 const input = e.currentTarget.elements.namedItem('aiEdit') as HTMLInputElement;
-                                if (input.value.trim()) {
-                                  console.log('AI Edit Request:', input.value);
-                                  input.value = '';
+                                if (input.value.trim() && handleAIEdit) { // Add null check here
+                                  try {
+                                    await handleAIEdit(input.value.trim());
+                                    input.value = '';
+                                  } catch (error) {
+                                    console.error('Error during AI edit:', error);
+                                  }
                                 }
                               }}
                               className="relative"
@@ -1799,6 +1807,9 @@ export default function Playground({
                   onScriptsGenerated={handleScriptsGenerated}
                   brdgeId={params.brdgeId}
                   isGenerating={isGeneratingScripts}
+                  onAIEdit={(fn) => {
+                    setHandleAIEdit(() => fn); // Wrap the function setting in a callback
+                  }}
                 />
               </div>
               {isGeneratingScripts && (
@@ -1839,12 +1850,16 @@ export default function Playground({
 
                     {/* Form */}
                     <form
-                      onSubmit={(e) => {
+                      onSubmit={async (e) => {
                         e.preventDefault();
                         const input = e.currentTarget.elements.namedItem('aiEdit') as HTMLInputElement;
-                        if (input.value.trim()) {
-                          console.log('AI Edit Request:', input.value);
-                          input.value = '';
+                        if (input.value.trim() && handleAIEdit) { // Add null check here
+                          try {
+                            await handleAIEdit(input.value.trim());
+                            input.value = '';
+                          } catch (error) {
+                            console.error('Error during AI edit:', error);
+                          }
                         }
                       }}
                       className="relative"
