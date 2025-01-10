@@ -216,14 +216,11 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                         agent: accumulatedContentRef.current.agent
                     };
 
-                    // Update parent component's state
-                    if (scripts && typeof scripts === 'object') {
-                        const updatedScripts = {
-                            ...scripts,
-                            [currentSlide]: finalContent
-                        };
-                        onScriptsUpdate?.(updatedScripts);
-                    }
+                    // Update local state and mark as changed
+                    setEditedScript(finalContent.script);
+                    setEditedAgent(finalContent.agent);
+                    setHasScriptChanges(true);
+                    setHasAgentChanges(true);
 
                     setAIEditState(prev => ({
                         ...prev,
@@ -231,8 +228,6 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                     }));
                     setIsStreaming(false);
                     setStreamingContent('');
-                    setEditedScript(finalContent.script);
-                    setEditedAgent(finalContent.agent);
 
                     // Clean up
                     eventSource.close();
@@ -313,9 +308,7 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
         brdgeId,
         currentSlide,
         editedScript,
-        editedAgent,
-        scripts,
-        onScriptsUpdate
+        editedAgent
     ]);
 
     // Update the textarea value based on streaming state
