@@ -318,12 +318,12 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
     const handleAIEdit = useCallback(async (instruction: string) => {
         if (!brdgeId || !currentSlide || aiEditState.isProcessing || !instruction) return;
 
-        // Reset streaming state
+        // Reset streaming state with empty strings to show fresh content
         setAIEditState(prev => ({
             ...prev,
             isProcessing: true,
-            scriptStream: '',  // Start empty to show generating text
-            agentStream: '',   // Start empty to show generating text
+            scriptStream: '',  // Start empty to show fresh stream
+            agentStream: '',   // Start empty to show fresh stream
             error: null,
             hasReceivedFirstToken: false
         }));
@@ -340,8 +340,9 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                 editKnowledge: aiEditState.targets.knowledge.toString()
             });
 
+            const baseUrl = api.defaults.baseURL || 'http://localhost:5000';
             const eventSource = new EventSource(
-                `${api.defaults.baseURL}/brdges/${brdgeId}/scripts/ai-edit?${params.toString()}`
+                `${baseUrl.replace('/api', '')}/api/brdges/${brdgeId}/scripts/ai-edit?${params.toString()}`
             );
 
             eventSource.onmessage = (event) => {
@@ -364,8 +365,8 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                             ...prev,
                             isProcessing: false,
                             error: parsed.error,
-                            scriptStream: '',
-                            agentStream: '',
+                            scriptStream: '',  // Reset on error
+                            agentStream: '',   // Reset on error
                             hasReceivedFirstToken: false
                         }));
                         eventSource.close();
@@ -410,8 +411,8 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                     ...prev,
                     isProcessing: false,
                     error: 'Connection error occurred',
-                    scriptStream: '',
-                    agentStream: '',
+                    scriptStream: '',  // Reset on error
+                    agentStream: '',   // Reset on error
                     hasReceivedFirstToken: false
                 }));
                 eventSource.close();
@@ -425,8 +426,8 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                 ...prev,
                 isProcessing: false,
                 error: 'Failed to process AI edit',
-                scriptStream: '',
-                agentStream: '',
+                scriptStream: '',  // Reset on error
+                agentStream: '',   // Reset on error
                 hasReceivedFirstToken: false
             }));
         }
@@ -523,7 +524,7 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
 
             // Organize versions by slide
             const slideVersions = versions.filter((v: any) =>
-                v.scripts[currentSlide.toString()]
+                v.scripts && v.scripts[currentSlide.toString()] && v.metadata?.generated_at
             ).map((v: any) => ({
                 script: v.scripts[currentSlide.toString()].script,
                 agent: v.scripts[currentSlide.toString()].agent,
