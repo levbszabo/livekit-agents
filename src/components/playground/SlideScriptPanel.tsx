@@ -82,29 +82,31 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
             return;
         }
 
-        // Only update if content actually changed
+        // Only update if content actually changed and there are no pending changes
         const newScript = typeof currentContent === 'object' ? currentContent.script : currentContent;
         const newAgent = typeof currentContent === 'object' ? currentContent.agent : '';
 
-        setEditedScript(prev => {
-            if (prev !== (newScript || '')) {
-                return newScript || '';
-            }
-            return prev;
-        });
+        // Only update script if there are no pending changes
+        if (!hasScriptChanges) {
+            setEditedScript(prev => {
+                if (prev !== (newScript || '')) {
+                    return newScript || '';
+                }
+                return prev;
+            });
+        }
 
-        setEditedAgent(prev => {
-            if (prev !== (newAgent || '')) {
-                return newAgent || '';
-            }
-            return prev;
-        });
+        // Only update agent if there are no pending changes
+        if (!hasAgentChanges) {
+            setEditedAgent(prev => {
+                if (prev !== (newAgent || '')) {
+                    return newAgent || '';
+                }
+                return prev;
+            });
+        }
 
-        // Reset change flags only when slide changes or new content is loaded
-        setHasScriptChanges(false);
-        setHasAgentChanges(false);
-
-    }, [scripts, currentSlide, isGenerating]);
+    }, [scripts, currentSlide, isGenerating, hasScriptChanges, hasAgentChanges]);
 
     const handleContentChange = useCallback((content: string, type: TabType) => {
         if (type === 'speech') {
@@ -121,12 +123,11 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
 
         setIsSavingScript(true);
         try {
+            const currentContent = scripts[currentSlide] || {};
             const updatedScripts = { ...scripts };
             updatedScripts[currentSlide] = {
-                script: editedScript,
-                agent: (typeof scripts[currentSlide] === 'object'
-                    ? (scripts[currentSlide] as ScriptContent).agent
-                    : '') || editedAgent
+                ...updatedScripts[currentSlide],
+                script: editedScript
             };
 
             const response = await api.put(`/brdges/${brdgeId}/scripts/update`, {
@@ -134,10 +135,17 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
             });
 
             if (response.data.scripts) {
-                onScriptsUpdate?.(response.data.scripts);
-            }
+                // Update scripts but preserve our current edited states
+                const newScripts = { ...scripts };
+                newScripts[currentSlide] = {
+                    ...newScripts[currentSlide],
+                    script: editedScript
+                };
+                onScriptsUpdate?.(newScripts);
 
-            setHasScriptChanges(false);
+                // Only reset script changes
+                setHasScriptChanges(false);
+            }
         } catch (error) {
             console.error('Error updating script:', error);
             if (scripts[currentSlide]) {
@@ -149,18 +157,17 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
         } finally {
             setIsSavingScript(false);
         }
-    }, [brdgeId, scripts, currentSlide, editedScript, editedAgent, onScriptsUpdate]);
+    }, [brdgeId, scripts, currentSlide, editedScript, onScriptsUpdate]);
 
     const handleSaveAgent = useCallback(async () => {
         if (!brdgeId || !scripts) return;
 
         setIsSavingAgent(true);
         try {
+            const currentContent = scripts[currentSlide] || {};
             const updatedScripts = { ...scripts };
             updatedScripts[currentSlide] = {
-                script: (typeof scripts[currentSlide] === 'object'
-                    ? (scripts[currentSlide] as ScriptContent).script
-                    : scripts[currentSlide]) || editedScript,
+                ...updatedScripts[currentSlide],
                 agent: editedAgent
             };
 
@@ -169,10 +176,17 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
             });
 
             if (response.data.scripts) {
-                onScriptsUpdate?.(response.data.scripts);
-            }
+                // Update scripts but preserve our current edited states
+                const newScripts = { ...scripts };
+                newScripts[currentSlide] = {
+                    ...newScripts[currentSlide],
+                    agent: editedAgent
+                };
+                onScriptsUpdate?.(newScripts);
 
-            setHasAgentChanges(false);
+                // Only reset agent changes
+                setHasAgentChanges(false);
+            }
         } catch (error) {
             console.error('Error updating agent instructions:', error);
             if (scripts[currentSlide]) {
@@ -184,7 +198,7 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
         } finally {
             setIsSavingAgent(false);
         }
-    }, [brdgeId, scripts, currentSlide, editedScript, editedAgent, onScriptsUpdate]);
+    }, [brdgeId, scripts, currentSlide, editedAgent, onScriptsUpdate]);
 
     const handleAIEdit = useCallback(async (instruction: string) => {
         if (!brdgeId || !currentSlide || aiEditState.isProcessing || !instruction) return;
@@ -309,6 +323,20 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
         aiEditState.targets
     ]);
 
+    // Add effect to update edited content when streaming is complete
+    useEffect(() => {
+        if (!aiEditState.isProcessing && aiEditState.hasReceivedFirstToken) {
+            if (aiEditState.targets.speech && aiEditState.scriptStream) {
+                setEditedScript(aiEditState.scriptStream);
+                setHasScriptChanges(true);
+            }
+            if (aiEditState.targets.knowledge && aiEditState.agentStream) {
+                setEditedAgent(aiEditState.agentStream);
+                setHasAgentChanges(true);
+            }
+        }
+    }, [aiEditState.isProcessing, aiEditState.hasReceivedFirstToken]);
+
     // Update the textarea value based on streaming state
     const textareaValue = useMemo(() => {
         if (isStreaming) {
@@ -392,17 +420,17 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                 <div className="space-y-2">
                     <div className="flex items-center justify-between">
                         <div className="text-sm font-medium text-gray-300">Speech Script</div>
-                        {hasScriptChanges && (
+                        {(hasScriptChanges || (aiEditState.isProcessing && aiEditState.targets.speech)) && (
                             <button
                                 onClick={handleSaveScript}
-                                disabled={isSavingScript}
+                                disabled={isSavingScript || aiEditState.isProcessing}
                                 className="px-3 py-1 text-xs bg-green-500/20 text-green-400 rounded-lg 
                                     hover:bg-green-500/30 disabled:opacity-50 flex items-center gap-1.5"
                             >
                                 <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
                                     <path d="M21 7L9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59 21 7z" />
                                 </svg>
-                                {isSavingScript ? 'Saving...' : 'Save'}
+                                {isSavingScript ? 'Saving...' : 'Save Changes'}
                             </button>
                         )}
                     </div>
@@ -432,17 +460,17 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                 <div className="space-y-2">
                     <div className="flex items-center justify-between">
                         <div className="text-sm font-medium text-gray-300">AI Knowledge</div>
-                        {hasAgentChanges && (
+                        {(hasAgentChanges || (aiEditState.isProcessing && aiEditState.targets.knowledge)) && (
                             <button
                                 onClick={handleSaveAgent}
-                                disabled={isSavingAgent}
+                                disabled={isSavingAgent || aiEditState.isProcessing}
                                 className="px-3 py-1 text-xs bg-green-500/20 text-green-400 rounded-lg 
                                     hover:bg-green-500/30 disabled:opacity-50 flex items-center gap-1.5"
                             >
                                 <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
                                     <path d="M21 7L9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59 21 7z" />
                                 </svg>
-                                {isSavingAgent ? 'Saving...' : 'Save'}
+                                {isSavingAgent ? 'Saving...' : 'Save Changes'}
                             </button>
                         )}
                     </div>
