@@ -797,7 +797,7 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                         exit={slideAnimation.exit}
                     >
                         <motion.div
-                            className="relative bg-gray-800/50 rounded-lg p-3.5 border border-gray-700/50 shadow-lg transition-all duration-200 hover:border-gray-600/50"
+                            className="relative bg-gray-800/30 rounded-xl p-4 border border-gray-700/30 shadow-lg transition-all duration-200 hover:border-gray-600/50 backdrop-blur-sm"
                             whileHover={{ scale: 1.002 }}
                             transition={{ type: "spring", stiffness: 300 }}
                         >
@@ -838,8 +838,13 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                                     <input
                                         type="text"
                                         name="aiEdit"
-                                        placeholder="Type instructions like 'Make this longer' or 'Simplify language'..."
-                                        className="flex-1 bg-gray-900/80 border border-gray-700/50 rounded-md p-2 text-xs text-gray-100 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 placeholder:text-gray-500 placeholder:text-xs transition-all duration-200 group-hover:border-gray-600/50"
+                                        placeholder="Type instructions like 'Make this longer' or 'Simplify'..."
+                                        className="flex-1 bg-gray-900/80 border border-gray-700/50 rounded-md p-2 text-xs text-gray-100 
+                                            focus:outline-none focus:ring-1 focus:ring-cyan-500/30 
+                                            placeholder:text-gray-500 placeholder:text-xs 
+                                            transition-all duration-200 
+                                            group-hover:border-gray-600/50
+                                            backdrop-blur-sm"
                                         disabled={aiEditState.isProcessing}
                                     />
                                     <Tooltip.Root>
@@ -847,13 +852,23 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                                             <motion.button
                                                 type="submit"
                                                 disabled={aiEditState.isProcessing}
-                                                className="relative px-2 py-1.5 rounded-md bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 disabled:opacity-50 transition-all duration-150 group overflow-hidden border border-cyan-500/20"
+                                                className="relative px-2 py-1.5 rounded-md 
+                                                    bg-cyan-500/10 text-cyan-400 
+                                                    hover:bg-cyan-500/20 
+                                                    disabled:opacity-50 
+                                                    transition-all duration-150 
+                                                    group overflow-hidden 
+                                                    border border-cyan-500/20
+                                                    shadow-[0_0_15px_rgba(34,211,238,0.1)]
+                                                    hover:shadow-[0_0_20px_rgba(34,211,238,0.2)]"
                                                 whileHover={{ scale: 1.05 }}
                                                 whileTap={{ scale: 0.95 }}
                                             >
-                                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent group-hover:via-cyan-500/20 translate-x-[-200%] group-hover:translate-x-[200%] transition-all duration-1000 ease-out" />
+                                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent 
+                                                    group-hover:via-cyan-500/20 translate-x-[-200%] group-hover:translate-x-[200%] 
+                                                    transition-all duration-1000 ease-out" />
                                                 <div className="relative flex items-center">
-                                                    <ArrowRight className="w-4 h-4 mr-[-4px]" />
+                                                    <ArrowRight className="w-4 h-4 mr-[-4px] opacity-50" />
                                                     <ArrowRight className="w-4 h-4" />
                                                 </div>
                                             </motion.button>
@@ -984,8 +999,13 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                                     <textarea
                                         value={aiEditState.isProcessing && aiEditState.targets.speech ? aiEditState.scriptStream : editedScript}
                                         onChange={(e) => handleContentChange(e.target.value, 'speech')}
-                                        className={`flex-1 w-full bg-gray-800/50 border border-gray-700/50 rounded-md p-3 text-xs leading-relaxed text-gray-100 resize-none min-h-[140px] focus:outline-none focus:ring-1 focus:ring-cyan-500/30 transition-all duration-200 group-hover:border-gray-600/50 ${aiEditState.isProcessing && aiEditState.targets.speech && !aiEditState.hasReceivedFirstToken ? generatingTextStyles : ''
-                                            }`}
+                                        className={`flex-1 w-full bg-gray-800/30 border border-gray-700/30 rounded-md p-3 
+                                            text-xs leading-relaxed text-gray-100 resize-none min-h-[140px] 
+                                            focus:outline-none focus:ring-1 focus:ring-cyan-500/30 
+                                            transition-all duration-200 
+                                            group-hover:border-gray-600/50
+                                            backdrop-blur-sm
+                                            ${aiEditState.isProcessing && aiEditState.targets.speech && !aiEditState.hasReceivedFirstToken ? generatingTextStyles : ''}`}
                                         placeholder="Enter speech script..."
                                         disabled={aiEditState.isProcessing && aiEditState.targets.speech}
                                     />
@@ -1068,8 +1088,13 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                                     <textarea
                                         value={aiEditState.isProcessing && aiEditState.targets.knowledge ? aiEditState.agentStream : editedAgent}
                                         onChange={(e) => handleContentChange(e.target.value, 'knowledge')}
-                                        className={`flex-1 w-full bg-gray-800/50 border border-gray-700/50 rounded-md p-3 text-xs leading-relaxed text-gray-100 resize-none min-h-[140px] focus:outline-none focus:ring-1 focus:ring-cyan-500/30 transition-all duration-200 group-hover:border-gray-600/50 ${aiEditState.isProcessing && aiEditState.targets.knowledge && !aiEditState.hasReceivedFirstToken ? generatingTextStyles : ''
-                                            }`}
+                                        className={`flex-1 w-full bg-gray-800/30 border border-gray-700/30 rounded-md p-3 
+                                            text-xs leading-relaxed text-gray-100 resize-none min-h-[300px] 
+                                            focus:outline-none focus:ring-1 focus:ring-cyan-500/30 
+                                            transition-all duration-200 
+                                            group-hover:border-gray-600/50
+                                            backdrop-blur-sm
+                                            ${aiEditState.isProcessing && aiEditState.targets.knowledge && !aiEditState.hasReceivedFirstToken ? generatingTextStyles : ''}`}
                                         placeholder="Enter AI knowledge..."
                                         disabled={aiEditState.isProcessing && aiEditState.targets.knowledge}
                                     />

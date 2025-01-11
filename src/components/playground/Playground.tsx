@@ -3,15 +3,8 @@
 import { LoadingSVG } from "@/components/button/LoadingSVG";
 import { ChatMessageType } from "@/components/chat/ChatTile";
 import { ColorPicker } from "@/components/colorPicker/ColorPicker";
-import { AudioInputTile } from "@/components/config/AudioInputTile";
 import { ConfigurationPanelItem } from "@/components/config/ConfigurationPanelItem";
 import { NameValueRow } from "@/components/config/NameValueRow";
-import { PlaygroundHeader } from "@/components/playground/PlaygroundHeader";
-import {
-  PlaygroundTab,
-  PlaygroundTabbedTile,
-  PlaygroundTile,
-} from "@/components/playground/PlaygroundTile";
 import { useConfig } from "@/hooks/useConfig";
 import { TranscriptionTile } from "@/transcriptions/TranscriptionTile";
 import {
@@ -24,19 +17,14 @@ import {
   useChat,
 } from "@livekit/components-react";
 import { ConnectionState, LocalParticipant, Track, DataPacket_Kind } from "livekit-client";
-import { QRCodeSVG } from "qrcode.react";
 import { ReactNode, useCallback, useEffect, useMemo, useState, useRef } from "react";
-import { useSearchParams } from 'next/navigation';
 import tailwindTheme from "../../lib/tailwindTheme.preval";
 import { InfoPanel } from "./InfoPanel";
 import { API_BASE_URL } from '@/config';
 import { api } from '@/api';
 import { SlideScriptPanel } from './SlideScriptPanel';
-import { ViewerHeader } from './ViewerHeader';
 import { jwtDecode } from "jwt-decode";
 import Image from 'next/image';
-import { ChatMessageInput } from "@/components/chat/ChatMessageInput";
-import styles from '@/styles/animations.module.css';
 import {
   Panel,
   PanelGroup,
@@ -77,6 +65,13 @@ interface JWTPayload {
   sub: string;
   exp: number;
   iat: number;
+}
+
+interface SavedVoice {
+  id: string;
+  name: string;
+  created_at: string;
+  active: boolean;
 }
 
 const useIsMobile = () => {
@@ -284,13 +279,14 @@ export default function Playground({
   const [isConfigDrawerOpen, setIsConfigDrawerOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>('chat');
   const [isCloning, setIsCloning] = useState(false);
-  const [savedVoices, setSavedVoices] = useState<Array<{ id: string; name: string; created_at: string }>>([]);
+  const [savedVoices, setSavedVoices] = useState<SavedVoice[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
   const walkthroughSelectorRef = useRef<WalkthroughSelectorRef>(null);
   const [isEditPage, setIsEditPage] = useState(false);
   const [handleAIEdit, setHandleAIEdit] = useState<((instruction: string) => Promise<void>) | null>(null);
+  const [isCreatingVoice, setIsCreatingVoice] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -1042,6 +1038,7 @@ export default function Playground({
         setSavedVoices(voicesResponse.data.voices);
         if (response.data?.voice?.id) {
           setSelectedVoice(response.data.voice.id);
+          setIsCreatingVoice(false);
         }
       }
 
@@ -1062,7 +1059,14 @@ export default function Playground({
       try {
         const response = await api.get(`/brdges/${params.brdgeId}/voices`);
         if (response.data?.voices) {
-          setSavedVoices(response.data.voices);
+          const voices = response.data.voices;
+          setSavedVoices(voices);
+          console.log('Loaded voices:', voices);
+
+          // Only auto-select if we're not in creation mode and no voice is selected
+          if (voices.length > 0 && !selectedVoice && !isCreatingVoice) {
+            setSelectedVoice(voices[0].id);
+          }
         }
       } catch (error) {
         console.error('Error loading voices:', error);
@@ -1433,14 +1437,27 @@ export default function Playground({
 
                   {/* Voice Tab */}
                   {configTab === 'voice' && (
-                    <div className="p-4 space-y-6">
-                      <h3 className="text-[16px] font-semibold text-gray-200 tracking-tight">Voice Setup</h3>
+                    <div className="p-4 space-y-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-medium text-gray-300">Voice Setup</h3>
+                        {selectedVoice && (
+                          <button
+                            onClick={() => {
+                              setSelectedVoice(null);
+                              setIsCreatingVoice(true);
+                            }}
+                            className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+                          >
+                            Create New Voice
+                          </button>
+                        )}
+                      </div>
 
                       {/* Voice Selection */}
-                      <div className="space-y-2">
+                      {savedVoices.length > 0 && (
                         <select
                           className="w-full bg-gray-800/50 border border-gray-700 rounded-lg
-                            px-3 py-2 text-sm text-gray-300
+                            px-3 py-2 text-xs text-gray-300
                             transition-all duration-300
                             focus:ring-2 focus:ring-cyan-500 focus:border-transparent
                             hover:border-cyan-500/50
@@ -1448,121 +1465,132 @@ export default function Playground({
                           value={selectedVoice || ''}
                           onChange={(e) => setSelectedVoice(e.target.value)}
                         >
-                          <option value="">Create new voice</option>
+                          <option value="">Select a voice...</option>
                           {savedVoices.map(voice => (
                             <option key={voice.id} value={voice.id}>
                               {voice.name}
                             </option>
                           ))}
                         </select>
-                      </div>
+                      )}
 
                       {/* Voice Creation Section */}
-                      {!selectedVoice && (
-                        <>
-                          <div className="bg-gray-800/30 rounded-lg p-4">
-                            <p className="text-sm text-gray-300 leading-relaxed mb-3">
-                              Create a natural-sounding AI voice clone by recording a short sample of your voice.
+                      {(isCreatingVoice || !selectedVoice) && (
+                        <div className="space-y-3">
+                          <div className="bg-gray-800/30 rounded-lg p-3">
+                            <p className="text-xs text-gray-300 leading-relaxed mb-2">
+                              Create an AI voice clone with a short voice sample:
                             </p>
-                            <ul className="space-y-2 text-sm text-gray-400">
-                              <li className="flex items-start gap-2">
-                                <span className="text-cyan-400 mt-0.5">•</span>
-                                Record 10-20 seconds of clear speech
-                              </li>
-                              <li className="flex items-start gap-2">
-                                <span className="text-cyan-400 mt-0.5">•</span>
-                                Speak naturally at your normal pace
-                              </li>
-                              <li className="flex items-start gap-2">
-                                <span className="text-cyan-400 mt-0.5">•</span>
-                                Avoid background noise and echoes
-                              </li>
+                            <ul className="space-y-1.5">
+                              {[
+                                'Record 10-20 seconds of clear speech',
+                                'Speak naturally at your normal pace',
+                                'Avoid background noise and echoes'
+                              ].map((tip, i) => (
+                                <li key={i} className="flex items-center gap-2 text-xs text-gray-400">
+                                  <span className="w-1 h-1 rounded-full bg-cyan-400/60" />
+                                  {tip}
+                                </li>
+                              ))}
                             </ul>
                           </div>
 
-                          <div className="space-y-3">
+                          <div className="space-y-2">
                             <input
                               type="text"
                               value={voiceName}
                               onChange={(e) => setVoiceName(e.target.value)}
                               placeholder="Enter voice name"
                               className="w-full bg-gray-800/50 border border-gray-700 rounded-lg
-                                px-3 py-2 text-sm text-gray-300
+                                px-3 py-2 text-xs text-gray-300
                                 transition-all duration-300
                                 focus:ring-2 focus:ring-cyan-500 focus:border-transparent
                                 hover:border-cyan-500/50
                                 hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]"
                             />
+
                             <button
                               onClick={isRecording ? stopRecording : startRecording}
                               className={`
-                                w-full px-4 py-2 rounded-lg text-sm font-medium
+                                w-full px-4 py-2 rounded-lg text-xs font-medium
                                 transition-all duration-300
                                 flex items-center justify-center gap-2
-                                transform hover:-translate-y-0.5
                                 ${isRecording
-                                  ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 shadow-[0_0_15px_rgba(255,0,0,0.1)]'
-                                  : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 shadow-[0_0_15px_rgba(0,255,255,0.1)]'
+                                  ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                                  : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
                                 }
+                                shadow-[0_0_15px_rgba(0,255,255,0.1)]
+                                hover:shadow-[0_0_20px_rgba(0,255,255,0.15)]
+                                transform hover:-translate-y-0.5
                               `}
                             >
                               <span className={`
-                                w-2 h-2 rounded-full 
+                                w-1.5 h-1.5 rounded-full 
                                 ${isRecording
                                   ? 'bg-red-500 animate-[pulse_1s_ease-in-out_infinite]'
                                   : 'bg-cyan-500'
                                 }
                               `} />
                               {isRecording ? (
-                                <>Stop Recording ({formatTime(recordingTime)})</>
+                                <>Recording... {formatTime(recordingTime)}</>
                               ) : (
-                                <>Record Voice</>
+                                'Start Recording'
                               )}
                             </button>
+                          </div>
 
-                            {currentRecording && (
-                              <div className="space-y-3">
+                          {currentRecording && (
+                            <div className="space-y-2 pt-1">
+                              <div className="bg-gray-800/30 rounded-lg p-2">
                                 <audio
                                   src={URL.createObjectURL(currentRecording)}
                                   controls
-                                  className="w-full h-8"
+                                  className="w-full h-7"
                                 />
-                                <button
-                                  onClick={handleCloneVoice}
-                                  disabled={!voiceName || isCloning}
-                                  className={`
-                                    w-full px-4 py-2 rounded-lg text-sm font-medium
-                                    transition-all duration-300
-                                    transform hover:-translate-y-0.5
-                                    bg-cyan-500/20 text-cyan-400 
-                                    hover:bg-cyan-500/30 
-                                    shadow-[0_0_15px_rgba(0,255,255,0.1)]
-                                    disabled:opacity-50 disabled:cursor-not-allowed
-                                    disabled:hover:transform-none
-                                  `}
-                                >
-                                  {isCloning ? 'Creating Voice Clone...' : 'Create Voice Clone'}
-                                </button>
                               </div>
-                            )}
-                          </div>
-                        </>
+                              <button
+                                onClick={handleCloneVoice}
+                                disabled={!voiceName || isCloning}
+                                className={`
+                                  w-full px-4 py-2 rounded-lg text-xs font-medium
+                                  transition-all duration-300
+                                  transform hover:-translate-y-0.5
+                                  bg-cyan-500/20 text-cyan-400 
+                                  hover:bg-cyan-500/30 
+                                  shadow-[0_0_15px_rgba(0,255,255,0.1)]
+                                  hover:shadow-[0_0_20px_rgba(0,255,255,0.15)]
+                                  disabled:opacity-50 disabled:cursor-not-allowed
+                                  disabled:hover:transform-none
+                                `}
+                              >
+                                {isCloning ? (
+                                  <div className="flex items-center justify-center gap-2">
+                                    <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                    Creating Voice Clone...
+                                  </div>
+                                ) : (
+                                  'Create Voice Clone'
+                                )}
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       )}
 
                       {/* Selected Voice Details */}
                       {selectedVoice && savedVoices.find(v => v.id === selectedVoice) && (
-                        <div className="bg-gray-800/30 rounded-lg p-3 space-y-2">
+                        <div className="bg-gray-800/30 rounded-lg p-3">
                           {(() => {
                             const voice = savedVoices.find(v => v.id === selectedVoice);
                             return voice ? (
                               <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-sm text-gray-400">Name</span>
-                                  <span className="text-sm text-cyan-400">{voice.name}</span>
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-gray-400">Voice Name</span>
+                                  <span className="text-cyan-400 font-medium">{voice.name}</span>
                                 </div>
-                                <div className="flex items-center justify-between">
-                                  <span className="text-sm text-gray-400">Created</span>
-                                  <span className="text-sm text-cyan-400">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-gray-400">Created</span>
+                                  <span className="text-cyan-400">
                                     {new Date(voice.created_at).toLocaleDateString()}
                                   </span>
                                 </div>
@@ -1676,8 +1704,8 @@ export default function Playground({
                             onClick={handleGenerateScripts}
                             disabled={!selectedWalkthrough || isGeneratingScripts}
                             className="flex-1 px-3 py-2 bg-cyan-500/20 text-cyan-400
-                              rounded-lg text-sm font-medium hover:bg-cyan-500/30 transition-colors
-                              disabled:opacity-50 disabled:cursor-not-allowed"
+                                rounded-lg text-sm font-medium hover:bg-cyan-500/30 transition-colors
+                                disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {isGeneratingScripts ? 'Generating...' : 'Generate Scripts'}
                           </button>

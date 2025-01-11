@@ -44,8 +44,8 @@ export default function Home() {
 export function HomeInner() {
   const { shouldConnect, wsUrl, token, mode, connect, disconnect } =
     useConnection();
-  
-  const {config} = useConfig();
+
+  const { config } = useConfig();
   const { toastMessage, setToastMessage } = useToast();
 
   const handleConnect = useCallback(
@@ -59,7 +59,7 @@ export function HomeInner() {
     if (process.env.NEXT_PUBLIC_LIVEKIT_URL) {
       return true;
     }
-    if(wsUrl) {
+    if (wsUrl) {
       return true;
     }
     return false;
@@ -84,7 +84,7 @@ export function HomeInner() {
         <meta property="og:image:height" content="630" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <main className="relative flex flex-col justify-center px-4 items-center h-full w-full bg-black repeating-square-background">
+      <main className="relative flex flex-col justify-center items-center h-full w-full bg-black repeating-square-background">
         <AnimatePresence>
           {toastMessage && (
             <motion.div
