@@ -207,8 +207,8 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
         setAIEditState(prev => ({
             ...prev,
             isProcessing: true,
-            scriptStream: '',
-            agentStream: '',
+            scriptStream: '',  // Start empty to show generating text
+            agentStream: '',   // Start empty to show generating text
             error: null,
             hasReceivedFirstToken: false
         }));
@@ -257,19 +257,19 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                         return;
                     }
 
-                    // Immediately update state with each token
-                    if (parsed.token) {
-                        setAIEditState(prev => {
-                            const newState = { ...prev, hasReceivedFirstToken: true };
-
-                            if (parsed.type === 'script' && aiEditState.targets.speech) {
-                                newState.scriptStream = prev.scriptStream + parsed.token;
-                            } else if (parsed.type === 'agent' && aiEditState.targets.knowledge) {
-                                newState.agentStream = prev.agentStream + parsed.token;
-                            }
-
-                            return newState;
-                        });
+                    // Handle token-by-token updates
+                    if (parsed.type === 'script' && parsed.token) {
+                        setAIEditState(prev => ({
+                            ...prev,
+                            hasReceivedFirstToken: true,
+                            scriptStream: prev.scriptStream + parsed.token
+                        }));
+                    } else if (parsed.type === 'agent' && parsed.token) {
+                        setAIEditState(prev => ({
+                            ...prev,
+                            hasReceivedFirstToken: true,
+                            agentStream: prev.agentStream + parsed.token
+                        }));
                     }
 
                     // Handle final content
@@ -322,6 +322,20 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
         editedAgent,
         aiEditState.targets
     ]);
+
+    // Update the textarea styles to make the generating text more prominent
+    const generatingTextStyles = `
+        after:content-["Generating..."] 
+        after:absolute after:top-1/2 after:left-1/2 
+        after:-translate-x-1/2 after:-translate-y-1/2 
+        after:text-cyan-400 
+        after:text-sm after:font-medium
+        after:animate-[pulse_1.5s_ease-in-out_infinite]
+        after:pointer-events-none
+        after:whitespace-nowrap
+        after:tracking-wide
+        after:shadow-[0_0_10px_rgba(34,211,238,0.3)]
+    `;
 
     // Add effect to update edited content when streaming is complete
     useEffect(() => {
@@ -439,18 +453,18 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                             ? (aiEditState.hasReceivedFirstToken ? aiEditState.scriptStream : '')
                             : editedScript}
                         onChange={(e) => !aiEditState.isProcessing && handleContentChange(e.target.value, 'speech')}
-                        placeholder={aiEditState.isProcessing && aiEditState.targets.speech && !aiEditState.hasReceivedFirstToken
-                            ? "Generating..."
-                            : "Enter your presentation script for this slide..."}
+                        placeholder="Enter your presentation script for this slide..."
                         className={`w-full h-[120px] bg-gray-800/80 
                             text-gray-200 rounded-lg px-4 py-3 resize-none
                             text-[13px] font-mono leading-relaxed tracking-wide
                             border border-gray-700/50
                             focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50
                             placeholder:text-gray-600
+                            transition-all duration-300
                             ${aiEditState.isProcessing && aiEditState.targets.speech
                                 ? `border-cyan-500/30 shadow-[0_0_15px_rgba(0,255,255,0.1)]
-                                   ${!aiEditState.hasReceivedFirstToken ? 'placeholder:text-cyan-500 placeholder:animate-pulse' : ''}`
+                                   relative
+                                   ${!aiEditState.hasReceivedFirstToken ? generatingTextStyles : ''}`
                                 : ''}`}
                         disabled={aiEditState.isProcessing}
                     />
@@ -479,18 +493,18 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                             ? (aiEditState.hasReceivedFirstToken ? aiEditState.agentStream : '')
                             : editedAgent}
                         onChange={(e) => !aiEditState.isProcessing && handleContentChange(e.target.value, 'knowledge')}
-                        placeholder={aiEditState.isProcessing && aiEditState.targets.knowledge && !aiEditState.hasReceivedFirstToken
-                            ? "Generating..."
-                            : "Enter context and knowledge for AI responses..."}
+                        placeholder="Enter context and knowledge for AI responses..."
                         className={`w-full h-[120px] bg-gray-800/80 
                             text-gray-200 rounded-lg px-4 py-3 resize-none
                             text-[13px] font-mono leading-relaxed tracking-wide
                             border border-gray-700/50
                             focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50
                             placeholder:text-gray-600
+                            transition-all duration-300
                             ${aiEditState.isProcessing && aiEditState.targets.knowledge
                                 ? `border-cyan-500/30 shadow-[0_0_15px_rgba(0,255,255,0.1)]
-                                   ${!aiEditState.hasReceivedFirstToken ? 'placeholder:text-cyan-500 placeholder:animate-pulse' : ''}`
+                                   relative
+                                   ${!aiEditState.hasReceivedFirstToken ? generatingTextStyles : ''}`
                                 : ''}`}
                         disabled={aiEditState.isProcessing}
                     />
