@@ -24,6 +24,18 @@ interface ScriptHistory {
     currentIndex: number;
 }
 
+interface HistoryEntry {
+    script: string;
+    knowledge: string;
+    timestamp: Date;
+    isSaved: boolean;
+}
+
+interface HistoryState {
+    entries: HistoryEntry[];
+    currentIndex: number;
+}
+
 interface SlideScriptPanelProps {
     currentSlide: number;
     scripts: Record<string, ScriptContent> | null;
@@ -179,51 +191,91 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
         speech: false,
         knowledge: false
     });
+    const [history, setHistory] = useState<HistoryState>({
+        entries: [],
+        currentIndex: -1
+    });
 
+    // Add undo/redo state
+    const [canUndo, setCanUndo] = useState(false);
+    const [canRedo, setCanRedo] = useState(false);
+
+    // Update undo/redo state whenever history changes
     useEffect(() => {
-        // Skip effect if no scripts or during generation
-        if (!scripts || isGenerating) {
-            if (isGenerating) {
-                setEditedScript('');
-                setEditedAgent('');
+        setCanUndo(history.currentIndex > 0);
+        setCanRedo(history.currentIndex < history.entries.length - 1);
+
+        console.log('History updated:', {
+            entries: history.entries.length,
+            currentIndex: history.currentIndex,
+            canUndo: history.currentIndex > 0,
+            canRedo: history.currentIndex < history.entries.length - 1
+        });
+    }, [history]);
+
+    // Update the effect that handles final AI edit content
+    useEffect(() => {
+        if (!aiEditState.isProcessing && aiEditState.hasReceivedFirstToken) {
+            // Create a new history entry for the AI edit
+            const newEntry = {
+                script: aiEditState.targets.speech ? aiEditState.scriptStream : editedScript,
+                knowledge: aiEditState.targets.knowledge ? aiEditState.agentStream : editedAgent,
+                timestamp: new Date(),
+                isSaved: false  // Mark as unsaved so user needs to explicitly save
+            };
+
+            // Update the content
+            if (aiEditState.targets.speech && aiEditState.scriptStream) {
+                setEditedScript(aiEditState.scriptStream);
+                setHasScriptChanges(true);  // Show save button
             }
-            return;
+            if (aiEditState.targets.knowledge && aiEditState.agentStream) {
+                setEditedAgent(aiEditState.agentStream);
+                setHasAgentChanges(true);  // Show save button
+            }
+
+            // Add the AI edit to history
+            setHistory(prev => {
+                const newEntries = [...prev.entries.slice(0, prev.currentIndex + 1), newEntry];
+                return {
+                    entries: newEntries,
+                    currentIndex: newEntries.length - 1
+                };
+            });
         }
+    }, [aiEditState.isProcessing, aiEditState.hasReceivedFirstToken]);
+
+    // Update the script initialization effect
+    useEffect(() => {
+        if (!scripts || !scripts[currentSlide]) return;
 
         const currentContent = scripts[currentSlide];
-        if (!currentContent) {
-            setEditedScript('');
-            setEditedAgent('');
-            return;
-        }
 
-        // Only update if content actually changed and there are no pending changes
-        const newScript = typeof currentContent === 'object' ? currentContent.script : currentContent;
-        const newAgent = typeof currentContent === 'object' ? currentContent.agent : '';
+        // Only initialize history if it's empty or if we're switching slides
+        if (history.entries.length === 0 || history.entries[0]?.script !== currentContent.script || history.entries[0]?.knowledge !== currentContent.agent) {
+            console.log('Initializing history with:', currentContent);
 
-        // Only update script if there are no pending changes
-        if (!hasScriptChanges) {
-            setEditedScript(prev => {
-                if (prev !== (newScript || '')) {
-                    return newScript || '';
-                }
-                return prev;
+            // Initialize with current content as first history entry
+            setHistory({
+                entries: [{
+                    script: currentContent.script || '',
+                    knowledge: currentContent.agent || '',
+                    timestamp: new Date(),
+                    isSaved: true
+                }],
+                currentIndex: 0
             });
-        }
 
-        // Only update agent if there are no pending changes
-        if (!hasAgentChanges) {
-            setEditedAgent(prev => {
-                if (prev !== (newAgent || '')) {
-                    return newAgent || '';
-                }
-                return prev;
-            });
+            // Also set the current content
+            setEditedScript(currentContent.script || '');
+            setEditedAgent(currentContent.agent || '');
+            setHasScriptChanges(false);
+            setHasAgentChanges(false);
         }
-
-    }, [scripts, currentSlide, isGenerating, hasScriptChanges, hasAgentChanges]);
+    }, [currentSlide, scripts]);
 
     const handleContentChange = useCallback((content: string, type: TabType) => {
+        // Update the content
         if (type === 'speech') {
             setEditedScript(content);
             setHasScriptChanges(true);
@@ -231,14 +283,32 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
             setEditedAgent(content);
             setHasAgentChanges(true);
         }
-    }, []);
+
+        // Add new entry to history
+        setHistory(prev => {
+            // Get the current content
+            const newEntry = {
+                script: type === 'speech' ? content : editedScript,
+                knowledge: type === 'knowledge' ? content : editedAgent,
+                timestamp: new Date(),
+                isSaved: false
+            };
+
+            // Remove any future entries if we're not at the latest point
+            const newEntries = [...prev.entries.slice(0, prev.currentIndex + 1), newEntry];
+
+            return {
+                entries: newEntries,
+                currentIndex: newEntries.length - 1
+            };
+        });
+    }, [editedScript, editedAgent]);
 
     const handleSaveScript = useCallback(async () => {
         if (!brdgeId || !scripts) return;
 
         setIsSavingScript(true);
         try {
-            const currentContent = scripts[currentSlide] || {};
             const updatedScripts = { ...scripts };
             updatedScripts[currentSlide] = {
                 ...updatedScripts[currentSlide],
@@ -250,36 +320,37 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
             });
 
             if (response.data.scripts) {
-                // Update scripts but preserve our current edited states
-                const newScripts = { ...scripts };
-                newScripts[currentSlide] = {
-                    ...newScripts[currentSlide],
-                    script: editedScript
+                // Create a new saved entry in history
+                const newEntry = {
+                    script: editedScript,
+                    knowledge: editedAgent,
+                    timestamp: new Date(),
+                    isSaved: true
                 };
-                onScriptsUpdate?.(newScripts);
 
-                // Only reset script changes
+                setHistory(prev => {
+                    const newEntries = [...prev.entries.slice(0, prev.currentIndex + 1), newEntry];
+                    return {
+                        entries: newEntries,
+                        currentIndex: newEntries.length - 1
+                    };
+                });
+
+                onScriptsUpdate?.(updatedScripts);
                 setHasScriptChanges(false);
             }
         } catch (error) {
             console.error('Error updating script:', error);
-            if (scripts[currentSlide]) {
-                const content = typeof scripts[currentSlide] === 'object'
-                    ? (scripts[currentSlide] as ScriptContent).script
-                    : scripts[currentSlide];
-                setEditedScript(content || '');
-            }
         } finally {
             setIsSavingScript(false);
         }
-    }, [brdgeId, scripts, currentSlide, editedScript, onScriptsUpdate]);
+    }, [brdgeId, scripts, currentSlide, editedScript, editedAgent, onScriptsUpdate]);
 
     const handleSaveAgent = useCallback(async () => {
         if (!brdgeId || !scripts) return;
 
         setIsSavingAgent(true);
         try {
-            const currentContent = scripts[currentSlide] || {};
             const updatedScripts = { ...scripts };
             updatedScripts[currentSlide] = {
                 ...updatedScripts[currentSlide],
@@ -291,29 +362,31 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
             });
 
             if (response.data.scripts) {
-                // Update scripts but preserve our current edited states
-                const newScripts = { ...scripts };
-                newScripts[currentSlide] = {
-                    ...newScripts[currentSlide],
-                    agent: editedAgent
+                // Create a new saved entry in history
+                const newEntry = {
+                    script: editedScript,
+                    knowledge: editedAgent,
+                    timestamp: new Date(),
+                    isSaved: true
                 };
-                onScriptsUpdate?.(newScripts);
 
-                // Only reset agent changes
+                setHistory(prev => {
+                    const newEntries = [...prev.entries.slice(0, prev.currentIndex + 1), newEntry];
+                    return {
+                        entries: newEntries,
+                        currentIndex: newEntries.length - 1
+                    };
+                });
+
+                onScriptsUpdate?.(updatedScripts);
                 setHasAgentChanges(false);
             }
         } catch (error) {
-            console.error('Error updating agent instructions:', error);
-            if (scripts[currentSlide]) {
-                const content = typeof scripts[currentSlide] === 'object'
-                    ? (scripts[currentSlide] as ScriptContent).agent
-                    : '';
-                setEditedAgent(content || '');
-            }
+            console.error('Error updating agent:', error);
         } finally {
             setIsSavingAgent(false);
         }
-    }, [brdgeId, scripts, currentSlide, editedAgent, onScriptsUpdate]);
+    }, [brdgeId, scripts, currentSlide, editedScript, editedAgent, onScriptsUpdate]);
 
     const handleAIEdit = useCallback(async (instruction: string) => {
         if (!brdgeId || !currentSlide || aiEditState.isProcessing || !instruction) return;
@@ -388,16 +461,10 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                         }));
                     }
 
-                    // Handle final content
+                    // Remove the automatic content update on final
                     if (parsed.final) {
-                        if (parsed.final.script && aiEditState.targets.speech) {
-                            setEditedScript(parsed.final.script);
-                            setHasScriptChanges(true);
-                        }
-                        if (parsed.final.agent && aiEditState.targets.knowledge) {
-                            setEditedAgent(parsed.final.agent);
-                            setHasAgentChanges(true);
-                        }
+                        // Don't update editedScript/editedAgent here
+                        // Let the user explicitly save the changes
                     }
 
                 } catch (e) {
@@ -452,20 +519,6 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
         after:tracking-wide
         after:shadow-[0_0_10px_rgba(34,211,238,0.3)]
     `;
-
-    // Add effect to update edited content when streaming is complete
-    useEffect(() => {
-        if (!aiEditState.isProcessing && aiEditState.hasReceivedFirstToken) {
-            if (aiEditState.targets.speech && aiEditState.scriptStream) {
-                setEditedScript(aiEditState.scriptStream);
-                setHasScriptChanges(true);
-            }
-            if (aiEditState.targets.knowledge && aiEditState.agentStream) {
-                setEditedAgent(aiEditState.agentStream);
-                setHasAgentChanges(true);
-            }
-        }
-    }, [aiEditState.isProcessing, aiEditState.hasReceivedFirstToken]);
 
     // Update the textarea value based on streaming state
     const textareaValue = useMemo(() => {
@@ -551,75 +604,115 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
     }, [currentSlide, fetchScriptHistory]);
 
     // Add undo/redo handlers
-    const handleUndo = useCallback(() => {
-        const history = scriptHistory[currentSlide];
-        if (!history || history.currentIndex <= 0) return;
+    const handleUndo = useCallback((e?: React.MouseEvent) => {
+        e?.stopPropagation(); // Prevent click from propagating to collapse handler
+        if (!canUndo) return;
 
-        const newIndex = history.currentIndex - 1;
-        const version = history.versions[newIndex];
+        setHistory(prev => {
+            const newIndex = prev.currentIndex - 1;
+            const prevEntry = prev.entries[newIndex];
 
-        setEditedScript(version.script);
-        setEditedAgent(version.agent);
-        setHasScriptChanges(true);
-        setHasAgentChanges(true);
+            // Update content
+            setEditedScript(prevEntry.script);
+            setEditedAgent(prevEntry.knowledge);
 
-        setScriptHistory(prev => ({
-            ...prev,
-            [currentSlide]: {
-                ...prev[currentSlide],
-                currentIndex: newIndex
+            // Set change flags by comparing with the latest saved entry
+            const latestSavedEntry = prev.entries.findLast(entry => entry.isSaved);
+            if (latestSavedEntry) {
+                setHasScriptChanges(prevEntry.script !== latestSavedEntry.script);
+                setHasAgentChanges(prevEntry.knowledge !== latestSavedEntry.knowledge);
             }
-        }));
-    }, [currentSlide, scriptHistory]);
 
-    const handleRedo = useCallback(() => {
-        const history = scriptHistory[currentSlide];
-        if (!history || history.currentIndex >= history.versions.length - 1) return;
-
-        const newIndex = history.currentIndex + 1;
-        const version = history.versions[newIndex];
-
-        setEditedScript(version.script);
-        setEditedAgent(version.agent);
-        setHasScriptChanges(true);
-        setHasAgentChanges(true);
-
-        setScriptHistory(prev => ({
-            ...prev,
-            [currentSlide]: {
-                ...prev[currentSlide],
+            return {
+                ...prev,
                 currentIndex: newIndex
+            };
+        });
+    }, [canUndo]);
+
+    const handleRedo = useCallback((e?: React.MouseEvent) => {
+        e?.stopPropagation(); // Prevent click from propagating to collapse handler
+        if (!canRedo) return;
+
+        setHistory(prev => {
+            const newIndex = prev.currentIndex + 1;
+            const nextEntry = prev.entries[newIndex];
+
+            // Update content
+            setEditedScript(nextEntry.script);
+            setEditedAgent(nextEntry.knowledge);
+
+            // Set change flags by comparing with the latest saved entry
+            const latestSavedEntry = prev.entries.findLast(entry => entry.isSaved);
+            if (latestSavedEntry) {
+                setHasScriptChanges(nextEntry.script !== latestSavedEntry.script);
+                setHasAgentChanges(nextEntry.knowledge !== latestSavedEntry.knowledge);
             }
-        }));
-    }, [currentSlide, scriptHistory]);
 
-    // Add history controls to the UI
-    const renderHistoryControls = () => {
-        const history = scriptHistory[currentSlide];
-        const canUndo = history && history.currentIndex > 0;
-        const canRedo = history && history.currentIndex < history.versions.length - 1;
+            return {
+                ...prev,
+                currentIndex: newIndex
+            };
+        });
+    }, [canRedo]);
 
-        return (
-            <div className="flex items-center space-x-2 mb-2">
-                <button
-                    onClick={handleUndo}
-                    disabled={!canUndo}
-                    className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${!canUndo ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    title="Undo"
-                >
-                    <ChevronLeftIcon className="w-4 h-4" />
-                </button>
-                <button
-                    onClick={handleRedo}
-                    disabled={!canRedo}
-                    className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${!canRedo ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    title="Redo"
-                >
-                    <ChevronRightIcon className="w-4 h-4" />
-                </button>
-            </div>
-        );
-    };
+    // Update the history controls render function
+    const renderHistoryControls = () => (
+        <div className="flex items-center space-x-1 text-gray-400" onClick={e => e.stopPropagation()}>
+            <Tooltip.Root>
+                <Tooltip.Trigger asChild>
+                    <button
+                        onClick={handleUndo}
+                        disabled={!canUndo}
+                        className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${!canUndo ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                        <ChevronLeftIcon className="w-3.5 h-3.5" />
+                    </button>
+                </Tooltip.Trigger>
+                <Tooltip.Portal>
+                    <Tooltip.Content
+                        className="bg-gray-900 text-gray-300 text-xs px-2 py-1 rounded shadow-lg border border-gray-800"
+                        sideOffset={5}
+                    >
+                        {canUndo ? 'Undo changes' : 'No changes to undo'}
+                        <Tooltip.Arrow className="fill-gray-900" />
+                    </Tooltip.Content>
+                </Tooltip.Portal>
+            </Tooltip.Root>
+
+            <Tooltip.Root>
+                <Tooltip.Trigger asChild>
+                    <button
+                        onClick={handleRedo}
+                        disabled={!canRedo}
+                        className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${!canRedo ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                        <ChevronRightIcon className="w-3.5 h-3.5" />
+                    </button>
+                </Tooltip.Trigger>
+                <Tooltip.Portal>
+                    <Tooltip.Content
+                        className="bg-gray-900 text-gray-300 text-xs px-2 py-1 rounded shadow-lg border border-gray-800"
+                        sideOffset={5}
+                    >
+                        {canRedo ? 'Redo changes' : 'No changes to redo'}
+                        <Tooltip.Arrow className="fill-gray-900" />
+                    </Tooltip.Content>
+                </Tooltip.Portal>
+            </Tooltip.Root>
+        </div>
+    );
+
+    // Update the debug logging
+    useEffect(() => {
+        console.log('History updated:', {
+            entries: history.entries.length,
+            currentIndex: history.currentIndex,
+            canUndo,
+            canRedo,
+            latestEntry: history.entries[history.currentIndex]
+        });
+    }, [history, canUndo, canRedo]);
 
     return (
         <Tooltip.Provider delayDuration={200}>
@@ -780,13 +873,21 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                                             {renderHistoryControls()}
                                         </div>
                                         <AnimatePresence>
-                                            {(hasScriptChanges || aiEditState.isProcessing) && (
+                                            {(hasScriptChanges || (!aiEditState.isProcessing && aiEditState.targets.speech && aiEditState.scriptStream)) && (
                                                 <motion.button
                                                     initial={{ opacity: 0, scale: 0.9 }}
                                                     animate={{ opacity: 1, scale: 1 }}
                                                     exit={{ opacity: 0, scale: 0.9 }}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
+                                                        if (aiEditState.scriptStream) {
+                                                            setEditedScript(aiEditState.scriptStream);
+                                                            setHasScriptChanges(true);
+                                                            setAIEditState(prev => ({
+                                                                ...prev,
+                                                                scriptStream: ''
+                                                            }));
+                                                        }
                                                         handleSaveScript();
                                                     }}
                                                     disabled={isSavingScript || aiEditState.isProcessing}
@@ -796,6 +897,33 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                                                 >
                                                     <Save className="w-3 h-3" />
                                                     {isSavingScript ? 'Saving...' : 'Save Changes'}
+                                                </motion.button>
+                                            )}
+
+                                            {(hasAgentChanges || (!aiEditState.isProcessing && aiEditState.targets.knowledge && aiEditState.agentStream)) && (
+                                                <motion.button
+                                                    initial={{ opacity: 0, scale: 0.9 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                    exit={{ opacity: 0, scale: 0.9 }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (aiEditState.agentStream) {
+                                                            setEditedAgent(aiEditState.agentStream);
+                                                            setHasAgentChanges(true);
+                                                            setAIEditState(prev => ({
+                                                                ...prev,
+                                                                agentStream: ''
+                                                            }));
+                                                        }
+                                                        handleSaveAgent();
+                                                    }}
+                                                    disabled={isSavingAgent || aiEditState.isProcessing}
+                                                    className="px-2 py-0.5 text-xs rounded-md bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 disabled:opacity-50 transition-all duration-150 flex items-center gap-1"
+                                                    whileHover={{ scale: 1.05 }}
+                                                    whileTap={{ scale: 0.95 }}
+                                                >
+                                                    <Save className="w-3 h-3" />
+                                                    {isSavingAgent ? 'Saving...' : 'Save Changes'}
                                                 </motion.button>
                                             )}
                                         </AnimatePresence>
