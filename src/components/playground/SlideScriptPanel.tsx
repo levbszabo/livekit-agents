@@ -48,13 +48,14 @@ interface HistoryState {
 interface SlideScriptPanelProps {
     currentSlide: number;
     scripts: Record<string, ScriptContent> | null;
-    onScriptChange?: (slideNumber: string, content: string) => void;
-    onScriptsUpdate?: (scripts: Record<string, ScriptContent>) => void;
-    brdgeId?: string | number | null;
-    isGenerating?: boolean;
-    onScriptsGenerated?: (newScripts: Record<string, ScriptContent>) => void;
+    onScriptChange: (slideId: string, newScript: string) => void;
+    onScriptsUpdate: (newScripts: Record<string, ScriptContent>) => void;
+    onScriptsGenerated?: (scripts: Record<string, any>) => void;
+    brdgeId: string | null;
+    isGenerating: boolean;
     onAIEdit: (fn: (instruction: string) => Promise<void>) => void;
-    isEditPage?: boolean;
+    isEditPage: boolean;
+    setScripts: (updater: (prev: Record<string, ScriptContent> | null) => Record<string, ScriptContent>) => void;
 }
 
 type TabType = 'speech' | 'knowledge';
@@ -165,7 +166,18 @@ const fadeAnimation = {
     exit: { opacity: 0 }
 };
 
-export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScriptsUpdate, onScriptsGenerated, brdgeId, isGenerating = false, onAIEdit, isEditPage = true }: SlideScriptPanelProps) => {
+export const SlideScriptPanel: React.FC<SlideScriptPanelProps> = ({
+    currentSlide,
+    scripts,
+    onScriptChange,
+    onScriptsUpdate,
+    onScriptsGenerated,
+    brdgeId,
+    isGenerating,
+    onAIEdit,
+    isEditPage,
+    setScripts
+}) => {
     const [activeTab, setActiveTab] = useState<TabType>('speech');
     const [editedScript, setEditedScript] = useState('');
     const [editedAgent, setEditedAgent] = useState('');

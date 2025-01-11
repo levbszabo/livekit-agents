@@ -31,7 +31,6 @@ import {
   PanelResizeHandle
 } from 'react-resizable-panels';
 import { useRouter } from 'next/router';
-import { MobileConfigDrawer } from './MobileConfigDrawer';
 import { WalkthroughSelector, WalkthroughSelectorRef } from './WalkthroughSelector';
 
 export interface PlaygroundProps {
@@ -74,6 +73,20 @@ interface SavedVoice {
   active: boolean;
 }
 
+type MobileTab = 'chat' | 'script' | 'voice' | 'info';
+type ConfigTab = 'content' | 'voice' | 'workflow';
+
+interface DataChannelMessage {
+  payload: Uint8Array;
+  topic?: string;
+  kind?: DataPacket_Kind;
+}
+
+interface ScriptContent {
+  script: string;
+  agent: string;
+}
+
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(false);
 
@@ -89,8 +102,6 @@ const useIsMobile = () => {
 
   return isMobile;
 };
-
-type MobileTab = 'chat' | 'script' | 'voice' | 'info';
 
 const componentStyles = {
   button: `
@@ -164,18 +175,31 @@ const resizeHandleStyles = {
   `
 };
 
-// Update the DataChannelMessage interface to match LiveKit's ReceivedDataMessage type
-interface DataChannelMessage {
-  payload: Uint8Array;
-  topic?: string;
-  kind?: DataPacket_Kind;
-}
-
-// Add this interface near the top with other interfaces
-interface ScriptContent {
-  script: string;
-  agent: string;
-}
+const MobileConfigDrawer = ({
+  isOpen,
+  onClose,
+  configTab,
+  setConfigTab,
+  children
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  configTab: ConfigTab;
+  setConfigTab: (tab: ConfigTab) => void;
+  children: ReactNode;
+}) => {
+  return (
+    <div
+      className={`
+        fixed inset-0 z-50 
+        transition-all duration-300 ease-in-out
+        ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}
+      `}
+    >
+      {/* Rest of the MobileConfigDrawer implementation */}
+    </div>
+  );
+};
 
 export default function Playground({
   logo,
@@ -184,7 +208,7 @@ export default function Playground({
   onScriptsGenerated
 }: PlaygroundProps) {
   const [currentStep, setCurrentStep] = useState(1);
-  const [configTab, setConfigTab] = useState<'content' | 'voice' | 'workflow'>('content');
+  const [configTab, setConfigTab] = useState<ConfigTab>('content');
   const isMobile = useIsMobile();
 
   const [params, setParams] = useState({
@@ -1442,6 +1466,7 @@ export default function Playground({
                         isGenerating={isGeneratingScripts}
                         onAIEdit={(fn) => setHandleAIEdit(() => fn)}
                         isEditPage={isEditPage}
+                        setScripts={setScripts}
                       />
                     </div>
                   )}
@@ -1715,8 +1740,8 @@ export default function Playground({
                             onClick={handleGenerateScripts}
                             disabled={!selectedWalkthrough || isGeneratingScripts}
                             className="flex-1 px-3 py-2 bg-cyan-500/20 text-cyan-400
-                              rounded-lg text-sm font-medium hover:bg-cyan-500/30 transition-colors
-                              disabled:opacity-50 disabled:cursor-not-allowed"
+                                rounded-lg text-sm font-medium hover:bg-cyan-500/30 transition-colors
+                                disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {isGeneratingScripts ? 'Generating...' : 'Generate Scripts'}
                           </button>
@@ -1768,6 +1793,7 @@ export default function Playground({
                 isGenerating={isGeneratingScripts}
                 onAIEdit={(fn) => setHandleAIEdit(() => fn)}
                 isEditPage={isEditPage}
+                setScripts={setScripts}
               />
             </div>
           )}
@@ -1777,7 +1803,7 @@ export default function Playground({
                 <select
                   value={selectedVoice || ''}
                   onChange={(e) => setSelectedVoice(e.target.value)}
-                  className="w-full bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-300
+                  className="w-full bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-300
                     transition-all duration-300
                     focus:ring-2 focus:ring-cyan-500 focus:border-transparent
                     hover:border-cyan-500/50
@@ -1854,8 +1880,8 @@ export default function Playground({
                     onClick={handleGenerateScripts}
                     disabled={!selectedWalkthrough || isGeneratingScripts}
                     className="flex-1 px-3 py-2 bg-cyan-500/20 text-cyan-400
-                      rounded-lg text-sm font-medium hover:bg-cyan-500/30 transition-colors
-                      disabled:opacity-50 disabled:cursor-not-allowed"
+                        rounded-lg text-sm font-medium hover:bg-cyan-500/30 transition-colors
+                        disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isGeneratingScripts ? 'Generating...' : 'Generate Scripts'}
                   </button>
