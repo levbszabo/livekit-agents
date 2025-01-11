@@ -16,19 +16,28 @@ interface SlideScriptPanelProps {
     isGenerating?: boolean;
     onScriptsGenerated?: (newScripts: Record<string, ScriptContent>) => void;
     onAIEdit: (fn: (instruction: string) => Promise<void>) => void;
+    isEditPage?: boolean;
 }
 
-type TabType = 'script' | 'agent';
+type TabType = 'speech' | 'knowledge';
+
+// Add this type for edit targets
+interface EditTargets {
+    speech: boolean;
+    knowledge: boolean;
+}
 
 // Add new interface for AI editing state
 interface AIEditState {
     isProcessing: boolean;
-    streamContent: string;
+    scriptStream: string;
+    agentStream: string;
     error: string | null;
+    targets: EditTargets;
 }
 
-export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScriptsUpdate, onScriptsGenerated, brdgeId, isGenerating = false, onAIEdit }: SlideScriptPanelProps) => {
-    const [activeTab, setActiveTab] = useState<TabType>('script');
+export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScriptsUpdate, onScriptsGenerated, brdgeId, isGenerating = false, onAIEdit, isEditPage = true }: SlideScriptPanelProps) => {
+    const [activeTab, setActiveTab] = useState<TabType>('speech');
     const [editedScript, setEditedScript] = useState('');
     const [editedAgent, setEditedAgent] = useState('');
     const [hasScriptChanges, setHasScriptChanges] = useState(false);
@@ -37,8 +46,10 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
     const [isSavingAgent, setIsSavingAgent] = useState(false);
     const [aiEditState, setAIEditState] = useState<AIEditState>({
         isProcessing: false,
-        streamContent: '',
-        error: null
+        scriptStream: '',
+        agentStream: '',
+        error: null,
+        targets: { speech: true, knowledge: true }
     });
     const eventSourceRef = useRef<EventSource | null>(null);
     const accumulatedContentRef = useRef<{
@@ -94,7 +105,7 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
     }, [scripts, currentSlide, isGenerating]);
 
     const handleContentChange = useCallback((content: string, type: TabType) => {
-        if (type === 'script') {
+        if (type === 'speech') {
             setEditedScript(content);
             setHasScriptChanges(true);
         } else {
@@ -176,20 +187,25 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
     const handleAIEdit = useCallback(async (instruction: string) => {
         if (!brdgeId || !currentSlide || aiEditState.isProcessing || !instruction) return;
 
+        // Check if at least one target is selected
+        if (!aiEditState.targets.speech && !aiEditState.targets.knowledge) {
+            setAIEditState(prev => ({
+                ...prev,
+                error: "Please select at least one target to edit"
+            }));
+            return;
+        }
+
         console.log('Starting AI edit with instruction:', instruction);
 
-        // Reset state and refs
+        // Reset streaming state
         setAIEditState(prev => ({
             ...prev,
             isProcessing: true,
-            streamContent: '',
+            scriptStream: aiEditState.targets.speech ? 'Generating...' : '',
+            agentStream: aiEditState.targets.knowledge ? 'Generating...' : '',
             error: null
         }));
-        setIsStreaming(true);
-
-        // Initialize streaming with empty content
-        setStreamingContent('');
-        let currentJsonStr = '';
 
         try {
             const params = new URLSearchParams({
@@ -198,7 +214,9 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                 currentContent: JSON.stringify({
                     script: editedScript || '',
                     agent: editedAgent || ''
-                })
+                }),
+                editSpeech: aiEditState.targets.speech.toString(),
+                editKnowledge: aiEditState.targets.knowledge.toString()
             });
 
             // Create EventSource for SSE connection
@@ -208,76 +226,52 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
 
             eventSource.onmessage = (event) => {
                 if (event.data === '[DONE]') {
-                    console.log('Stream complete. Final content:', accumulatedContentRef.current);
-
-                    // Final update
-                    const finalContent = {
-                        script: accumulatedContentRef.current.script,
-                        agent: accumulatedContentRef.current.agent
-                    };
-
-                    // Update local state and mark as changed
-                    setEditedScript(finalContent.script);
-                    setEditedAgent(finalContent.agent);
-                    setHasScriptChanges(true);
-                    setHasAgentChanges(true);
-
+                    console.log('Stream complete');
                     setAIEditState(prev => ({
                         ...prev,
                         isProcessing: false
                     }));
-                    setIsStreaming(false);
-                    setStreamingContent('');
-
-                    // Clean up
                     eventSource.close();
                     return;
                 }
 
                 try {
                     const parsed = JSON.parse(event.data);
-                    console.log('Received token:', parsed);
 
                     if (parsed.error) {
                         console.error('Error from server:', parsed.error);
                         setAIEditState(prev => ({
                             ...prev,
                             isProcessing: false,
-                            error: parsed.error
+                            error: parsed.error,
+                            scriptStream: '',
+                            agentStream: ''
                         }));
-                        setIsStreaming(false);
                         eventSource.close();
                         return;
                     }
 
-                    if (parsed.token) {
-                        // Accumulate JSON string
-                        currentJsonStr += parsed.token;
-                        console.log('Current JSON string:', currentJsonStr);
+                    // Update the streaming content based on what's being edited
+                    setAIEditState(prev => ({
+                        ...prev,
+                        scriptStream: parsed.script_update || prev.scriptStream,
+                        agentStream: parsed.agent_update || prev.agentStream
+                    }));
 
-                        try {
-                            // Try to parse the accumulated JSON
-                            const content = JSON.parse(currentJsonStr);
-                            console.log('Parsed content:', content);
-
-                            // Update the streaming content in real-time
-                            if (content.script !== undefined) {
-                                setStreamingContent(content.script);
-                                accumulatedContentRef.current.script = content.script;
-                            }
-                            if (content.agent !== undefined) {
-                                accumulatedContentRef.current.agent = content.agent;
-                            }
-                        } catch (e) {
-                            // Not valid JSON yet, just show the accumulated tokens
-                            const scriptMatch = currentJsonStr.match(/"script"\s*:\s*"([^"]*)/);
-                            if (scriptMatch && scriptMatch[1]) {
-                                setStreamingContent(scriptMatch[1]);
-                            }
+                    // Handle final content
+                    if (parsed.final) {
+                        if (parsed.final.script && aiEditState.targets.speech) {
+                            setEditedScript(parsed.final.script);
+                            setHasScriptChanges(true);
+                        }
+                        if (parsed.final.agent && aiEditState.targets.knowledge) {
+                            setEditedAgent(parsed.final.agent);
+                            setHasAgentChanges(true);
                         }
                     }
+
                 } catch (e) {
-                    console.error('Error processing token:', e);
+                    console.error('Error processing message:', e);
                 }
             };
 
@@ -286,9 +280,10 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                 setAIEditState(prev => ({
                     ...prev,
                     isProcessing: false,
-                    error: 'Connection error occurred'
+                    error: 'Connection error occurred',
+                    scriptStream: '',
+                    agentStream: ''
                 }));
-                setIsStreaming(false);
                 eventSource.close();
             };
 
@@ -300,15 +295,17 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
             setAIEditState(prev => ({
                 ...prev,
                 isProcessing: false,
-                error: 'Failed to process AI edit'
+                error: 'Failed to process AI edit',
+                scriptStream: '',
+                agentStream: ''
             }));
-            setIsStreaming(false);
         }
     }, [
         brdgeId,
         currentSlide,
         editedScript,
-        editedAgent
+        editedAgent,
+        aiEditState.targets
     ]);
 
     // Update the textarea value based on streaming state
@@ -316,7 +313,7 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
         if (isStreaming) {
             return streamingContent;
         }
-        return activeTab === 'script' ? editedScript : editedAgent;
+        return activeTab === 'speech' ? editedScript : editedAgent;
     }, [isStreaming, streamingContent, activeTab, editedScript, editedAgent]);
 
     // Cleanup EventSource on unmount or when changing slides
@@ -358,94 +355,234 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
         }
     }, [onAIEdit, handleAIEdit]);
 
+    // Update the suggestions to be a simple array
+    const quickSuggestions = [
+        'Make it conversational',
+        'Add examples',
+        'More technical',
+        'Simplify language',
+        'Make it concise'
+    ];
+
     return (
         <div className="flex flex-col h-full bg-gray-900/50" role="tabpanel">
+            {/* Header */}
             <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800">
-                <div className="flex items-center gap-2">
-                    <h3 className="text-xs font-medium text-gray-400">
-                        Slide {currentSlide}
-                        {(!scripts || !scripts[currentSlide]) && (
-                            <span className="ml-2 text-gray-500">
-                                {isGenerating ? 'Generating...' : '(No content available)'}
-                            </span>
-                        )}
-                    </h3>
-                    {isGenerating && (
-                        <div className="animate-pulse flex space-x-1">
-                            <div className="h-1.5 w-1.5 bg-cyan-400 rounded-full"></div>
-                            <div className="h-1.5 w-1.5 bg-cyan-400 rounded-full"></div>
-                            <div className="h-1.5 w-1.5 bg-cyan-400 rounded-full"></div>
-                        </div>
+                <h3 className="text-xs font-medium text-gray-400">
+                    Slide {currentSlide}
+                    {(!scripts || !scripts[currentSlide]) && (
+                        <span className="ml-2 text-gray-500">
+                            {isGenerating ? 'Generating...' : '(No content available)'}
+                        </span>
                     )}
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="flex items-center bg-gray-800/80 rounded-lg overflow-hidden">
-                        <button
-                            onClick={() => setActiveTab('script')}
-                            className={`px-3 py-1.5 text-xs transition-colors ${activeTab === 'script'
-                                ? 'bg-cyan-500/20 text-cyan-400'
-                                : 'text-gray-400 hover:text-gray-300'
-                                }`}
-                        >
-                            Script
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('agent')}
-                            className={`px-3 py-1.5 text-xs transition-colors ${activeTab === 'agent'
-                                ? 'bg-cyan-500/20 text-cyan-400'
-                                : 'text-gray-400 hover:text-gray-300'
-                                }`}
-                        >
-                            Agent
-                        </button>
+                </h3>
+                {isGenerating && (
+                    <div className="animate-pulse flex space-x-1">
+                        <div className="h-1.5 w-1.5 bg-cyan-400 rounded-full"></div>
+                        <div className="h-1.5 w-1.5 bg-cyan-400 rounded-full"></div>
+                        <div className="h-1.5 w-1.5 bg-cyan-400 rounded-full"></div>
                     </div>
-                    {((activeTab === 'script' && hasScriptChanges) || (activeTab === 'agent' && hasAgentChanges)) && (
-                        <button
-                            onClick={activeTab === 'script' ? handleSaveScript : handleSaveAgent}
-                            disabled={activeTab === 'script' ? isSavingScript : isSavingAgent}
-                            className="px-3 py-1.5 text-xs bg-green-500/20 text-green-400 rounded-lg 
-                                hover:bg-green-500/30 disabled:opacity-50 flex items-center gap-1.5"
-                        >
-                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M21 7L9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59 21 7z" />
-                            </svg>
-                            {(activeTab === 'script' ? isSavingScript : isSavingAgent) ? 'Saving...' : 'Save'}
-                        </button>
-                    )}
-                </div>
+                )}
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4">
-                <textarea
-                    value={textareaValue}
-                    onChange={(e) => !isStreaming && handleContentChange(e.target.value, activeTab)}
-                    placeholder={
-                        isStreaming
-                            ? "AI is rewriting content..."
-                            : activeTab === 'script'
-                                ? "Enter script for this slide..."
-                                : "Enter agent instructions for this slide..."
-                    }
-                    className={`w-full min-h-[280px] max-h-[400px] bg-gray-800/80 
-                        ${isStreaming ? 'cursor-not-allowed' : ''}
-                        ${aiEditState.error ? 'border-red-500' : ''}
-                        text-gray-200 rounded-lg px-4 py-3 resize-y
-                        text-[13px] font-mono leading-relaxed tracking-wide
-                        border border-gray-700/50
-                        focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50
-                        placeholder:text-gray-600
-                        shadow-[0_0_15px_rgba(255,255,255,0.03)]
-                        transition-colors duration-150
-                    `}
-                    disabled={isStreaming}
-                    style={{
-                        boxShadow: '0 0 15px rgba(255,255,255,0.03), inset 0 0 20px rgba(255,255,255,0.02)'
-                    }}
-                />
+            {/* Content Area */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {/* Speech Script Section */}
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                        <div className="text-sm font-medium text-gray-300">Speech Script</div>
+                        {hasScriptChanges && (
+                            <button
+                                onClick={handleSaveScript}
+                                disabled={isSavingScript}
+                                className="px-3 py-1 text-xs bg-green-500/20 text-green-400 rounded-lg 
+                                    hover:bg-green-500/30 disabled:opacity-50 flex items-center gap-1.5"
+                            >
+                                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M21 7L9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59 21 7z" />
+                                </svg>
+                                {isSavingScript ? 'Saving...' : 'Save'}
+                            </button>
+                        )}
+                    </div>
+                    <textarea
+                        value={aiEditState.isProcessing && aiEditState.targets.speech
+                            ? aiEditState.scriptStream
+                            : editedScript}
+                        onChange={(e) => !aiEditState.isProcessing && handleContentChange(e.target.value, 'speech')}
+                        placeholder="Enter your presentation script for this slide..."
+                        className={`w-full h-[120px] bg-gray-800/80 
+                            text-gray-200 rounded-lg px-4 py-3 resize-none
+                            text-[13px] font-mono leading-relaxed tracking-wide
+                            border border-gray-700/50
+                            focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50
+                            placeholder:text-gray-600
+                            ${aiEditState.isProcessing && aiEditState.targets.speech
+                                ? 'border-cyan-500/30 shadow-[0_0_15px_rgba(0,255,255,0.1)]'
+                                : ''}`}
+                        disabled={aiEditState.isProcessing}
+                    />
+                </div>
 
-                {aiEditState.error && (
-                    <div className="text-red-500 text-sm mt-2">
-                        {aiEditState.error}
+                {/* AI Knowledge Section */}
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                        <div className="text-sm font-medium text-gray-300">AI Knowledge</div>
+                        {hasAgentChanges && (
+                            <button
+                                onClick={handleSaveAgent}
+                                disabled={isSavingAgent}
+                                className="px-3 py-1 text-xs bg-green-500/20 text-green-400 rounded-lg 
+                                    hover:bg-green-500/30 disabled:opacity-50 flex items-center gap-1.5"
+                            >
+                                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M21 7L9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59 21 7z" />
+                                </svg>
+                                {isSavingAgent ? 'Saving...' : 'Save'}
+                            </button>
+                        )}
+                    </div>
+                    <textarea
+                        value={aiEditState.isProcessing && aiEditState.targets.knowledge
+                            ? aiEditState.agentStream
+                            : editedAgent}
+                        onChange={(e) => !aiEditState.isProcessing && handleContentChange(e.target.value, 'knowledge')}
+                        placeholder="Enter context and knowledge for AI responses..."
+                        className={`w-full h-[120px] bg-gray-800/80 
+                            text-gray-200 rounded-lg px-4 py-3 resize-none
+                            text-[13px] font-mono leading-relaxed tracking-wide
+                            border border-gray-700/50
+                            focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50
+                            placeholder:text-gray-600
+                            ${aiEditState.isProcessing && aiEditState.targets.knowledge
+                                ? 'border-cyan-500/30 shadow-[0_0_15px_rgba(0,255,255,0.1)]'
+                                : ''}`}
+                        disabled={aiEditState.isProcessing}
+                    />
+                </div>
+
+                {/* AI Edit Section */}
+                {isEditPage && (
+                    <div className="relative bg-gray-800/30 rounded-xl p-4 border border-gray-700/50
+                        transition-all duration-300 hover:border-cyan-500/30
+                        hover:shadow-[0_0_30px_rgba(0,255,255,0.1)]
+                        group
+                    ">
+                        {/* Header with checkboxes */}
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 
+                                    group-hover:animate-[pulse_2s_ease-in-out_infinite]
+                                "/>
+                                <h3 className="text-sm font-medium text-gray-300 tracking-tight
+                                    group-hover:text-cyan-400 transition-colors duration-300
+                                ">
+                                    AI Edit
+                                </h3>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs">
+                                <button
+                                    onClick={() => setAIEditState(prev => ({
+                                        ...prev,
+                                        targets: { ...prev.targets, speech: !prev.targets.speech }
+                                    }))}
+                                    className={`px-2 py-1 rounded flex items-center gap-1.5 ${aiEditState.targets.speech
+                                        ? 'bg-cyan-500/20 text-cyan-400'
+                                        : 'text-gray-400 hover:text-gray-300'
+                                        }`}
+                                >
+                                    <div className={`w-3 h-3 rounded border ${aiEditState.targets.speech
+                                        ? 'border-cyan-400 bg-cyan-500/20'
+                                        : 'border-gray-600'
+                                        }`}>
+                                        {aiEditState.targets.speech && (
+                                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                                            </svg>
+                                        )}
+                                    </div>
+                                    Speech
+                                </button>
+                                <button
+                                    onClick={() => setAIEditState(prev => ({
+                                        ...prev,
+                                        targets: { ...prev.targets, knowledge: !prev.targets.knowledge }
+                                    }))}
+                                    className={`px-2 py-1 rounded flex items-center gap-1.5 ${aiEditState.targets.knowledge
+                                        ? 'bg-cyan-500/20 text-cyan-400'
+                                        : 'text-gray-400 hover:text-gray-300'
+                                        }`}
+                                >
+                                    <div className={`w-3 h-3 rounded border ${aiEditState.targets.knowledge
+                                        ? 'border-cyan-400 bg-cyan-500/20'
+                                        : 'border-gray-600'
+                                        }`}>
+                                        {aiEditState.targets.knowledge && (
+                                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                                            </svg>
+                                        )}
+                                    </div>
+                                    Knowledge
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Input Form */}
+                        <form onSubmit={handleAIEditSubmit} className="relative">
+                            <input
+                                type="text"
+                                name="aiEdit"
+                                placeholder="Type instructions like 'Make this longer' or 'Simplify language'..."
+                                className="w-full bg-gray-900/50 border border-gray-700/50 rounded-lg
+                                    px-4 py-2.5 pr-12 text-[13px] text-gray-300
+                                    placeholder:text-gray-500 placeholder:text-[12px]
+                                    transition-all duration-300
+                                    focus:ring-2 focus:ring-cyan-500 focus:border-transparent
+                                    hover:border-cyan-500/30
+                                    hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]
+                                    group-hover:border-cyan-500/20
+                                "
+                            />
+                            <button
+                                type="submit"
+                                className="absolute right-2 top-1/2 -translate-y-1/2
+                                    p-2 rounded-lg
+                                    text-gray-400 
+                                    transition-all duration-300
+                                    hover:text-cyan-400
+                                    hover:scale-110
+                                    active:scale-95
+                                    focus:outline-none focus:ring-2 focus:ring-cyan-500/50
+                                "
+                            >
+                                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                                </svg>
+                            </button>
+                        </form>
+
+                        {/* Quick Suggestions */}
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                            {quickSuggestions.map((suggestion) => (
+                                <button
+                                    key={suggestion}
+                                    onClick={() => {
+                                        const input = document.querySelector('input[name="aiEdit"]') as HTMLInputElement;
+                                        if (input) input.value = suggestion;
+                                    }}
+                                    className="px-2 py-1 text-[11px] rounded
+                                        bg-gray-800/80 backdrop-blur-sm
+                                        text-gray-400 border border-gray-700/50
+                                        transition-all duration-200
+                                        hover:text-cyan-400 hover:border-cyan-500/50
+                                        hover:shadow-[0_0_10px_rgba(0,255,255,0.1)]
+                                        active:scale-95"
+                                >
+                                    {suggestion}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 )}
             </div>
