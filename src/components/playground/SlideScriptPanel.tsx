@@ -1,10 +1,22 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { api } from '@/api';
+import { ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 
 // Add this interface to define the script content structure
 interface ScriptContent {
     script: string;
     agent: string;
+}
+
+interface ScriptVersion {
+    script: string;
+    agent: string;
+    timestamp: string;
+}
+
+interface ScriptHistory {
+    versions: ScriptVersion[];
+    currentIndex: number;
 }
 
 interface SlideScriptPanelProps {
@@ -37,6 +49,87 @@ interface AIEditState {
     hasReceivedFirstToken: boolean;
 }
 
+interface AIEditComponentProps {
+    onEdit: (instruction: string) => Promise<void>;
+    isProcessing: boolean;
+    targets: EditTargets;
+    onTargetsChange: (targets: EditTargets) => void;
+}
+
+// Move quickSuggestions outside of components
+const quickSuggestions: string[] = [
+    'Make it conversational',
+    'Add examples',
+    'Simplify language'
+];
+
+const AIEditComponent: React.FC<AIEditComponentProps> = ({
+    onEdit,
+    isProcessing,
+    targets,
+    onTargetsChange
+}) => {
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const form = e.target as HTMLFormElement;
+        const input = form.querySelector('input[name="aiEdit"]') as HTMLInputElement;
+        if (input?.value) {
+            onEdit(input.value);
+            input.value = '';
+        }
+    };
+
+    return (
+        <div className="relative bg-gray-800/30 rounded-xl p-4 border border-gray-700/50">
+            <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-500" />
+                    <h3 className="text-sm font-medium text-gray-300">AI Edit</h3>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                    <button
+                        onClick={() => onTargetsChange({ ...targets, speech: !targets.speech })}
+                        className={`px-2 py-1 rounded ${targets.speech ? 'bg-cyan-500/20 text-cyan-400' : 'text-gray-400'}`}
+                    >
+                        Speech
+                    </button>
+                    <button
+                        onClick={() => onTargetsChange({ ...targets, knowledge: !targets.knowledge })}
+                        className={`px-2 py-1 rounded ${targets.knowledge ? 'bg-cyan-500/20 text-cyan-400' : 'text-gray-400'}`}
+                    >
+                        Knowledge
+                    </button>
+                </div>
+            </div>
+            <form onSubmit={handleSubmit}>
+                <input
+                    type="text"
+                    name="aiEdit"
+                    placeholder="Type instructions like 'Make this longer' or 'Simplify language'..."
+                    className="w-full bg-gray-900/50 border border-gray-700/50 rounded p-2"
+                    disabled={isProcessing}
+                />
+            </form>
+            <div className="mt-3 flex flex-wrap gap-2">
+                {quickSuggestions.map((suggestion: string, index: number) => (
+                    <button
+                        key={index}
+                        onClick={() => onEdit(suggestion)}
+                        disabled={isProcessing}
+                        className="px-2 py-1 text-xs rounded bg-gray-700/50 text-gray-400 hover:bg-gray-700 disabled:opacity-50"
+                    >
+                        {suggestion}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+// Add these styles at the top of the file
+const slideUpAnimation = `animate-[slideUp_0.2s_ease-out]`;
+const fadeAnimation = `animate-[fadeIn_0.2s_ease-out]`;
+
 export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScriptsUpdate, onScriptsGenerated, brdgeId, isGenerating = false, onAIEdit, isEditPage = true }: SlideScriptPanelProps) => {
     const [activeTab, setActiveTab] = useState<TabType>('speech');
     const [editedScript, setEditedScript] = useState('');
@@ -64,6 +157,14 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
     const streamTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const [streamingContent, setStreamingContent] = useState('');
     const [isStreaming, setIsStreaming] = useState(false);
+    const [scriptHistory, setScriptHistory] = useState<Record<string, ScriptHistory>>({});
+    const [collapsedSections, setCollapsedSections] = useState<{
+        speech: boolean;
+        knowledge: boolean;
+    }>({
+        speech: false,
+        knowledge: false
+    });
 
     useEffect(() => {
         // Skip effect if no scripts or during generation
@@ -398,242 +499,291 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
         }
     }, [onAIEdit, handleAIEdit]);
 
-    // Update the suggestions to be a simple array
-    const quickSuggestions = [
-        'Make it conversational',
-        'Add examples',
-        'More technical',
-        'Simplify language',
-        'Make it concise'
-    ];
+    // Add function to fetch script history
+    const fetchScriptHistory = useCallback(async () => {
+        if (!brdgeId || !currentSlide) return;
+
+        try {
+            const response = await api.get(`/brdges/${brdgeId}/scripts/history`);
+            const versions = response.data;
+
+            // Organize versions by slide
+            const slideVersions = versions.filter((v: any) =>
+                v.scripts[currentSlide.toString()]
+            ).map((v: any) => ({
+                script: v.scripts[currentSlide.toString()].script,
+                agent: v.scripts[currentSlide.toString()].agent,
+                timestamp: v.metadata.generated_at
+            }));
+
+            if (slideVersions.length > 0) {
+                setScriptHistory(prev => ({
+                    ...prev,
+                    [currentSlide]: {
+                        versions: slideVersions,
+                        currentIndex: slideVersions.length - 1
+                    }
+                }));
+            }
+        } catch (error) {
+            console.error('Error fetching script history:', error);
+        }
+    }, [brdgeId, currentSlide]);
+
+    // Fetch history when slide changes
+    useEffect(() => {
+        fetchScriptHistory();
+    }, [currentSlide, fetchScriptHistory]);
+
+    // Add undo/redo handlers
+    const handleUndo = useCallback(() => {
+        const history = scriptHistory[currentSlide];
+        if (!history || history.currentIndex <= 0) return;
+
+        const newIndex = history.currentIndex - 1;
+        const version = history.versions[newIndex];
+
+        setEditedScript(version.script);
+        setEditedAgent(version.agent);
+        setHasScriptChanges(true);
+        setHasAgentChanges(true);
+
+        setScriptHistory(prev => ({
+            ...prev,
+            [currentSlide]: {
+                ...prev[currentSlide],
+                currentIndex: newIndex
+            }
+        }));
+    }, [currentSlide, scriptHistory]);
+
+    const handleRedo = useCallback(() => {
+        const history = scriptHistory[currentSlide];
+        if (!history || history.currentIndex >= history.versions.length - 1) return;
+
+        const newIndex = history.currentIndex + 1;
+        const version = history.versions[newIndex];
+
+        setEditedScript(version.script);
+        setEditedAgent(version.agent);
+        setHasScriptChanges(true);
+        setHasAgentChanges(true);
+
+        setScriptHistory(prev => ({
+            ...prev,
+            [currentSlide]: {
+                ...prev[currentSlide],
+                currentIndex: newIndex
+            }
+        }));
+    }, [currentSlide, scriptHistory]);
+
+    // Add history controls to the UI
+    const renderHistoryControls = () => {
+        const history = scriptHistory[currentSlide];
+        const canUndo = history && history.currentIndex > 0;
+        const canRedo = history && history.currentIndex < history.versions.length - 1;
+
+        return (
+            <div className="flex items-center space-x-2 mb-2">
+                <button
+                    onClick={handleUndo}
+                    disabled={!canUndo}
+                    className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${!canUndo ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    title="Undo"
+                >
+                    <ChevronLeftIcon className="w-4 h-4" />
+                </button>
+                <button
+                    onClick={handleRedo}
+                    disabled={!canRedo}
+                    className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${!canRedo ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    title="Redo"
+                >
+                    <ChevronRightIcon className="w-4 h-4" />
+                </button>
+            </div>
+        );
+    };
 
     return (
-        <div className="flex flex-col h-full bg-gray-900/50" role="tabpanel">
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800">
-                <h3 className="text-xs font-medium text-gray-400">
-                    Slide {currentSlide}
-                    {(!scripts || !scripts[currentSlide]) && (
-                        <span className="ml-2 text-gray-500">
-                            {isGenerating ? 'Generating...' : '(No content available)'}
-                        </span>
-                    )}
-                </h3>
-                {isGenerating && (
-                    <div className="animate-pulse flex space-x-1">
-                        <div className="h-1.5 w-1.5 bg-cyan-400 rounded-full"></div>
-                        <div className="h-1.5 w-1.5 bg-cyan-400 rounded-full"></div>
-                        <div className="h-1.5 w-1.5 bg-cyan-400 rounded-full"></div>
-                    </div>
-                )}
-            </div>
-
-            {/* Content Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {/* Speech Script Section */}
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                        <div className="text-sm font-medium text-gray-300">Speech Script</div>
-                        {(hasScriptChanges || (aiEditState.isProcessing && aiEditState.targets.speech)) && (
-                            <button
-                                onClick={handleSaveScript}
-                                disabled={isSavingScript || aiEditState.isProcessing}
-                                className="px-3 py-1 text-xs bg-green-500/20 text-green-400 rounded-lg 
-                                    hover:bg-green-500/30 disabled:opacity-50 flex items-center gap-1.5"
-                            >
-                                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M21 7L9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59 21 7z" />
-                                </svg>
-                                {isSavingScript ? 'Saving...' : 'Save Changes'}
-                            </button>
-                        )}
-                    </div>
-                    <textarea
-                        value={aiEditState.isProcessing && aiEditState.targets.speech
-                            ? (aiEditState.hasReceivedFirstToken ? aiEditState.scriptStream : '')
-                            : editedScript}
-                        onChange={(e) => !aiEditState.isProcessing && handleContentChange(e.target.value, 'speech')}
-                        placeholder="Enter your presentation script for this slide..."
-                        className={`w-full h-[120px] bg-gray-800/80 
-                            text-gray-200 rounded-lg px-4 py-3 resize-none
-                            text-[13px] font-mono leading-relaxed tracking-wide
-                            border border-gray-700/50
-                            focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50
-                            placeholder:text-gray-600
-                            transition-all duration-300
-                            ${aiEditState.isProcessing && aiEditState.targets.speech
-                                ? `border-cyan-500/30 shadow-[0_0_15px_rgba(0,255,255,0.1)]
-                                   relative
-                                   ${!aiEditState.hasReceivedFirstToken ? generatingTextStyles : ''}`
-                                : ''}`}
-                        disabled={aiEditState.isProcessing}
-                    />
-                </div>
-
-                {/* AI Knowledge Section */}
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                        <div className="text-sm font-medium text-gray-300">AI Knowledge</div>
-                        {(hasAgentChanges || (aiEditState.isProcessing && aiEditState.targets.knowledge)) && (
-                            <button
-                                onClick={handleSaveAgent}
-                                disabled={isSavingAgent || aiEditState.isProcessing}
-                                className="px-3 py-1 text-xs bg-green-500/20 text-green-400 rounded-lg 
-                                    hover:bg-green-500/30 disabled:opacity-50 flex items-center gap-1.5"
-                            >
-                                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M21 7L9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59 21 7z" />
-                                </svg>
-                                {isSavingAgent ? 'Saving...' : 'Save Changes'}
-                            </button>
-                        )}
-                    </div>
-                    <textarea
-                        value={aiEditState.isProcessing && aiEditState.targets.knowledge
-                            ? (aiEditState.hasReceivedFirstToken ? aiEditState.agentStream : '')
-                            : editedAgent}
-                        onChange={(e) => !aiEditState.isProcessing && handleContentChange(e.target.value, 'knowledge')}
-                        placeholder="Enter context and knowledge for AI responses..."
-                        className={`w-full h-[120px] bg-gray-800/80 
-                            text-gray-200 rounded-lg px-4 py-3 resize-none
-                            text-[13px] font-mono leading-relaxed tracking-wide
-                            border border-gray-700/50
-                            focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50
-                            placeholder:text-gray-600
-                            transition-all duration-300
-                            ${aiEditState.isProcessing && aiEditState.targets.knowledge
-                                ? `border-cyan-500/30 shadow-[0_0_15px_rgba(0,255,255,0.1)]
-                                   relative
-                                   ${!aiEditState.hasReceivedFirstToken ? generatingTextStyles : ''}`
-                                : ''}`}
-                        disabled={aiEditState.isProcessing}
-                    />
-                </div>
-
-                {/* AI Edit Section */}
-                {isEditPage && (
-                    <div className="relative bg-gray-800/30 rounded-xl p-4 border border-gray-700/50
-                        transition-all duration-300 hover:border-cyan-500/30
-                        hover:shadow-[0_0_30px_rgba(0,255,255,0.1)]
-                        group
-                    ">
-                        {/* Header with checkboxes */}
+        <div className="flex flex-col h-full space-y-4 pb-4 text-gray-300 px-2">
+            {isEditPage && (
+                <div className="sticky top-0 bg-gray-900/95 backdrop-blur-sm pt-4 pb-3 -mx-8 px-6 border-b border-gray-800/60 z-10">
+                    <div className="relative bg-gray-800/50 rounded-lg p-3.5 border border-gray-700/50 shadow-lg transition-all duration-200 hover:border-gray-600/50">
                         <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-2">
-                                <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 
-                                    group-hover:animate-[pulse_2s_ease-in-out_infinite]
-                                "/>
-                                <h3 className="text-sm font-medium text-gray-300 tracking-tight
-                                    group-hover:text-cyan-400 transition-colors duration-300
-                                ">
-                                    AI Edit
-                                </h3>
+                                <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
+                                <h3 className="text-sm font-medium text-cyan-400">AI Edit</h3>
                             </div>
-                            <div className="flex items-center gap-2 text-xs">
+                            <div className="flex gap-2">
                                 <button
                                     onClick={() => setAIEditState(prev => ({
                                         ...prev,
                                         targets: { ...prev.targets, speech: !prev.targets.speech }
                                     }))}
-                                    className={`px-2 py-1 rounded flex items-center gap-1.5 ${aiEditState.targets.speech
-                                        ? 'bg-cyan-500/20 text-cyan-400'
-                                        : 'text-gray-400 hover:text-gray-300'
+                                    className={`px-2 py-0.5 text-xs rounded-md border transition-all duration-150 ${aiEditState.targets.speech
+                                        ? 'bg-cyan-500/20 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/30'
+                                        : 'border-gray-700/50 text-gray-400 hover:border-gray-600 hover:text-gray-300'
                                         }`}
                                 >
-                                    <div className={`w-3 h-3 rounded border ${aiEditState.targets.speech
-                                        ? 'border-cyan-400 bg-cyan-500/20'
-                                        : 'border-gray-600'
-                                        }`}>
-                                        {aiEditState.targets.speech && (
-                                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-                                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                                            </svg>
-                                        )}
-                                    </div>
-                                    Speech
+                                    Script
                                 </button>
                                 <button
                                     onClick={() => setAIEditState(prev => ({
                                         ...prev,
                                         targets: { ...prev.targets, knowledge: !prev.targets.knowledge }
                                     }))}
-                                    className={`px-2 py-1 rounded flex items-center gap-1.5 ${aiEditState.targets.knowledge
-                                        ? 'bg-cyan-500/20 text-cyan-400'
-                                        : 'text-gray-400 hover:text-gray-300'
+                                    className={`px-2 py-0.5 text-xs rounded-md border transition-all duration-150 ${aiEditState.targets.knowledge
+                                        ? 'bg-cyan-500/20 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/30'
+                                        : 'border-gray-700/50 text-gray-400 hover:border-gray-600 hover:text-gray-300'
                                         }`}
                                 >
-                                    <div className={`w-3 h-3 rounded border ${aiEditState.targets.knowledge
-                                        ? 'border-cyan-400 bg-cyan-500/20'
-                                        : 'border-gray-600'
-                                        }`}>
-                                        {aiEditState.targets.knowledge && (
-                                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-                                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                                            </svg>
-                                        )}
-                                    </div>
                                     Knowledge
                                 </button>
                             </div>
                         </div>
-
-                        {/* Input Form */}
-                        <form onSubmit={handleAIEditSubmit} className="relative">
-                            <input
-                                type="text"
-                                name="aiEdit"
-                                placeholder="Type instructions like 'Make this longer' or 'Simplify language'..."
-                                className="w-full bg-gray-900/50 border border-gray-700/50 rounded-lg
-                                    px-4 py-2.5 pr-12 text-[13px] text-gray-300
-                                    placeholder:text-gray-500 placeholder:text-[12px]
-                                    transition-all duration-300
-                                    focus:ring-2 focus:ring-cyan-500 focus:border-transparent
-                                    hover:border-cyan-500/30
-                                    hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]
-                                    group-hover:border-cyan-500/20
-                                "
-                            />
-                            <button
-                                type="submit"
-                                className="absolute right-2 top-1/2 -translate-y-1/2
-                                    p-2 rounded-lg
-                                    text-gray-400 
-                                    transition-all duration-300
-                                    hover:text-cyan-400
-                                    hover:scale-110
-                                    active:scale-95
-                                    focus:outline-none focus:ring-2 focus:ring-cyan-500/50
-                                "
-                            >
-                                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                                </svg>
-                            </button>
-                        </form>
-
-                        {/* Quick Suggestions */}
-                        <div className="mt-3 flex flex-wrap gap-1.5">
-                            {quickSuggestions.map((suggestion) => (
+                        <div className="relative mb-2">
+                            <form onSubmit={handleAIEditSubmit} className="group flex gap-1.5">
+                                <input
+                                    type="text"
+                                    name="aiEdit"
+                                    placeholder="Type instructions like 'Make this longer' or 'Simplify language'..."
+                                    className="flex-1 bg-gray-900/80 border border-gray-700/50 rounded-md p-2 text-xs text-gray-100 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 placeholder:text-gray-500 placeholder:text-xs transition-all duration-200 group-hover:border-gray-600/50"
+                                    disabled={aiEditState.isProcessing}
+                                />
                                 <button
-                                    key={suggestion}
+                                    type="submit"
+                                    disabled={aiEditState.isProcessing}
+                                    className="relative px-2 py-1.5 rounded-md bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 disabled:opacity-50 transition-all duration-150 group overflow-hidden border border-cyan-500/20"
+                                >
+                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent group-hover:via-cyan-500/20 translate-x-[-200%] group-hover:translate-x-[200%] transition-all duration-1000 ease-out" />
+                                    <div className="relative flex items-center">
+                                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M12.75 4.75L19.25 12L12.75 19.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                            <path d="M19 12H4.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                        </svg>
+                                        <svg className="w-4 h-4 -ml-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M12.75 4.75L19.25 12L12.75 19.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                        </svg>
+                                    </div>
+                                </button>
+                            </form>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                            {quickSuggestions.map((suggestion: string, index: number) => (
+                                <button
+                                    key={index}
                                     onClick={() => {
                                         const input = document.querySelector('input[name="aiEdit"]') as HTMLInputElement;
-                                        if (input) input.value = suggestion;
+                                        if (input) {
+                                            input.value = suggestion;
+                                            input.focus();
+                                        }
                                     }}
-                                    className="px-2 py-1 text-[11px] rounded
-                                        bg-gray-800/80 backdrop-blur-sm
-                                        text-gray-400 border border-gray-700/50
-                                        transition-all duration-200
-                                        hover:text-cyan-400 hover:border-cyan-500/50
-                                        hover:shadow-[0_0_10px_rgba(0,255,255,0.1)]
-                                        active:scale-95"
+                                    disabled={aiEditState.isProcessing}
+                                    className="px-2 py-0.5 text-[11px] rounded-full border border-gray-700/50 bg-gray-900/80 text-gray-400 hover:bg-gray-800 hover:text-cyan-400 hover:border-cyan-500/30 disabled:opacity-50 transition-all duration-150"
                                 >
                                     {suggestion}
                                 </button>
                             ))}
                         </div>
                     </div>
-                )}
+                </div>
+            )}
+
+            <div className="flex flex-col flex-1 min-h-0 space-y-4">
+                <div className={`flex flex-col flex-1 min-h-0 group transition-all duration-200 ${collapsedSections.speech ? 'mb-0' : ''}`}>
+                    <div
+                        className="flex items-center justify-between mb-2 cursor-pointer select-none"
+                        onClick={() => setCollapsedSections(prev => ({ ...prev, speech: !prev.speech }))}
+                    >
+                        <div className="text-sm font-medium text-cyan-400 flex items-center gap-2 group-hover:text-cyan-300 transition-colors duration-150">
+                            <span className="flex items-center gap-1.5">
+                                {collapsedSections.speech ? (
+                                    <ChevronDownIcon className="w-3.5 h-3.5" />
+                                ) : (
+                                    <ChevronUpIcon className="w-3.5 h-3.5" />
+                                )}
+                                Speech Script
+                            </span>
+                            {hasScriptChanges && <div className="w-1 h-1 rounded-full bg-cyan-500 animate-pulse" />}
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-1 text-gray-400">
+                                {renderHistoryControls()}
+                            </div>
+                            {(hasScriptChanges || aiEditState.isProcessing) && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSaveScript();
+                                    }}
+                                    disabled={isSavingScript || aiEditState.isProcessing}
+                                    className="px-2 py-0.5 text-xs rounded-md bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 disabled:opacity-50 transition-all duration-150 transform hover:scale-105"
+                                >
+                                    {isSavingScript ? 'Saving...' : 'Save Changes'}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                    {!collapsedSections.speech && (
+                        <textarea
+                            value={aiEditState.isProcessing && aiEditState.targets.speech ? aiEditState.scriptStream : editedScript}
+                            onChange={(e) => handleContentChange(e.target.value, 'speech')}
+                            className={`flex-1 w-full bg-gray-800/50 border border-gray-700/50 rounded-md p-3 text-xs leading-relaxed text-gray-100 resize-none min-h-[140px] focus:outline-none focus:ring-1 focus:ring-cyan-500/30 transition-all duration-200 group-hover:border-gray-600/50 ${aiEditState.isProcessing && aiEditState.targets.speech && !aiEditState.hasReceivedFirstToken ? generatingTextStyles : ''
+                                }`}
+                            placeholder="Enter speech script..."
+                            disabled={aiEditState.isProcessing && aiEditState.targets.speech}
+                        />
+                    )}
+                </div>
+
+                <div className={`flex flex-col flex-1 min-h-0 group transition-all duration-200 ${collapsedSections.knowledge ? 'mb-0' : ''}`}>
+                    <div
+                        className="flex items-center justify-between mb-2 cursor-pointer select-none"
+                        onClick={() => setCollapsedSections(prev => ({ ...prev, knowledge: !prev.knowledge }))}
+                    >
+                        <div className="text-sm font-medium text-cyan-400 flex items-center gap-2 group-hover:text-cyan-300 transition-colors duration-150">
+                            <span className="flex items-center gap-1.5">
+                                {collapsedSections.knowledge ? (
+                                    <ChevronDownIcon className="w-3.5 h-3.5" />
+                                ) : (
+                                    <ChevronUpIcon className="w-3.5 h-3.5" />
+                                )}
+                                AI Knowledge
+                            </span>
+                            {hasAgentChanges && <div className="w-1 h-1 rounded-full bg-cyan-500 animate-pulse" />}
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-1 text-gray-400">
+                                {renderHistoryControls()}
+                            </div>
+                            {(hasAgentChanges || aiEditState.isProcessing) && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSaveAgent();
+                                    }}
+                                    disabled={isSavingAgent || aiEditState.isProcessing}
+                                    className="px-2 py-0.5 text-xs rounded-md bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 disabled:opacity-50 transition-all duration-150 transform hover:scale-105"
+                                >
+                                    {isSavingAgent ? 'Saving...' : 'Save Changes'}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                    {!collapsedSections.knowledge && (
+                        <textarea
+                            value={aiEditState.isProcessing && aiEditState.targets.knowledge ? aiEditState.agentStream : editedAgent}
+                            onChange={(e) => handleContentChange(e.target.value, 'knowledge')}
+                            className={`flex-1 w-full bg-gray-800/50 border border-gray-700/50 rounded-md p-3 text-xs leading-relaxed text-gray-100 resize-none min-h-[140px] focus:outline-none focus:ring-1 focus:ring-cyan-500/30 transition-all duration-200 group-hover:border-gray-600/50 ${aiEditState.isProcessing && aiEditState.targets.knowledge && !aiEditState.hasReceivedFirstToken ? generatingTextStyles : ''
+                                }`}
+                            placeholder="Enter AI knowledge..."
+                            disabled={aiEditState.isProcessing && aiEditState.targets.knowledge}
+                        />
+                    )}
+                </div>
             </div>
         </div>
     );

@@ -220,6 +220,45 @@ export default function Playground({
     }
   }, []);
 
+  useEffect(() => {
+    const fetchScripts = async () => {
+      if (!params.brdgeId) return;
+
+      try {
+        const response = await fetch(`${params.coreApiUrl}/api/brdges/${params.brdgeId}/scripts`, {
+          headers: {
+            'Content-Type': 'application/json',
+            // Add authorization header if token exists
+            ...(localStorage.getItem('token') && {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            })
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch scripts: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        if (data.has_scripts) {
+          setScripts(data.scripts);
+          // Also update edited scripts to match current scripts
+          setEditedScripts(data.scripts);
+          // Reset changes flag
+          setHasScriptChanges(false);
+          // Call the callback if provided
+          if (onScriptsGenerated) {
+            onScriptsGenerated(data.scripts);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching scripts:', error);
+      }
+    };
+
+    fetchScripts();
+  }, [params.brdgeId, params.coreApiUrl, onScriptsGenerated]);
+
   const { config, setUserSettings } = useConfig();
   const { name } = useRoomInfo();
   const { localParticipant } = useLocalParticipant();
