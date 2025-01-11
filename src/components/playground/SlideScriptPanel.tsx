@@ -34,6 +34,7 @@ interface AIEditState {
     agentStream: string;
     error: string | null;
     targets: EditTargets;
+    hasReceivedFirstToken: boolean;
 }
 
 export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScriptsUpdate, onScriptsGenerated, brdgeId, isGenerating = false, onAIEdit, isEditPage = true }: SlideScriptPanelProps) => {
@@ -49,7 +50,8 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
         scriptStream: '',
         agentStream: '',
         error: null,
-        targets: { speech: true, knowledge: true }
+        targets: { speech: true, knowledge: true },
+        hasReceivedFirstToken: false
     });
     const eventSourceRef = useRef<EventSource | null>(null);
     const accumulatedContentRef = useRef<{
@@ -187,24 +189,14 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
     const handleAIEdit = useCallback(async (instruction: string) => {
         if (!brdgeId || !currentSlide || aiEditState.isProcessing || !instruction) return;
 
-        // Check if at least one target is selected
-        if (!aiEditState.targets.speech && !aiEditState.targets.knowledge) {
-            setAIEditState(prev => ({
-                ...prev,
-                error: "Please select at least one target to edit"
-            }));
-            return;
-        }
-
-        console.log('Starting AI edit with instruction:', instruction);
-
         // Reset streaming state
         setAIEditState(prev => ({
             ...prev,
             isProcessing: true,
-            scriptStream: aiEditState.targets.speech ? 'Generating...' : '',
-            agentStream: aiEditState.targets.knowledge ? 'Generating...' : '',
-            error: null
+            scriptStream: '',
+            agentStream: '',
+            error: null,
+            hasReceivedFirstToken: false
         }));
 
         try {
@@ -219,7 +211,6 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                 editKnowledge: aiEditState.targets.knowledge.toString()
             });
 
-            // Create EventSource for SSE connection
             const eventSource = new EventSource(
                 `${api.defaults.baseURL}/brdges/${brdgeId}/scripts/ai-edit?${params.toString()}`
             );
@@ -229,7 +220,7 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                     console.log('Stream complete');
                     setAIEditState(prev => ({
                         ...prev,
-                        isProcessing: false
+                        isProcessing: false,
                     }));
                     eventSource.close();
                     return;
@@ -245,18 +236,27 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                             isProcessing: false,
                             error: parsed.error,
                             scriptStream: '',
-                            agentStream: ''
+                            agentStream: '',
+                            hasReceivedFirstToken: false
                         }));
                         eventSource.close();
                         return;
                     }
 
-                    // Update the streaming content based on what's being edited
-                    setAIEditState(prev => ({
-                        ...prev,
-                        scriptStream: parsed.script_update || prev.scriptStream,
-                        agentStream: parsed.agent_update || prev.agentStream
-                    }));
+                    // Immediately update state with each token
+                    if (parsed.token) {
+                        setAIEditState(prev => {
+                            const newState = { ...prev, hasReceivedFirstToken: true };
+
+                            if (parsed.type === 'script' && aiEditState.targets.speech) {
+                                newState.scriptStream = prev.scriptStream + parsed.token;
+                            } else if (parsed.type === 'agent' && aiEditState.targets.knowledge) {
+                                newState.agentStream = prev.agentStream + parsed.token;
+                            }
+
+                            return newState;
+                        });
+                    }
 
                     // Handle final content
                     if (parsed.final) {
@@ -282,12 +282,12 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                     isProcessing: false,
                     error: 'Connection error occurred',
                     scriptStream: '',
-                    agentStream: ''
+                    agentStream: '',
+                    hasReceivedFirstToken: false
                 }));
                 eventSource.close();
             };
 
-            // Store EventSource reference for cleanup
             eventSourceRef.current = eventSource;
 
         } catch (error) {
@@ -297,7 +297,8 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                 isProcessing: false,
                 error: 'Failed to process AI edit',
                 scriptStream: '',
-                agentStream: ''
+                agentStream: '',
+                hasReceivedFirstToken: false
             }));
         }
     }, [
@@ -407,10 +408,12 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                     </div>
                     <textarea
                         value={aiEditState.isProcessing && aiEditState.targets.speech
-                            ? aiEditState.scriptStream
+                            ? (aiEditState.hasReceivedFirstToken ? aiEditState.scriptStream : '')
                             : editedScript}
                         onChange={(e) => !aiEditState.isProcessing && handleContentChange(e.target.value, 'speech')}
-                        placeholder="Enter your presentation script for this slide..."
+                        placeholder={aiEditState.isProcessing && aiEditState.targets.speech && !aiEditState.hasReceivedFirstToken
+                            ? "Generating..."
+                            : "Enter your presentation script for this slide..."}
                         className={`w-full h-[120px] bg-gray-800/80 
                             text-gray-200 rounded-lg px-4 py-3 resize-none
                             text-[13px] font-mono leading-relaxed tracking-wide
@@ -418,7 +421,8 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                             focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50
                             placeholder:text-gray-600
                             ${aiEditState.isProcessing && aiEditState.targets.speech
-                                ? 'border-cyan-500/30 shadow-[0_0_15px_rgba(0,255,255,0.1)]'
+                                ? `border-cyan-500/30 shadow-[0_0_15px_rgba(0,255,255,0.1)]
+                                   ${!aiEditState.hasReceivedFirstToken ? 'placeholder:text-cyan-500 placeholder:animate-pulse' : ''}`
                                 : ''}`}
                         disabled={aiEditState.isProcessing}
                     />
@@ -444,10 +448,12 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                     </div>
                     <textarea
                         value={aiEditState.isProcessing && aiEditState.targets.knowledge
-                            ? aiEditState.agentStream
+                            ? (aiEditState.hasReceivedFirstToken ? aiEditState.agentStream : '')
                             : editedAgent}
                         onChange={(e) => !aiEditState.isProcessing && handleContentChange(e.target.value, 'knowledge')}
-                        placeholder="Enter context and knowledge for AI responses..."
+                        placeholder={aiEditState.isProcessing && aiEditState.targets.knowledge && !aiEditState.hasReceivedFirstToken
+                            ? "Generating..."
+                            : "Enter context and knowledge for AI responses..."}
                         className={`w-full h-[120px] bg-gray-800/80 
                             text-gray-200 rounded-lg px-4 py-3 resize-none
                             text-[13px] font-mono leading-relaxed tracking-wide
@@ -455,7 +461,8 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                             focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50
                             placeholder:text-gray-600
                             ${aiEditState.isProcessing && aiEditState.targets.knowledge
-                                ? 'border-cyan-500/30 shadow-[0_0_15px_rgba(0,255,255,0.1)]'
+                                ? `border-cyan-500/30 shadow-[0_0_15px_rgba(0,255,255,0.1)]
+                                   ${!aiEditState.hasReceivedFirstToken ? 'placeholder:text-cyan-500 placeholder:animate-pulse' : ''}`
                                 : ''}`}
                         disabled={aiEditState.isProcessing}
                     />
