@@ -209,27 +209,25 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
     const [canUndo, setCanUndo] = useState({ script: false, knowledge: false });
     const [canRedo, setCanRedo] = useState({ script: false, knowledge: false });
 
-    // Update undo/redo state whenever history changes
+    // Update canUndo/canRedo state whenever history changes
     useEffect(() => {
-        setCanUndo(history.script.currentIndex > 0);
-        setCanRedo(history.script.currentIndex < history.script.entries.length - 1);
-
-        console.log('History updated:', {
-            entries: history.script.entries.length,
-            currentIndex: history.script.currentIndex,
-            canUndo: history.script.currentIndex > 0,
-            canRedo: history.script.currentIndex < history.script.entries.length - 1
+        setCanUndo({
+            script: history.script.currentIndex > 0,
+            knowledge: history.knowledge.currentIndex > 0
+        });
+        setCanRedo({
+            script: history.script.currentIndex < history.script.entries.length - 1,
+            knowledge: history.knowledge.currentIndex < history.knowledge.entries.length - 1
         });
     }, [history]);
 
-    // Initialize history when scripts load or slide changes
+    // First, update the initialization effect to ensure we have initial content in history
     useEffect(() => {
         if (!scripts || !scripts[currentSlide]) return;
 
         const currentContent = scripts[currentSlide];
-        console.log('Initializing history with:', currentContent);
 
-        // Initialize with current content as first history entry
+        // Initialize history with current content
         setHistory({
             script: {
                 entries: [{
@@ -237,7 +235,7 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                     timestamp: new Date(),
                     isSaved: true
                 }],
-                currentIndex: 0
+                currentIndex: 0  // Start at index 0
             },
             knowledge: {
                 entries: [{
@@ -245,38 +243,28 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                     timestamp: new Date(),
                     isSaved: true
                 }],
-                currentIndex: 0
+                currentIndex: 0  // Start at index 0
             }
         });
 
-        // Also set the current content
         setEditedScript(currentContent.script || '');
         setEditedAgent(currentContent.agent || '');
         setHasScriptChanges(false);
         setHasAgentChanges(false);
     }, [currentSlide, scripts]);
 
-    const handleContentChange = useCallback((content: string, type: TabType) => {
-        // Update the content
-        if (type === 'speech') {
-            setEditedScript(content);
-            setHasScriptChanges(true);
-        } else {
-            setEditedAgent(content);
-            setHasAgentChanges(true);
-        }
-
-        // Add new entry to history
+    // 1. First define addToHistory
+    const addToHistory = useCallback((content: string, type: 'script' | 'knowledge') => {
         setHistory(prev => {
-            // Get the current content
+            const typeHistory = prev[type];
             const newEntry = {
                 content,
                 timestamp: new Date(),
                 isSaved: false
             };
 
-            // Remove any future entries if we're not at the latest point
-            const newEntries = [...prev[type].entries.slice(0, prev[type].currentIndex + 1), newEntry];
+            // Remove future entries if we're not at the latest point
+            const newEntries = [...typeHistory.entries.slice(0, typeHistory.currentIndex + 1), newEntry];
 
             return {
                 ...prev,
@@ -286,14 +274,33 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                 }
             };
         });
-    }, []);
+    }, []); // No dependencies needed since we're only using setHistory
+
+    // 2. Then define handleContentChange using addToHistory
+    const handleContentChange = useCallback((content: string, type: TabType) => {
+        // Update the content
+        if (type === 'speech') {
+            setEditedScript(content);
+            setHasScriptChanges(true);
+            // Add to history only if content actually changed
+            if (content !== history.script.entries[history.script.currentIndex]?.content) {
+                addToHistory(content, 'script');
+            }
+        } else {
+            setEditedAgent(content);
+            setHasAgentChanges(true);
+            // Add to history only if content actually changed
+            if (content !== history.knowledge.entries[history.knowledge.currentIndex]?.content) {
+                addToHistory(content, 'knowledge');
+            }
+        }
+    }, [addToHistory, history]);
 
     const handleSaveScript = useCallback(async () => {
-        if (!brdgeId || !scripts) return;
+        if (!brdgeId || !scripts || !hasScriptChanges) return;
 
         setIsSavingScript(true);
         try {
-            // Only send the script field for the current slide
             const updatedScripts = {
                 [currentSlide]: {
                     script: editedScript
@@ -305,7 +312,7 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
             });
 
             if (response.data.scripts) {
-                // Mark the current entry as saved
+                // Mark current history entry as saved
                 setHistory(prev => {
                     const newEntries = [...prev.script.entries];
                     if (newEntries[prev.script.currentIndex]) {
@@ -323,7 +330,7 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                     };
                 });
 
-                // Update local scripts state without affecting knowledge
+                // Update local scripts state
                 setScripts(prev => ({
                     ...prev,
                     [currentSlide]: {
@@ -339,7 +346,7 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
         } finally {
             setIsSavingScript(false);
         }
-    }, [brdgeId, scripts, currentSlide, editedScript]);
+    }, [brdgeId, scripts, currentSlide, editedScript, hasScriptChanges]);
 
     const handleSaveAgent = useCallback(async () => {
         if (!brdgeId || !scripts) return;
@@ -394,43 +401,88 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
         }
     }, [brdgeId, scripts, currentSlide, editedAgent]);
 
+    // Then simplify the AI edit handler to focus on history management
     const handleAIEdit = useCallback(async (instruction: string) => {
         if (!brdgeId || !currentSlide || aiEditState.isProcessing || !instruction) return;
 
-        // Reset streaming state with empty strings to show fresh content
         setAIEditState(prev => ({
             ...prev,
             isProcessing: true,
-            scriptStream: '',  // Start empty to show fresh stream
-            agentStream: '',   // Start empty to show fresh stream
+            scriptStream: '',
+            agentStream: '',
             error: null,
             hasReceivedFirstToken: false
         }));
 
         try {
+            // Get current content from either edited state or history
+            const currentScriptContent = editedScript || history.script.entries[history.script.currentIndex]?.content || '';
+            const currentAgentContent = editedAgent || history.knowledge.entries[history.knowledge.currentIndex]?.content || '';
+
             const params = new URLSearchParams({
                 slideNumber: currentSlide.toString(),
                 instruction: instruction,
                 currentContent: JSON.stringify({
-                    script: editedScript || '',
-                    agent: editedAgent || ''
+                    script: currentScriptContent,
+                    agent: currentAgentContent
                 }),
                 editSpeech: aiEditState.targets.speech.toString(),
                 editKnowledge: aiEditState.targets.knowledge.toString()
             });
 
-            const baseUrl = api.defaults.baseURL || 'http://localhost:5000';
+            const baseUrl = api.defaults.baseURL?.replace('/api', '') || 'http://localhost:5000';
             const eventSource = new EventSource(
-                `${baseUrl.replace('/api', '')}/api/brdges/${brdgeId}/scripts/ai-edit?${params.toString()}`
+                `${baseUrl}/api/brdges/${brdgeId}/scripts/ai-edit?${params.toString()}`
             );
 
             eventSource.onmessage = (event) => {
                 if (event.data === '[DONE]') {
-                    console.log('Stream complete');
-                    setAIEditState(prev => ({
-                        ...prev,
-                        isProcessing: false,
-                    }));
+                    setAIEditState(prev => {
+                        // If we have generated content, add it to history
+                        if (prev.targets.speech && prev.scriptStream) {
+                            setHistory(hist => ({
+                                ...hist,
+                                script: {
+                                    entries: [
+                                        ...hist.script.entries.slice(0, hist.script.currentIndex + 1),
+                                        {
+                                            content: prev.scriptStream,
+                                            timestamp: new Date(),
+                                            isSaved: false
+                                        }
+                                    ],
+                                    currentIndex: hist.script.currentIndex + 1
+                                }
+                            }));
+                            setEditedScript(prev.scriptStream);
+                            setHasScriptChanges(true);
+                        }
+
+                        if (prev.targets.knowledge && prev.agentStream) {
+                            setHistory(hist => ({
+                                ...hist,
+                                knowledge: {
+                                    entries: [
+                                        ...hist.knowledge.entries.slice(0, hist.knowledge.currentIndex + 1),
+                                        {
+                                            content: prev.agentStream,
+                                            timestamp: new Date(),
+                                            isSaved: false
+                                        }
+                                    ],
+                                    currentIndex: hist.knowledge.currentIndex + 1
+                                }
+                            }));
+                            setEditedAgent(prev.agentStream);
+                            setHasAgentChanges(true);
+                        }
+
+                        return {
+                            ...prev,
+                            isProcessing: false
+                        };
+                    });
+
                     eventSource.close();
                     return;
                 }
@@ -504,19 +556,10 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
             setAIEditState(prev => ({
                 ...prev,
                 isProcessing: false,
-                error: 'Failed to process AI edit',
-                scriptStream: '',  // Reset on error
-                agentStream: '',   // Reset on error
-                hasReceivedFirstToken: false
+                error: 'Failed to process AI edit'
             }));
         }
-    }, [
-        brdgeId,
-        currentSlide,
-        editedScript,
-        editedAgent,
-        aiEditState.targets
-    ]);
+    }, [brdgeId, currentSlide, editedScript, editedAgent, aiEditState.targets, history]);
 
     // Update the textarea styles to make the generating text more prominent
     const generatingTextStyles = `
@@ -629,29 +672,6 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
         fetchScriptHistory();
     }, [currentSlide, fetchScriptHistory]);
 
-    // Update history management for specific content type
-    const addToHistory = useCallback((content: string, type: 'script' | 'knowledge') => {
-        setHistory(prev => {
-            const typeHistory = prev[type];
-            const newEntry = {
-                content,
-                timestamp: new Date(),
-                isSaved: false
-            };
-
-            // Remove future entries if we're not at the latest point
-            const newEntries = [...typeHistory.entries.slice(0, typeHistory.currentIndex + 1), newEntry];
-
-            return {
-                ...prev,
-                [type]: {
-                    entries: newEntries,
-                    currentIndex: newEntries.length - 1
-                }
-            };
-        });
-    }, []);
-
     // Separate undo handlers for each type
     const handleUndo = useCallback((type: 'script' | 'knowledge') => {
         if (!canUndo[type]) return;
@@ -661,13 +681,13 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
             const newIndex = typeHistory.currentIndex - 1;
             const prevEntry = typeHistory.entries[newIndex];
 
-            // Update content based on type
+            // Update content and mark as changed if not saved
             if (type === 'script') {
                 setEditedScript(prevEntry.content);
-                setHasScriptChanges(true);
+                setHasScriptChanges(!prevEntry.isSaved);
             } else {
                 setEditedAgent(prevEntry.content);
-                setHasAgentChanges(true);
+                setHasAgentChanges(!prevEntry.isSaved);
             }
 
             return {
@@ -689,13 +709,13 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
             const newIndex = typeHistory.currentIndex + 1;
             const nextEntry = typeHistory.entries[newIndex];
 
-            // Update content based on type
+            // Update content and mark as changed if not saved
             if (type === 'script') {
                 setEditedScript(nextEntry.content);
-                setHasScriptChanges(true);
+                setHasScriptChanges(!nextEntry.isSaved);
             } else {
                 setEditedAgent(nextEntry.content);
-                setHasAgentChanges(true);
+                setHasAgentChanges(!nextEntry.isSaved);
             }
 
             return {
@@ -920,7 +940,7 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                                             {renderHistoryControls('script')}
                                         </div>
                                         <AnimatePresence>
-                                            {(hasScriptChanges || aiEditState.isProcessing) && (
+                                            {hasScriptChanges && (
                                                 <motion.button
                                                     initial={{ opacity: 0, scale: 0.9 }}
                                                     animate={{ opacity: 1, scale: 1 }}
@@ -1004,7 +1024,7 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                                             {renderHistoryControls('knowledge')}
                                         </div>
                                         <AnimatePresence>
-                                            {(hasAgentChanges || aiEditState.isProcessing) && (
+                                            {hasAgentChanges && (
                                                 <motion.button
                                                     initial={{ opacity: 0, scale: 0.9 }}
                                                     animate={{ opacity: 1, scale: 1 }}
