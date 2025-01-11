@@ -1182,7 +1182,7 @@ export default function Playground({
                 defaultSize={isMobile ? 15 : isRightPanelCollapsed ? 15 : 30}
                 minSize={isMobile ? 8 : 15}
               >
-                <div className="h-full flex flex-col bg-gray-900/50 backdrop-blur-md">
+                <div className="h-full flex flex-col bg-gray-900/50 backdrop-blur-md overflow-x-hidden">
                   {/* Controls */}
                   <div className={`
                     border-b border-gray-800 bg-gray-900/80 backdrop-blur-md
@@ -1343,32 +1343,67 @@ export default function Playground({
 
           {/* Right Panel - Only show on desktop in edit mode */}
           {!isMobile && isEditPage && (
-            <div className={`fixed right-0 top-[48px] bottom-0 w-[400px] transition-all duration-300 ${isRightPanelCollapsed ? 'translate-x-full' : 'translate-x-0'}`}>
+            <div className={`
+              fixed right-0 top-[48px] bottom-0 w-[400px] 
+              transition-all duration-300 ease-in-out
+              transform ${isRightPanelCollapsed ? 'translate-x-[400px]' : 'translate-x-0'}
+              bg-gray-900/50 backdrop-blur-md
+              border-l border-gray-800
+              z-30
+            `}>
               {/* Collapse Toggle Button */}
               <button
                 onClick={() => setIsRightPanelCollapsed(!isRightPanelCollapsed)}
-                className="absolute -left-8 top-1/2 transform -translate-y-1/2 z-10
-                  w-8 h-16 bg-gray-800 rounded-l-lg flex items-center justify-center
-                  text-gray-400 hover:text-white transition-colors"
+                className="absolute -left-8 top-1/2 transform -translate-y-1/2
+                  w-8 h-16 
+                  bg-gray-900/80 backdrop-blur-sm
+                  rounded-l-lg 
+                  flex items-center justify-center
+                  text-gray-400 
+                  transition-all duration-300
+                  border-t border-b border-l border-gray-800/50
+                  hover:border-cyan-500/30
+                  hover:text-cyan-400
+                  hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]
+                  group
+                  z-40
+                "
               >
-                <svg
-                  className={`w-5 h-5 transform transition-transform ${isRightPanelCollapsed ? 'rotate-180' : ''
-                    }`}
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
+                <div className="relative w-5 h-5">
+                  <div className={`
+                    absolute inset-0
+                    transition-all duration-300 ease-in-out
+                    transform ${isRightPanelCollapsed ? 'rotate-180' : ''}
+                    group-hover:scale-110
+                  `}>
+                    <svg
+                      className="w-full h-full"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.5}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                  </div>
+                  <div className="
+                    absolute inset-0 
+                    bg-cyan-500/0 
+                    group-hover:bg-cyan-500/10 
+                    rounded-full 
+                    transition-all duration-300
+                    blur-xl
+                    -z-10
+                  "/>
+                </div>
               </button>
 
               {/* Right Panel Content */}
-              <div className="h-full flex flex-col bg-gray-900/50 backdrop-blur-md">
+              <div className="h-full flex flex-col bg-gray-900/50 backdrop-blur-md overflow-x-hidden">
                 {/* Tab Navigation */}
                 <div className="flex border-b border-gray-800">
                   {['Content', 'Voice', 'Workflow'].map((tab) => (
@@ -1394,44 +1429,20 @@ export default function Playground({
 
                 {/* Tab Content */}
                 <div className="flex-1 overflow-y-auto">
-                  {/* Agent Tab */}
+                  {/* Content Tab */}
                   {configTab === 'content' && (
                     <div className="relative">
-                      <div className="
-                        transition-all duration-300
-                        hover:border-cyan-500/30
-                        shadow-[0_0_20px_rgba(0,255,255,0.05)]
-                        hover:shadow-[0_0_30px_rgba(0,255,255,0.1)]
-                      ">
-                        <SlideScriptPanel
-                          currentSlide={params.currentSlide}
-                          scripts={scripts}
-                          onScriptChange={handleScriptChange}
-                          onScriptsUpdate={updateScripts}
-                          onScriptsGenerated={handleScriptsGenerated}
-                          brdgeId={params.brdgeId}
-                          isGenerating={isGeneratingScripts}
-                          onAIEdit={(fn) => {
-                            setHandleAIEdit(() => fn); // Wrap the function setting in a callback
-                          }}
-                          isEditPage={isEditPage}
-                        />
-                      </div>
-                      {isGeneratingScripts && (
-                        <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm
-                          flex items-center justify-center
-                          animate-[fadeIn_0.3s_ease-out]
-                        ">
-                          <div className="text-cyan-400 flex flex-col items-center gap-3">
-                            <div className="w-8 h-8 border-2 border-current border-t-transparent
-                              rounded-full animate-spin
-                            "/>
-                            <div className="animate-[glow_2s_ease-in-out_infinite]">
-                              Generating Scripts...
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                      <SlideScriptPanel
+                        currentSlide={params.currentSlide}
+                        scripts={scripts}
+                        onScriptChange={handleScriptChange}
+                        onScriptsUpdate={updateScripts}
+                        onScriptsGenerated={handleScriptsGenerated}
+                        brdgeId={params.brdgeId}
+                        isGenerating={isGeneratingScripts}
+                        onAIEdit={(fn) => setHandleAIEdit(() => fn)}
+                        isEditPage={isEditPage}
+                      />
                     </div>
                   )}
 
@@ -1704,8 +1715,8 @@ export default function Playground({
                             onClick={handleGenerateScripts}
                             disabled={!selectedWalkthrough || isGeneratingScripts}
                             className="flex-1 px-3 py-2 bg-cyan-500/20 text-cyan-400
-                                rounded-lg text-sm font-medium hover:bg-cyan-500/30 transition-colors
-                                disabled:opacity-50 disabled:cursor-not-allowed"
+                              rounded-lg text-sm font-medium hover:bg-cyan-500/30 transition-colors
+                              disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {isGeneratingScripts ? 'Generating...' : 'Generate Scripts'}
                           </button>
@@ -1747,63 +1758,63 @@ export default function Playground({
         >
           {configTab === 'content' && (
             <div className="relative">
-              <div className="
-                transition-all duration-300
-                hover:border-cyan-500/30
-                shadow-[0_0_20px_rgba(0,255,255,0.05)]
-                hover:shadow-[0_0_30px_rgba(0,255,255,0.1)]
-              ">
-                <SlideScriptPanel
-                  currentSlide={params.currentSlide}
-                  scripts={scripts}
-                  onScriptChange={handleScriptChange}
-                  onScriptsUpdate={updateScripts}
-                  onScriptsGenerated={handleScriptsGenerated}
-                  brdgeId={params.brdgeId}
-                  isGenerating={isGeneratingScripts}
-                  onAIEdit={(fn) => {
-                    setHandleAIEdit(() => fn); // Wrap the function setting in a callback
-                  }}
-                  isEditPage={isEditPage}
-                />
-              </div>
-              {isGeneratingScripts && (
-                <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm
-                  flex items-center justify-center
-                  animate-[fadeIn_0.3s_ease-out]
-                ">
-                  <div className="text-cyan-400 flex flex-col items-center gap-3">
-                    <div className="w-8 h-8 border-2 border-current border-t-transparent
-                      rounded-full animate-spin
-                    "/>
-                    <div className="animate-[glow_2s_ease-in-out_infinite]">
-                      Generating Scripts...
-                    </div>
-                  </div>
-                </div>
-              )}
+              <SlideScriptPanel
+                currentSlide={params.currentSlide}
+                scripts={scripts}
+                onScriptChange={handleScriptChange}
+                onScriptsUpdate={updateScripts}
+                onScriptsGenerated={handleScriptsGenerated}
+                brdgeId={params.brdgeId}
+                isGenerating={isGeneratingScripts}
+                onAIEdit={(fn) => setHandleAIEdit(() => fn)}
+                isEditPage={isEditPage}
+              />
             </div>
           )}
           {configTab === 'voice' && (
             <div className="p-4 space-y-6">
-              {/* Voice Configuration Content */}
               <div className="space-y-4">
                 <select
                   value={selectedVoice || ''}
                   onChange={(e) => setSelectedVoice(e.target.value)}
-                  className="w-full bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2"
+                  className="w-full bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-300
+                    transition-all duration-300
+                    focus:ring-2 focus:ring-cyan-500 focus:border-transparent
+                    hover:border-cyan-500/50
+                    hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]"
                 >
                   <option value="">Select Voice</option>
                   {savedVoices.map(voice => (
                     <option key={voice.id} value={voice.id}>{voice.name}</option>
                   ))}
                 </select>
+                {/* Voice configuration content stays in the right panel */}
+                {selectedVoice && savedVoices.find(v => v.id === selectedVoice) && (
+                  <div className="bg-gray-800/30 rounded-lg p-3">
+                    {(() => {
+                      const voice = savedVoices.find(v => v.id === selectedVoice);
+                      return voice ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-400">Voice Name</span>
+                            <span className="text-cyan-400 font-medium">{voice.name}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-400">Created</span>
+                            <span className="text-cyan-400">
+                              {new Date(voice.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
+                )}
               </div>
             </div>
           )}
           {configTab === 'workflow' && (
             <div className="p-4 space-y-6">
-              {/* Workflow Configuration Content */}
               <div className="space-y-4">
                 <WalkthroughSelector
                   ref={walkthroughSelectorRef}
@@ -1813,6 +1824,42 @@ export default function Playground({
                   onWalkthroughSelect={handleWalkthroughSelect}
                   onWalkthroughsLoaded={(walkthroughs) => setWalkthroughs(walkthroughs)}
                 />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      if (roomState === ConnectionState.Connected) {
+                        onConnect(false);
+                      } else {
+                        setIsRightPanelCollapsed(true);
+                        handleWalkthroughClick('edit');
+                      }
+                    }}
+                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium 
+                      transition-colors flex items-center justify-center gap-2
+                      ${roomState === ConnectionState.Connected
+                        ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                        : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
+                      }`}
+                  >
+                    {roomState === ConnectionState.Connected ? (
+                      <>
+                        <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                        Stop Walkthrough
+                      </>
+                    ) : (
+                      'Record Walkthrough'
+                    )}
+                  </button>
+                  <button
+                    onClick={handleGenerateScripts}
+                    disabled={!selectedWalkthrough || isGeneratingScripts}
+                    className="flex-1 px-3 py-2 bg-cyan-500/20 text-cyan-400
+                      rounded-lg text-sm font-medium hover:bg-cyan-500/30 transition-colors
+                      disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isGeneratingScripts ? 'Generating...' : 'Generate Scripts'}
+                  </button>
+                </div>
               </div>
             </div>
           )}

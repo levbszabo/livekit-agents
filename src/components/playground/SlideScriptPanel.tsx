@@ -791,7 +791,7 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
             >
                 {isEditPage && (
                     <motion.div
-                        className="sticky top-0 bg-gray-900/95 backdrop-blur-sm pt-4 pb-3 -mx-8 px-6 border-b border-gray-800/60 z-10"
+                        className="sticky top-0 bg-gray-900/95 backdrop-blur-sm pt-4 pb-3 px-1 border-b border-gray-800/60 z-10"
                         initial={slideAnimation.initial}
                         animate={slideAnimation.animate}
                         exit={slideAnimation.exit}
