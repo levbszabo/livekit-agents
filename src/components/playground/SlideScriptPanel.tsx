@@ -213,65 +213,29 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
         });
     }, [history]);
 
-    // Update the effect that handles final AI edit content
-    useEffect(() => {
-        if (!aiEditState.isProcessing && aiEditState.hasReceivedFirstToken) {
-            // Create a new history entry for the AI edit
-            const newEntry = {
-                script: aiEditState.targets.speech ? aiEditState.scriptStream : editedScript,
-                knowledge: aiEditState.targets.knowledge ? aiEditState.agentStream : editedAgent,
-                timestamp: new Date(),
-                isSaved: false  // Mark as unsaved so user needs to explicitly save
-            };
-
-            // Update the content
-            if (aiEditState.targets.speech && aiEditState.scriptStream) {
-                setEditedScript(aiEditState.scriptStream);
-                setHasScriptChanges(true);  // Show save button
-            }
-            if (aiEditState.targets.knowledge && aiEditState.agentStream) {
-                setEditedAgent(aiEditState.agentStream);
-                setHasAgentChanges(true);  // Show save button
-            }
-
-            // Add the AI edit to history
-            setHistory(prev => {
-                const newEntries = [...prev.entries.slice(0, prev.currentIndex + 1), newEntry];
-                return {
-                    entries: newEntries,
-                    currentIndex: newEntries.length - 1
-                };
-            });
-        }
-    }, [aiEditState.isProcessing, aiEditState.hasReceivedFirstToken]);
-
-    // Update the script initialization effect
+    // Initialize history when scripts load or slide changes
     useEffect(() => {
         if (!scripts || !scripts[currentSlide]) return;
 
         const currentContent = scripts[currentSlide];
+        console.log('Initializing history with:', currentContent);
 
-        // Only initialize history if it's empty or if we're switching slides
-        if (history.entries.length === 0 || history.entries[0]?.script !== currentContent.script || history.entries[0]?.knowledge !== currentContent.agent) {
-            console.log('Initializing history with:', currentContent);
+        // Initialize with current content as first history entry
+        setHistory({
+            entries: [{
+                script: currentContent.script || '',
+                knowledge: currentContent.agent || '',
+                timestamp: new Date(),
+                isSaved: true
+            }],
+            currentIndex: 0
+        });
 
-            // Initialize with current content as first history entry
-            setHistory({
-                entries: [{
-                    script: currentContent.script || '',
-                    knowledge: currentContent.agent || '',
-                    timestamp: new Date(),
-                    isSaved: true
-                }],
-                currentIndex: 0
-            });
-
-            // Also set the current content
-            setEditedScript(currentContent.script || '');
-            setEditedAgent(currentContent.agent || '');
-            setHasScriptChanges(false);
-            setHasAgentChanges(false);
-        }
+        // Also set the current content
+        setEditedScript(currentContent.script || '');
+        setEditedAgent(currentContent.agent || '');
+        setHasScriptChanges(false);
+        setHasAgentChanges(false);
     }, [currentSlide, scripts]);
 
     const handleContentChange = useCallback((content: string, type: TabType) => {
@@ -320,19 +284,18 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
             });
 
             if (response.data.scripts) {
-                // Create a new saved entry in history
-                const newEntry = {
-                    script: editedScript,
-                    knowledge: editedAgent,
-                    timestamp: new Date(),
-                    isSaved: true
-                };
-
+                // Mark the current entry as saved
                 setHistory(prev => {
-                    const newEntries = [...prev.entries.slice(0, prev.currentIndex + 1), newEntry];
+                    const newEntries = [...prev.entries];
+                    if (newEntries[prev.currentIndex]) {
+                        newEntries[prev.currentIndex] = {
+                            ...newEntries[prev.currentIndex],
+                            isSaved: true
+                        };
+                    }
                     return {
                         entries: newEntries,
-                        currentIndex: newEntries.length - 1
+                        currentIndex: prev.currentIndex
                     };
                 });
 
@@ -344,7 +307,7 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
         } finally {
             setIsSavingScript(false);
         }
-    }, [brdgeId, scripts, currentSlide, editedScript, editedAgent, onScriptsUpdate]);
+    }, [brdgeId, scripts, currentSlide, editedScript, onScriptsUpdate]);
 
     const handleSaveAgent = useCallback(async () => {
         if (!brdgeId || !scripts) return;
@@ -362,19 +325,18 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
             });
 
             if (response.data.scripts) {
-                // Create a new saved entry in history
-                const newEntry = {
-                    script: editedScript,
-                    knowledge: editedAgent,
-                    timestamp: new Date(),
-                    isSaved: true
-                };
-
+                // Mark the current entry as saved
                 setHistory(prev => {
-                    const newEntries = [...prev.entries.slice(0, prev.currentIndex + 1), newEntry];
+                    const newEntries = [...prev.entries];
+                    if (newEntries[prev.currentIndex]) {
+                        newEntries[prev.currentIndex] = {
+                            ...newEntries[prev.currentIndex],
+                            isSaved: true
+                        };
+                    }
                     return {
                         entries: newEntries,
-                        currentIndex: newEntries.length - 1
+                        currentIndex: prev.currentIndex
                     };
                 });
 
@@ -386,7 +348,7 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
         } finally {
             setIsSavingAgent(false);
         }
-    }, [brdgeId, scripts, currentSlide, editedScript, editedAgent, onScriptsUpdate]);
+    }, [brdgeId, scripts, currentSlide, editedAgent, onScriptsUpdate]);
 
     const handleAIEdit = useCallback(async (instruction: string) => {
         if (!brdgeId || !currentSlide || aiEditState.isProcessing || !instruction) return;
@@ -461,10 +423,16 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                         }));
                     }
 
-                    // Remove the automatic content update on final
+                    // Handle final content
                     if (parsed.final) {
-                        // Don't update editedScript/editedAgent here
-                        // Let the user explicitly save the changes
+                        if (parsed.final.script && aiEditState.targets.speech) {
+                            setEditedScript(parsed.final.script);
+                            setHasScriptChanges(true);
+                        }
+                        if (parsed.final.agent && aiEditState.targets.knowledge) {
+                            setEditedAgent(parsed.final.agent);
+                            setHasAgentChanges(true);
+                        }
                     }
 
                 } catch (e) {
@@ -519,6 +487,20 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
         after:tracking-wide
         after:shadow-[0_0_10px_rgba(34,211,238,0.3)]
     `;
+
+    // Add effect to update edited content when streaming is complete
+    useEffect(() => {
+        if (!aiEditState.isProcessing && aiEditState.hasReceivedFirstToken) {
+            if (aiEditState.targets.speech && aiEditState.scriptStream) {
+                setEditedScript(aiEditState.scriptStream);
+                setHasScriptChanges(true);
+            }
+            if (aiEditState.targets.knowledge && aiEditState.agentStream) {
+                setEditedAgent(aiEditState.agentStream);
+                setHasAgentChanges(true);
+            }
+        }
+    }, [aiEditState.isProcessing, aiEditState.hasReceivedFirstToken]);
 
     // Update the textarea value based on streaming state
     const textareaValue = useMemo(() => {
@@ -873,21 +855,13 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                                             {renderHistoryControls()}
                                         </div>
                                         <AnimatePresence>
-                                            {(hasScriptChanges || (!aiEditState.isProcessing && aiEditState.targets.speech && aiEditState.scriptStream)) && (
+                                            {(hasScriptChanges || aiEditState.isProcessing) && (
                                                 <motion.button
                                                     initial={{ opacity: 0, scale: 0.9 }}
                                                     animate={{ opacity: 1, scale: 1 }}
                                                     exit={{ opacity: 0, scale: 0.9 }}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        if (aiEditState.scriptStream) {
-                                                            setEditedScript(aiEditState.scriptStream);
-                                                            setHasScriptChanges(true);
-                                                            setAIEditState(prev => ({
-                                                                ...prev,
-                                                                scriptStream: ''
-                                                            }));
-                                                        }
                                                         handleSaveScript();
                                                     }}
                                                     disabled={isSavingScript || aiEditState.isProcessing}
@@ -897,33 +871,6 @@ export const SlideScriptPanel = ({ currentSlide, scripts, onScriptChange, onScri
                                                 >
                                                     <Save className="w-3 h-3" />
                                                     {isSavingScript ? 'Saving...' : 'Save Changes'}
-                                                </motion.button>
-                                            )}
-
-                                            {(hasAgentChanges || (!aiEditState.isProcessing && aiEditState.targets.knowledge && aiEditState.agentStream)) && (
-                                                <motion.button
-                                                    initial={{ opacity: 0, scale: 0.9 }}
-                                                    animate={{ opacity: 1, scale: 1 }}
-                                                    exit={{ opacity: 0, scale: 0.9 }}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        if (aiEditState.agentStream) {
-                                                            setEditedAgent(aiEditState.agentStream);
-                                                            setHasAgentChanges(true);
-                                                            setAIEditState(prev => ({
-                                                                ...prev,
-                                                                agentStream: ''
-                                                            }));
-                                                        }
-                                                        handleSaveAgent();
-                                                    }}
-                                                    disabled={isSavingAgent || aiEditState.isProcessing}
-                                                    className="px-2 py-0.5 text-xs rounded-md bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 disabled:opacity-50 transition-all duration-150 flex items-center gap-1"
-                                                    whileHover={{ scale: 1.05 }}
-                                                    whileTap={{ scale: 0.95 }}
-                                                >
-                                                    <Save className="w-3 h-3" />
-                                                    {isSavingAgent ? 'Saving...' : 'Save Changes'}
                                                 </motion.button>
                                             )}
                                         </AnimatePresence>
