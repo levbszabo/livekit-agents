@@ -1457,14 +1457,17 @@ export default function Playground({
                       <SlideScriptPanel
                         currentSlide={params.currentSlide}
                         scripts={scripts}
+                        // @ts-ignore
                         onScriptChange={handleScriptChange}
                         onScriptsUpdate={updateScripts}
                         onScriptsGenerated={handleScriptsGenerated}
+                        // @ts-ignore
                         brdgeId={params.brdgeId}
                         isGenerating={isGeneratingScripts}
                         onAIEdit={(fn) => setHandleAIEdit(() => fn)}
                         isEditPage={isEditPage}
                         setScripts={setScripts}
+                        onConnect={onConnect}
                       />
                     </div>
                   )}
@@ -1783,14 +1786,17 @@ export default function Playground({
               <SlideScriptPanel
                 currentSlide={params.currentSlide}
                 scripts={scripts}
+                // @ts-ignore
                 onScriptChange={handleScriptChange}
                 onScriptsUpdate={updateScripts}
                 onScriptsGenerated={handleScriptsGenerated}
+                // @ts-ignore
                 brdgeId={params.brdgeId}
                 isGenerating={isGeneratingScripts}
                 onAIEdit={(fn) => setHandleAIEdit(() => fn)}
                 isEditPage={isEditPage}
                 setScripts={setScripts}
+                onConnect={onConnect}
               />
             </div>
           )}
