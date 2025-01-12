@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { api } from '@/api';
-import { ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
+import { useConnectionState } from '@livekit/components-react';
+import { ConnectionState } from 'livekit-client';
+import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { motion, AnimatePresence } from 'framer-motion';
-import * as Tooltip from '@radix-ui/react-tooltip';
 import { ArrowRight, ChevronDown, ChevronUp, History, Save } from 'lucide-react';
 import Skeleton from 'react-loading-skeleton';
 import 'react-loading-skeleton/dist/skeleton.css';
@@ -45,17 +46,18 @@ interface HistoryState {
     knowledge: ContentHistory;
 }
 
-interface SlideScriptPanelProps {
+export interface SlideScriptPanelProps {
     currentSlide: number;
-    scripts: Record<string, ScriptContent> | null;
-    onScriptChange: (slideId: string, newScript: string) => void;
-    onScriptsUpdate: (newScripts: Record<string, ScriptContent>) => void;
-    onScriptsGenerated?: (scripts: Record<string, any>) => void;
-    brdgeId: string | null;
+    scripts: any;
+    onScriptChange: (script: any) => void;
+    onScriptsUpdate: (scripts: any) => void;
+    onScriptsGenerated: () => void;
+    brdgeId: string;
     isGenerating: boolean;
     onAIEdit: (fn: (instruction: string) => Promise<void>) => void;
     isEditPage: boolean;
-    setScripts: (updater: (prev: Record<string, ScriptContent> | null) => Record<string, ScriptContent>) => void;
+    setScripts: (scripts: any) => void;
+    onConnect: (shouldConnect: boolean) => void;
 }
 
 type TabType = 'speech' | 'knowledge';
@@ -166,7 +168,7 @@ const fadeAnimation = {
     exit: { opacity: 0 }
 };
 
-export const SlideScriptPanel: React.FC<SlideScriptPanelProps> = ({
+export const SlideScriptPanel = ({
     currentSlide,
     scripts,
     onScriptChange,
@@ -176,8 +178,9 @@ export const SlideScriptPanel: React.FC<SlideScriptPanelProps> = ({
     isGenerating,
     onAIEdit,
     isEditPage,
-    setScripts
-}) => {
+    setScripts,
+    onConnect,
+}: SlideScriptPanelProps) => {
     const [activeTab, setActiveTab] = useState<TabType>('speech');
     const [editedScript, setEditedScript] = useState('');
     const [editedAgent, setEditedAgent] = useState('');
@@ -671,43 +674,21 @@ export const SlideScriptPanel: React.FC<SlideScriptPanelProps> = ({
     // Update the history controls render function
     const renderHistoryControls = (type: 'script' | 'knowledge') => (
         <div className="flex items-center space-x-1 text-gray-400" onClick={e => e.stopPropagation()}>
-            <Tooltip.Root>
-                <Tooltip.Trigger asChild>
-                    <button
-                        onClick={() => handleUndo(type)}
-                        disabled={!canUndo[type]}
-                        className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${!canUndo[type] ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                        <ChevronLeftIcon className="w-3.5 h-3.5" />
-                    </button>
-                </Tooltip.Trigger>
-                <Tooltip.Content
-                    className="bg-gray-900 text-gray-300 text-xs px-2 py-1 rounded shadow-lg border border-gray-800"
-                    sideOffset={5}
-                >
-                    {canUndo[type] ? 'Undo changes' : 'No changes to undo'}
-                    <Tooltip.Arrow className="fill-gray-900" />
-                </Tooltip.Content>
-            </Tooltip.Root>
+            <button
+                onClick={() => handleUndo(type)}
+                disabled={!canUndo[type]}
+                className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${!canUndo[type] ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+                <ChevronLeftIcon className="w-3.5 h-3.5" />
+            </button>
 
-            <Tooltip.Root>
-                <Tooltip.Trigger asChild>
-                    <button
-                        onClick={() => handleRedo(type)}
-                        disabled={!canRedo[type]}
-                        className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${!canRedo[type] ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                        <ChevronRightIcon className="w-3.5 h-3.5" />
-                    </button>
-                </Tooltip.Trigger>
-                <Tooltip.Content
-                    className="bg-gray-900 text-gray-300 text-xs px-2 py-1 rounded shadow-lg border border-gray-800"
-                    sideOffset={5}
-                >
-                    {canRedo[type] ? 'Redo changes' : 'No changes to redo'}
-                    <Tooltip.Arrow className="fill-gray-900" />
-                </Tooltip.Content>
-            </Tooltip.Root>
+            <button
+                onClick={() => handleRedo(type)}
+                disabled={!canRedo[type]}
+                className={`p-1 rounded hover:bg-gray-700/50 transition-colors ${!canRedo[type] ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+                <ChevronRightIcon className="w-3.5 h-3.5" />
+            </button>
         </div>
     );
 
@@ -721,368 +702,304 @@ export const SlideScriptPanel: React.FC<SlideScriptPanelProps> = ({
         });
     }, [history, canUndo, canRedo]);
 
-    return (
-        <Tooltip.Provider delayDuration={200}>
-            <motion.div
-                className="flex flex-col h-full space-y-4 pb-4 text-gray-300 px-2"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.3 }}
-            >
-                {isEditPage && (
-                    <motion.div
-                        className="sticky top-0 bg-gray-900/95 backdrop-blur-sm pt-4 pb-3 px-1 border-b border-gray-800/60 z-10"
-                        initial={slideAnimation.initial}
-                        animate={slideAnimation.animate}
-                        exit={slideAnimation.exit}
-                    >
-                        <motion.div
-                            className="relative bg-gray-800/30 rounded-xl p-4 border border-gray-700/30 shadow-lg transition-all duration-200 hover:border-gray-600/50 backdrop-blur-sm"
-                            whileHover={{ scale: 1.002 }}
-                            transition={{ type: "spring", stiffness: 300 }}
-                        >
-                            <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
-                                    <h3 className="text-sm font-medium text-cyan-400">AI Edit</h3>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={() => setAIEditState(prev => ({
-                                            ...prev,
-                                            targets: { ...prev.targets, speech: !prev.targets.speech }
-                                        }))}
-                                        className={`px-2 py-0.5 text-xs rounded-md border transition-all duration-150 ${aiEditState.targets.speech
-                                            ? 'bg-cyan-500/20 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/30'
-                                            : 'border-gray-700/50 text-gray-400 hover:border-gray-600 hover:text-gray-300'
-                                            }`}
-                                    >
-                                        Script
-                                    </button>
-                                    <button
-                                        onClick={() => setAIEditState(prev => ({
-                                            ...prev,
-                                            targets: { ...prev.targets, knowledge: !prev.targets.knowledge }
-                                        }))}
-                                        className={`px-2 py-0.5 text-xs rounded-md border transition-all duration-150 ${aiEditState.targets.knowledge
-                                            ? 'bg-cyan-500/20 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/30'
-                                            : 'border-gray-700/50 text-gray-400 hover:border-gray-600 hover:text-gray-300'
-                                            }`}
-                                    >
-                                        Knowledge
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="relative mb-2">
-                                <form onSubmit={handleAIEditSubmit} className="group flex gap-1.5">
-                                    <input
-                                        type="text"
-                                        name="aiEdit"
-                                        placeholder="Instructions like 'Make this longer' or 'Simplify'..."
-                                        className="flex-1 bg-gray-900/80 border border-gray-700/50 rounded-md p-2 text-xs text-gray-100 
-                                            focus:outline-none focus:ring-1 focus:ring-cyan-500/30 
-                                            placeholder:text-gray-500 placeholder:text-xs 
-                                            transition-all duration-200 
-                                            group-hover:border-gray-600/50
-                                            backdrop-blur-sm"
-                                        disabled={aiEditState.isProcessing}
-                                    />
-                                    <Tooltip.Root>
-                                        <Tooltip.Trigger asChild>
-                                            <motion.button
-                                                type="submit"
-                                                disabled={aiEditState.isProcessing}
-                                                className="relative px-2 py-1.5 rounded-md 
-                                                    bg-cyan-500/10 text-cyan-400 
-                                                    hover:bg-cyan-500/20 
-                                                    disabled:opacity-50 
-                                                    transition-all duration-150 
-                                                    group overflow-hidden 
-                                                    border border-cyan-500/20
-                                                    shadow-[0_0_15px_rgba(34,211,238,0.1)]
-                                                    hover:shadow-[0_0_20px_rgba(34,211,238,0.2)]"
-                                                whileHover={{ scale: 1.05 }}
-                                                whileTap={{ scale: 0.95 }}
-                                            >
-                                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent 
-                                                    group-hover:via-cyan-500/20 translate-x-[-200%] group-hover:translate-x-[200%] 
-                                                    transition-all duration-1000 ease-out" />
-                                                <div className="relative flex items-center">
-                                                    <ArrowRight className="w-4 h-4 mr-[-4px] opacity-50" />
-                                                    <ArrowRight className="w-4 h-4" />
-                                                </div>
-                                            </motion.button>
-                                        </Tooltip.Trigger>
-                                    </Tooltip.Root>
-                                </form>
-                            </div>
-                            <AnimatePresence>
-                                <motion.div
-                                    className="flex flex-wrap gap-1 mb-3"
-                                    initial={{ opacity: 0, y: -5 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.1 }}
-                                >
-                                    {quickSuggestions.map((suggestion: string, index: number) => (
-                                        <motion.button
-                                            key={index}
-                                            onClick={() => {
-                                                const input = document.querySelector('input[name="aiEdit"]') as HTMLInputElement;
-                                                if (input) {
-                                                    input.value = suggestion;
-                                                    input.focus();
-                                                }
-                                            }}
-                                            disabled={aiEditState.isProcessing}
-                                            className="px-2 py-0.5 text-[11px] rounded-full border border-gray-700/50 bg-gray-900/80 text-gray-400 hover:bg-gray-800 hover:text-cyan-400 hover:border-cyan-500/30 disabled:opacity-50 transition-all duration-150"
-                                            whileHover={{ scale: 1.05 }}
-                                            whileTap={{ scale: 0.95 }}
-                                        >
-                                            {suggestion}
-                                        </motion.button>
-                                    ))}
-                                </motion.div>
-                            </AnimatePresence>
-                            <Tooltip.Root>
-                                <Tooltip.Trigger asChild>
-                                    <motion.button
-                                        onClick={() => {
-                                            // TODO: Implement presentation functionality
-                                            console.log('Present This Slide clicked');
-                                        }}
-                                        className="text-[11px] rounded-md 
-                                            bg-cyan-500/10 text-cyan-400
-                                            border border-cyan-500/20
-                                            hover:bg-cyan-500/20
-                                            transition-all duration-300
-                                            flex items-center gap-1.5
-                                            px-2 py-1
-                                            group
-                                            relative
-                                            overflow-hidden
-                                            shadow-[0_0_15px_rgba(34,211,238,0.1)]
-                                            hover:shadow-[0_0_20px_rgba(34,211,238,0.2)]"
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.98 }}
-                                    >
-                                        <svg
-                                            className="w-3 h-3 transition-transform duration-300 group-hover:scale-110"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth={1.5}
-                                        >
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                        </svg>
-                                        Present This Slide
-                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-all duration-1000 ease-out" />
-                                    </motion.button>
-                                </Tooltip.Trigger>
-                                <Tooltip.Portal>
-                                    <Tooltip.Content
-                                        className="bg-gray-900 text-gray-300 text-xs px-3 py-2 rounded-lg shadow-lg border border-gray-800 max-w-[240px] z-[100]"
-                                        sideOffset={5}
-                                    >
-                                        <div className="space-y-1">
-                                            <p className="font-medium text-cyan-400">Quick Presentation Mode</p>
-                                            <p>Speak naturally about what's shown on this slide. Your presentation will be used to generate the script and AI knowledge.</p>
-                                        </div>
-                                        <Tooltip.Arrow className="fill-gray-900" />
-                                    </Tooltip.Content>
-                                </Tooltip.Portal>
-                            </Tooltip.Root>
-                        </motion.div>
-                    </motion.div>
-                )}
+    // Add state for recording status
+    const [isRecording, setIsRecording] = useState(false);
+    const roomState = useConnectionState();
 
+    // Function to handle presentation start/stop
+    const handlePresentation = useCallback(async () => {
+        if (isRecording) {
+            // If recording, stop it and generate scripts
+            try {
+                onConnect(false);
+
+                // Generate scripts
+                if (!brdgeId) return;
+
+                const response = await api.post(`/brdges/${brdgeId}/scripts/generate`);
+                if (response.data.scripts) {
+                    onScriptsUpdate(response.data.scripts);
+                    onScriptsGenerated();
+                }
+            } catch (error) {
+                console.error('Error stopping recording:', error);
+            }
+            setIsRecording(false);
+        } else {
+            // If not recording, start it
+            try {
+                onConnect(true);
+                setIsRecording(true);
+            } catch (error) {
+                console.error('Error starting recording:', error);
+                setIsRecording(false);
+            }
+        }
+    }, [isRecording, onConnect, brdgeId, onScriptsUpdate, onScriptsGenerated]);
+
+    return (
+        <motion.div
+            className="flex flex-col h-full space-y-4 pb-4 text-gray-300 px-2"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+        >
+            {isEditPage && (
                 <motion.div
-                    className="flex flex-col flex-1 min-h-0 space-y-4"
-                    variants={fadeAnimation}
-                    initial="initial"
-                    animate="animate"
+                    className="sticky top-0 bg-gray-900/95 pt-4 pb-3 px-1 border-b border-gray-800/60 z-10"
+                    initial={slideAnimation.initial}
+                    animate={slideAnimation.animate}
+                    exit={slideAnimation.exit}
                 >
                     <motion.div
-                        className={`flex flex-col flex-1 min-h-0 group transition-all duration-200 ${collapsedSections.speech ? 'mb-0' : ''}`}
-                        layout
+                        className="relative bg-gray-800/30 rounded-xl p-4 border border-gray-700/30 shadow-lg transition-all duration-200 hover:border-gray-600/50"
+                        whileHover={{ scale: 1.002 }}
+                        transition={{ type: "spring", stiffness: 300 }}
                     >
-                        <Tooltip.Root>
-                            <Tooltip.Trigger asChild>
-                                <motion.div
-                                    className="flex items-center justify-between mb-2 cursor-pointer select-none"
-                                    onClick={() => setCollapsedSections(prev => ({ ...prev, speech: !prev.speech }))}
-                                    whileHover={{ opacity: 0.9 }}
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
+                                <h3 className="text-sm font-medium text-cyan-400">AI Edit</h3>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setAIEditState(prev => ({
+                                        ...prev,
+                                        targets: { ...prev.targets, speech: !prev.targets.speech }
+                                    }))}
+                                    className={`px-2 py-0.5 text-xs rounded-md border transition-all duration-150 ${aiEditState.targets.speech
+                                        ? 'bg-cyan-500/20 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/30'
+                                        : 'border-gray-700/50 text-gray-400 hover:border-gray-600 hover:text-gray-300'
+                                        }`}
                                 >
-                                    <div className="text-sm font-medium text-cyan-400 flex items-center gap-2 group-hover:text-cyan-300 transition-colors duration-150">
-                                        <span className="flex items-center gap-1.5">
-                                            {collapsedSections.speech ? (
-                                                <ChevronDown className="w-3.5 h-3.5" />
-                                            ) : (
-                                                <ChevronUp className="w-3.5 h-3.5" />
-                                            )}
-                                            Speech Script
-                                        </span>
-                                        {hasScriptChanges && (
-                                            <motion.div
-                                                className="w-1 h-1 rounded-full bg-cyan-500"
-                                                animate={{ opacity: [0.5, 1, 0.5] }}
-                                                transition={{ duration: 2, repeat: Infinity }}
-                                            />
-                                        )}
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <div className="flex items-center space-x-1 text-gray-400">
-                                            {renderHistoryControls('script')}
-                                        </div>
-                                        <AnimatePresence>
-                                            {hasScriptChanges && (
-                                                <motion.button
-                                                    initial={{ opacity: 0, scale: 0.9 }}
-                                                    animate={{ opacity: 1, scale: 1 }}
-                                                    exit={{ opacity: 0, scale: 0.9 }}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleSaveScript();
-                                                    }}
-                                                    disabled={isSavingScript || aiEditState.isProcessing}
-                                                    className="px-2 py-0.5 text-xs rounded-md bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 disabled:opacity-50 transition-all duration-150 flex items-center gap-1"
-                                                    whileHover={{ scale: 1.05 }}
-                                                    whileTap={{ scale: 0.95 }}
-                                                >
-                                                    <Save className="w-3 h-3" />
-                                                    {isSavingScript ? 'Saving...' : 'Save Changes'}
-                                                </motion.button>
-                                            )}
-                                        </AnimatePresence>
-                                    </div>
-                                </motion.div>
-                            </Tooltip.Trigger>
-                            <Tooltip.Portal>
-                                <Tooltip.Content
-                                    className="bg-gray-900 text-gray-300 text-xs px-2 py-1 rounded shadow-lg border border-gray-800"
-                                    sideOffset={5}
+                                    Script
+                                </button>
+                                <button
+                                    onClick={() => setAIEditState(prev => ({
+                                        ...prev,
+                                        targets: { ...prev.targets, knowledge: !prev.targets.knowledge }
+                                    }))}
+                                    className={`px-2 py-0.5 text-xs rounded-md border transition-all duration-150 ${aiEditState.targets.knowledge
+                                        ? 'bg-cyan-500/20 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/30'
+                                        : 'border-gray-700/50 text-gray-400 hover:border-gray-600 hover:text-gray-300'
+                                        }`}
                                 >
-                                    Click to {collapsedSections.speech ? 'expand' : 'collapse'}
-                                    <Tooltip.Arrow className="fill-gray-900" />
-                                </Tooltip.Content>
-                            </Tooltip.Portal>
-                        </Tooltip.Root>
-
+                                    Knowledge
+                                </button>
+                            </div>
+                        </div>
+                        <div className="relative mb-2">
+                            <form onSubmit={handleAIEditSubmit} className="group flex gap-1.5">
+                                <input
+                                    type="text"
+                                    name="aiEdit"
+                                    placeholder="Instructions like 'Make this longer' or 'Simplify'..."
+                                    className="flex-1 bg-gray-900/80 border border-gray-700/50 rounded-md p-2 text-xs text-gray-100 
+                                        focus:outline-none focus:ring-1 focus:ring-cyan-500/30 
+                                        placeholder:text-gray-500 placeholder:text-xs 
+                                        transition-all duration-200 
+                                        group-hover:border-gray-600/50"
+                                    disabled={aiEditState.isProcessing}
+                                />
+                                <motion.button
+                                    type="submit"
+                                    disabled={aiEditState.isProcessing}
+                                    className="relative px-2 py-1.5 rounded-md
+                                        bg-cyan-500/10 text-cyan-400
+                                        hover:bg-cyan-500/20
+                                        disabled:opacity-50
+                                        transition-all duration-150
+                                        group overflow-hidden
+                                        border border-cyan-500/20"
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                >
+                                    <div className="relative flex items-center">
+                                        <ArrowRight className="w-4 h-4" />
+                                    </div>
+                                </motion.button>
+                            </form>
+                        </div>
                         <AnimatePresence>
-                            {!collapsedSections.speech && (
-                                <motion.div
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: 'auto' }}
-                                    exit={{ opacity: 0, height: 0 }}
-                                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                                >
-                                    <textarea
-                                        value={aiEditState.isProcessing && aiEditState.targets.speech ? aiEditState.scriptStream : editedScript}
-                                        onChange={(e) => handleContentChange(e.target.value, 'speech')}
-                                        className={`flex-1 w-full bg-gray-800/30 border border-gray-700/30 rounded-md p-3 
-                                            text-xs leading-relaxed text-gray-100 resize-none min-h-[140px] 
-                                            focus:outline-none focus:ring-1 focus:ring-cyan-500/30 
-                                            transition-all duration-200 
-                                            group-hover:border-gray-600/50
-                                            backdrop-blur-sm
-                                            ${aiEditState.isProcessing && aiEditState.targets.speech && !aiEditState.hasReceivedFirstToken ? generatingTextStyles : ''}`}
-                                        placeholder="Enter speech script..."
-                                        disabled={aiEditState.isProcessing && aiEditState.targets.speech}
-                                    />
-                                </motion.div>
-                            )}
+                            <motion.div className="flex flex-wrap gap-1 mb-3">
+                                {quickSuggestions.map((suggestion: string, index: number) => (
+                                    <motion.button
+                                        key={index}
+                                        onClick={() => {
+                                            const input = document.querySelector('input[name="aiEdit"]') as HTMLInputElement;
+                                            if (input) {
+                                                input.value = suggestion;
+                                                input.focus();
+                                            }
+                                        }}
+                                        disabled={aiEditState.isProcessing}
+                                        className="px-2 py-0.5 text-[11px] rounded-full border border-gray-700/50 bg-gray-900/80 text-gray-400 hover:bg-gray-800 hover:text-cyan-400 hover:border-cyan-500/30 disabled:opacity-50 transition-all duration-150"
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                    >
+                                        {suggestion}
+                                    </motion.button>
+                                ))}
+                            </motion.div>
                         </AnimatePresence>
                     </motion.div>
+                </motion.div>
+            )}
 
-                    <div className={`flex flex-col flex-1 min-h-0 group transition-all duration-200 ${collapsedSections.knowledge ? 'mb-0' : ''}`}>
-                        <Tooltip.Root>
-                            <Tooltip.Trigger asChild>
+            <motion.div
+                className="flex flex-col flex-1 min-h-0 space-y-4"
+                variants={fadeAnimation}
+                initial="initial"
+                animate="animate"
+            >
+                <motion.div
+                    className={`flex flex-col flex-1 min-h-0 group transition-all duration-200 ${collapsedSections.speech ? 'mb-0' : ''}`}
+                    layout
+                >
+                    <div className="flex items-center justify-between mb-2 cursor-pointer select-none">
+                        <div className="text-sm font-medium text-cyan-400 flex items-center gap-2 group-hover:text-cyan-300 transition-colors duration-150">
+                            <span className="flex items-center gap-1.5">
+                                {collapsedSections.speech ? (
+                                    <ChevronDown className="w-3.5 h-3.5" />
+                                ) : (
+                                    <ChevronUp className="w-3.5 h-3.5" />
+                                )}
+                                Speech Script
+                            </span>
+                            {hasScriptChanges && (
                                 <motion.div
-                                    className="flex items-center justify-between mb-2 cursor-pointer select-none"
-                                    onClick={() => setCollapsedSections(prev => ({ ...prev, knowledge: !prev.knowledge }))}
-                                    whileHover={{ opacity: 0.9 }}
-                                >
-                                    <div className="text-sm font-medium text-cyan-400 flex items-center gap-2 group-hover:text-cyan-300 transition-colors duration-150">
-                                        <span className="flex items-center gap-1.5">
-                                            {collapsedSections.knowledge ? (
-                                                <ChevronDown className="w-3.5 h-3.5" />
-                                            ) : (
-                                                <ChevronUp className="w-3.5 h-3.5" />
-                                            )}
-                                            AI Knowledge
-                                        </span>
-                                        {hasAgentChanges && (
-                                            <motion.div
-                                                className="w-1 h-1 rounded-full bg-cyan-500"
-                                                animate={{ opacity: [0.5, 1, 0.5] }}
-                                                transition={{ duration: 2, repeat: Infinity }}
-                                            />
-                                        )}
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <div className="flex items-center space-x-1 text-gray-400">
-                                            {renderHistoryControls('knowledge')}
-                                        </div>
-                                        <AnimatePresence>
-                                            {hasAgentChanges && (
-                                                <motion.button
-                                                    initial={{ opacity: 0, scale: 0.9 }}
-                                                    animate={{ opacity: 1, scale: 1 }}
-                                                    exit={{ opacity: 0, scale: 0.9 }}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleSaveAgent();
-                                                    }}
-                                                    disabled={isSavingAgent || aiEditState.isProcessing}
-                                                    className="px-2 py-0.5 text-xs rounded-md bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 disabled:opacity-50 transition-all duration-150 flex items-center gap-1"
-                                                    whileHover={{ scale: 1.05 }}
-                                                    whileTap={{ scale: 0.95 }}
-                                                >
-                                                    <Save className="w-3 h-3" />
-                                                    {isSavingAgent ? 'Saving...' : 'Save Changes'}
-                                                </motion.button>
-                                            )}
-                                        </AnimatePresence>
-                                    </div>
-                                </motion.div>
-                            </Tooltip.Trigger>
-                            <Tooltip.Portal>
-                                <Tooltip.Content
-                                    className="bg-gray-900 text-gray-300 text-xs px-2 py-1 rounded shadow-lg border border-gray-800"
-                                    sideOffset={5}
-                                >
-                                    Click to {collapsedSections.knowledge ? 'expand' : 'collapse'}
-                                    <Tooltip.Arrow className="fill-gray-900" />
-                                </Tooltip.Content>
-                            </Tooltip.Portal>
-                        </Tooltip.Root>
-
-                        <AnimatePresence>
-                            {!collapsedSections.knowledge && (
-                                <motion.div
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: 'auto' }}
-                                    exit={{ opacity: 0, height: 0 }}
-                                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                                >
-                                    <textarea
-                                        value={aiEditState.isProcessing && aiEditState.targets.knowledge ? aiEditState.agentStream : editedAgent}
-                                        onChange={(e) => handleContentChange(e.target.value, 'knowledge')}
-                                        className={`flex-1 w-full bg-gray-800/30 border border-gray-700/30 rounded-md p-3 
-                                            text-xs leading-relaxed text-gray-100 resize-none min-h-[300px] 
-                                            focus:outline-none focus:ring-1 focus:ring-cyan-500/30 
-                                            transition-all duration-200 
-                                            group-hover:border-gray-600/50
-                                            backdrop-blur-sm
-                                            ${aiEditState.isProcessing && aiEditState.targets.knowledge && !aiEditState.hasReceivedFirstToken ? generatingTextStyles : ''}`}
-                                        placeholder="Enter AI knowledge..."
-                                        disabled={aiEditState.isProcessing && aiEditState.targets.knowledge}
-                                    />
-                                </motion.div>
+                                    className="w-1 h-1 rounded-full bg-cyan-500"
+                                    animate={{ opacity: [0.5, 1, 0.5] }}
+                                    transition={{ duration: 2, repeat: Infinity }}
+                                />
                             )}
-                        </AnimatePresence>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-1 text-gray-400">
+                                {renderHistoryControls('script')}
+                            </div>
+                            <AnimatePresence>
+                                {hasScriptChanges && (
+                                    <motion.button
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.9 }}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleSaveScript();
+                                        }}
+                                        disabled={isSavingScript || aiEditState.isProcessing}
+                                        className="px-2 py-0.5 text-xs rounded-md bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 disabled:opacity-50 transition-all duration-150 flex items-center gap-1"
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                    >
+                                        <Save className="w-3 h-3" />
+                                        {isSavingScript ? 'Saving...' : 'Save Changes'}
+                                    </motion.button>
+                                )}
+                            </AnimatePresence>
+                        </div>
                     </div>
+
+                    <AnimatePresence>
+                        {!collapsedSections.speech && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                            >
+                                <textarea
+                                    value={aiEditState.isProcessing && aiEditState.targets.speech ? aiEditState.scriptStream : editedScript}
+                                    onChange={(e) => handleContentChange(e.target.value, 'speech')}
+                                    className={`flex-1 w-full bg-gray-800/30 border border-gray-700/30 rounded-md p-3 
+                                                text-xs leading-relaxed text-gray-100 resize-none min-h-[140px] 
+                                                focus:outline-none focus:ring-1 focus:ring-cyan-500/30 
+                                                transition-all duration-200 
+                                                group-hover:border-gray-600/50
+                                                ${aiEditState.isProcessing && aiEditState.targets.speech && !aiEditState.hasReceivedFirstToken ? generatingTextStyles : ''}`}
+                                    placeholder="Enter speech script..."
+                                    disabled={aiEditState.isProcessing && aiEditState.targets.speech}
+                                />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </motion.div>
+
+                <motion.div
+                    className={`flex flex-col flex-1 min-h-0 group transition-all duration-200 ${collapsedSections.knowledge ? 'mb-0' : ''}`}
+                    layout
+                >
+                    <div className="flex items-center justify-between mb-2 cursor-pointer select-none">
+                        <div className="text-sm font-medium text-cyan-400 flex items-center gap-2 group-hover:text-cyan-300 transition-colors duration-150">
+                            <span className="flex items-center gap-1.5">
+                                {collapsedSections.knowledge ? (
+                                    <ChevronDown className="w-3.5 h-3.5" />
+                                ) : (
+                                    <ChevronUp className="w-3.5 h-3.5" />
+                                )}
+                                AI Knowledge
+                            </span>
+                            {hasAgentChanges && (
+                                <motion.div
+                                    className="w-1 h-1 rounded-full bg-cyan-500"
+                                    animate={{ opacity: [0.5, 1, 0.5] }}
+                                    transition={{ duration: 2, repeat: Infinity }}
+                                />
+                            )}
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-1 text-gray-400">
+                                {renderHistoryControls('knowledge')}
+                            </div>
+                            <AnimatePresence>
+                                {hasAgentChanges && (
+                                    <motion.button
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.9 }}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleSaveAgent();
+                                        }}
+                                        disabled={isSavingAgent || aiEditState.isProcessing}
+                                        className="px-2 py-0.5 text-xs rounded-md bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 disabled:opacity-50 transition-all duration-150 flex items-center gap-1"
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                    >
+                                        <Save className="w-3 h-3" />
+                                        {isSavingAgent ? 'Saving...' : 'Save Changes'}
+                                    </motion.button>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    </div>
+
+                    <AnimatePresence>
+                        {!collapsedSections.knowledge && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                            >
+                                <textarea
+                                    value={aiEditState.isProcessing && aiEditState.targets.knowledge ? aiEditState.agentStream : editedAgent}
+                                    onChange={(e) => handleContentChange(e.target.value, 'knowledge')}
+                                    className={`flex-1 w-full bg-gray-800/30 border border-gray-700/30 rounded-md p-3 
+                                                text-xs leading-relaxed text-gray-100 resize-none min-h-[300px] 
+                                                focus:outline-none focus:ring-1 focus:ring-cyan-500/30 
+                                                transition-all duration-200 
+                                                group-hover:border-gray-600/50
+                                                ${aiEditState.isProcessing && aiEditState.targets.knowledge && !aiEditState.hasReceivedFirstToken ? generatingTextStyles : ''}`}
+                                    placeholder="Enter AI knowledge..."
+                                    disabled={aiEditState.isProcessing && aiEditState.targets.knowledge}
+                                />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </motion.div>
             </motion.div>
-        </Tooltip.Provider>
+        </motion.div>
     );
 }; 
