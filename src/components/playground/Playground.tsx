@@ -244,7 +244,7 @@ export default function Playground({
       if (!params.brdgeId) return;
 
       try {
-        const response = await fetch(`${params.coreApiUrl}/api/brdges/${params.brdgeId}/scripts`, {
+        const response = await fetch(`${params.coreApiUrl}/brdges/${params.brdgeId}/scripts`, {
           headers: {
             'Content-Type': 'application/json',
             // Add authorization header if token exists
@@ -658,7 +658,6 @@ export default function Playground({
                     if (roomState === ConnectionState.Connected) {
                       onConnect(false);
                     } else {
-                      setIsRightPanelCollapsed(true);
                       handleWalkthroughClick('view');
                     }
                   }}
@@ -1224,7 +1223,6 @@ export default function Playground({
                             if (roomState === ConnectionState.Connected) {
                               onConnect(false);
                             } else {
-                              setIsRightPanelCollapsed(true);
                               handleWalkthroughClick('view');
                             }
                           }}
@@ -1716,7 +1714,6 @@ export default function Playground({
                               if (roomState === ConnectionState.Connected) {
                                 onConnect(false);
                               } else {
-                                setIsRightPanelCollapsed(true);
                                 handleWalkthroughClick('edit');
                               }
                             }}
@@ -1856,7 +1853,6 @@ export default function Playground({
                       if (roomState === ConnectionState.Connected) {
                         onConnect(false);
                       } else {
-                        setIsRightPanelCollapsed(true);
                         handleWalkthroughClick('edit');
                       }
                     }}

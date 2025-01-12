@@ -181,6 +181,8 @@ export const SlideScriptPanel: React.FC<SlideScriptPanelProps> = ({
     const [activeTab, setActiveTab] = useState<TabType>('speech');
     const [editedScript, setEditedScript] = useState('');
     const [editedAgent, setEditedAgent] = useState('');
+    const [originalScript, setOriginalScript] = useState('');
+    const [originalAgent, setOriginalAgent] = useState('');
     const [hasScriptChanges, setHasScriptChanges] = useState(false);
     const [hasAgentChanges, setHasAgentChanges] = useState(false);
     const [isSavingScript, setIsSavingScript] = useState(false);
@@ -233,39 +235,51 @@ export const SlideScriptPanel: React.FC<SlideScriptPanelProps> = ({
         });
     }, [history]);
 
-    // First, update the initialization effect to ensure we have initial content in history
+    // Update the initialization effect to properly initialize history
     useEffect(() => {
         if (!scripts || !scripts[currentSlide]) return;
 
         const currentContent = scripts[currentSlide];
 
-        // Initialize history with current content
-        setHistory({
-            script: {
-                entries: [{
-                    content: currentContent.script || '',
-                    timestamp: new Date(),
-                    isSaved: true
-                }],
-                currentIndex: 0  // Start at index 0
-            },
-            knowledge: {
-                entries: [{
-                    content: currentContent.agent || '',
-                    timestamp: new Date(),
-                    isSaved: true
-                }],
-                currentIndex: 0  // Start at index 0
-            }
-        });
+        // Initialize script history
+        if (!history.script.entries.length) {
+            setHistory(prev => ({
+                ...prev,
+                script: {
+                    entries: [{
+                        content: currentContent.script || '',
+                        timestamp: new Date(),
+                        isSaved: true
+                    }],
+                    currentIndex: 0
+                }
+            }));
+        }
+
+        // Initialize knowledge history
+        if (!history.knowledge.entries.length) {
+            setHistory(prev => ({
+                ...prev,
+                knowledge: {
+                    entries: [{
+                        content: currentContent.agent || '',
+                        timestamp: new Date(),
+                        isSaved: true
+                    }],
+                    currentIndex: 0
+                }
+            }));
+        }
 
         setEditedScript(currentContent.script || '');
         setEditedAgent(currentContent.agent || '');
+        setOriginalScript(currentContent.script || '');
+        setOriginalAgent(currentContent.agent || '');
         setHasScriptChanges(false);
         setHasAgentChanges(false);
     }, [currentSlide, scripts]);
 
-    // 1. First define addToHistory
+    // Update the addToHistory function to handle each type independently
     const addToHistory = useCallback((content: string, type: 'script' | 'knowledge') => {
         setHistory(prev => {
             const typeHistory = prev[type];
@@ -275,38 +289,29 @@ export const SlideScriptPanel: React.FC<SlideScriptPanelProps> = ({
                 isSaved: false
             };
 
-            // Remove future entries if we're not at the latest point
-            const newEntries = [...typeHistory.entries.slice(0, typeHistory.currentIndex + 1), newEntry];
-
+            // Only update the specific type's history
             return {
                 ...prev,
                 [type]: {
-                    entries: newEntries,
-                    currentIndex: newEntries.length - 1
+                    entries: [...typeHistory.entries.slice(0, typeHistory.currentIndex + 1), newEntry],
+                    currentIndex: typeHistory.entries.length
                 }
             };
         });
-    }, []); // No dependencies needed since we're only using setHistory
+    }, []);
 
-    // 2. Then define handleContentChange using addToHistory
+    // Update handleContentChange to use addToHistory
     const handleContentChange = useCallback((content: string, type: TabType) => {
-        // Update the content
         if (type === 'speech') {
             setEditedScript(content);
-            setHasScriptChanges(true);
-            // Add to history only if content actually changed
-            if (content !== history.script.entries[history.script.currentIndex]?.content) {
-                addToHistory(content, 'script');
-            }
+            setHasScriptChanges(content !== originalScript);
+            addToHistory(content, 'script');
         } else {
             setEditedAgent(content);
-            setHasAgentChanges(true);
-            // Add to history only if content actually changed
-            if (content !== history.knowledge.entries[history.knowledge.currentIndex]?.content) {
-                addToHistory(content, 'knowledge');
-            }
+            setHasAgentChanges(content !== originalAgent);
+            addToHistory(content, 'knowledge');
         }
-    }, [addToHistory, history]);
+    }, [originalScript, originalAgent, addToHistory]);
 
     const handleSaveScript = useCallback(async () => {
         if (!brdgeId || !scripts || !hasScriptChanges) return;
@@ -315,59 +320,7 @@ export const SlideScriptPanel: React.FC<SlideScriptPanelProps> = ({
         try {
             const updatedScripts = {
                 [currentSlide]: {
-                    script: editedScript
-                }
-            };
-
-            const response = await api.put(`/brdges/${brdgeId}/scripts/update`, {
-                scripts: updatedScripts
-            });
-
-            if (response.data.scripts) {
-                // Mark current history entry as saved
-                setHistory(prev => {
-                    const newEntries = [...prev.script.entries];
-                    if (newEntries[prev.script.currentIndex]) {
-                        newEntries[prev.script.currentIndex] = {
-                            ...newEntries[prev.script.currentIndex],
-                            isSaved: true
-                        };
-                    }
-                    return {
-                        ...prev,
-                        script: {
-                            ...prev.script,
-                            entries: newEntries
-                        }
-                    };
-                });
-
-                // Update local scripts state
-                setScripts(prev => ({
-                    ...prev,
-                    [currentSlide]: {
-                        ...prev?.[currentSlide],
-                        script: editedScript
-                    }
-                }));
-
-                setHasScriptChanges(false);
-            }
-        } catch (error) {
-            console.error('Error updating script:', error);
-        } finally {
-            setIsSavingScript(false);
-        }
-    }, [brdgeId, scripts, currentSlide, editedScript, hasScriptChanges]);
-
-    const handleSaveAgent = useCallback(async () => {
-        if (!brdgeId || !scripts) return;
-
-        setIsSavingAgent(true);
-        try {
-            // Only send the agent field for the current slide
-            const updatedScripts = {
-                [currentSlide]: {
+                    script: editedScript,
                     agent: editedAgent
                 }
             };
@@ -377,43 +330,62 @@ export const SlideScriptPanel: React.FC<SlideScriptPanelProps> = ({
             });
 
             if (response.data.scripts) {
-                // Mark the current entry as saved
-                setHistory(prev => {
-                    const newEntries = [...prev.knowledge.entries];
-                    if (newEntries[prev.knowledge.currentIndex]) {
-                        newEntries[prev.knowledge.currentIndex] = {
-                            ...newEntries[prev.knowledge.currentIndex],
-                            isSaved: true
-                        };
-                    }
-                    return {
-                        ...prev,
-                        knowledge: {
-                            ...prev.knowledge,
-                            entries: newEntries
-                        }
-                    };
-                });
+                setOriginalScript(editedScript);
+                setHasScriptChanges(false);
 
-                // Update local scripts state without affecting script
-                setScripts(prev => ({
-                    ...prev,
+                onScriptsUpdate({
+                    ...scripts,
                     [currentSlide]: {
-                        ...prev?.[currentSlide],
+                        ...scripts[currentSlide],
+                        script: editedScript,
                         agent: editedAgent
                     }
-                }));
+                });
+            }
+        } catch (error) {
+            console.error('Error updating script:', error);
+        } finally {
+            setIsSavingScript(false);
+        }
+    }, [brdgeId, scripts, currentSlide, editedScript, editedAgent, hasScriptChanges, onScriptsUpdate]);
 
+    const handleSaveAgent = useCallback(async () => {
+        if (!brdgeId || !scripts || !hasAgentChanges) return;
+
+        setIsSavingAgent(true);
+        try {
+            const updatedScripts = {
+                [currentSlide]: {
+                    script: editedScript,
+                    agent: editedAgent
+                }
+            };
+
+            const response = await api.put(`/brdges/${brdgeId}/scripts/update`, {
+                scripts: updatedScripts
+            });
+
+            if (response.data.scripts) {
+                setOriginalAgent(editedAgent);
                 setHasAgentChanges(false);
+
+                onScriptsUpdate({
+                    ...scripts,
+                    [currentSlide]: {
+                        ...scripts[currentSlide],
+                        script: editedScript,
+                        agent: editedAgent
+                    }
+                });
             }
         } catch (error) {
             console.error('Error updating agent:', error);
         } finally {
             setIsSavingAgent(false);
         }
-    }, [brdgeId, scripts, currentSlide, editedAgent]);
+    }, [brdgeId, scripts, currentSlide, editedScript, editedAgent, hasAgentChanges, onScriptsUpdate]);
 
-    // Then simplify the AI edit handler to focus on history management
+    // Update the AI edit handler to properly replace content
     const handleAIEdit = useCallback(async (instruction: string) => {
         if (!brdgeId || !currentSlide || aiEditState.isProcessing || !instruction) return;
 
@@ -427,16 +399,12 @@ export const SlideScriptPanel: React.FC<SlideScriptPanelProps> = ({
         }));
 
         try {
-            // Get current content from either edited state or history
-            const currentScriptContent = editedScript || history.script.entries[history.script.currentIndex]?.content || '';
-            const currentAgentContent = editedAgent || history.knowledge.entries[history.knowledge.currentIndex]?.content || '';
-
             const params = new URLSearchParams({
                 slideNumber: currentSlide.toString(),
                 instruction: instruction,
                 currentContent: JSON.stringify({
-                    script: currentScriptContent,
-                    agent: currentAgentContent
+                    script: editedScript,
+                    agent: editedAgent
                 }),
                 editSpeech: aiEditState.targets.speech.toString(),
                 editKnowledge: aiEditState.targets.knowledge.toString()
@@ -447,53 +415,30 @@ export const SlideScriptPanel: React.FC<SlideScriptPanelProps> = ({
                 `${baseUrl}/api/brdges/${brdgeId}/scripts/ai-edit?${params.toString()}`
             );
 
+            // Initialize with empty strings since we want to replace content
+            let accumulatedScript = '';
+            let accumulatedAgent = '';
+
             eventSource.onmessage = (event) => {
                 if (event.data === '[DONE]') {
-                    setAIEditState(prev => {
-                        // If we have generated content, add it to history
-                        if (prev.targets.speech && prev.scriptStream) {
-                            setHistory(hist => ({
-                                ...hist,
-                                script: {
-                                    entries: [
-                                        ...hist.script.entries.slice(0, hist.script.currentIndex + 1),
-                                        {
-                                            content: prev.scriptStream,
-                                            timestamp: new Date(),
-                                            isSaved: false
-                                        }
-                                    ],
-                                    currentIndex: hist.script.currentIndex + 1
-                                }
-                            }));
-                            setEditedScript(prev.scriptStream);
-                            setHasScriptChanges(true);
-                        }
+                    // Only update the fields that were actually edited
+                    if (aiEditState.targets.speech) {
+                        const newScript = accumulatedScript.trim();
+                        setEditedScript(newScript);
+                        setHasScriptChanges(newScript !== originalScript);
+                    }
+                    if (aiEditState.targets.knowledge) {
+                        const newAgent = accumulatedAgent.trim();
+                        setEditedAgent(newAgent);
+                        setHasAgentChanges(newAgent !== originalAgent);
+                    }
 
-                        if (prev.targets.knowledge && prev.agentStream) {
-                            setHistory(hist => ({
-                                ...hist,
-                                knowledge: {
-                                    entries: [
-                                        ...hist.knowledge.entries.slice(0, hist.knowledge.currentIndex + 1),
-                                        {
-                                            content: prev.agentStream,
-                                            timestamp: new Date(),
-                                            isSaved: false
-                                        }
-                                    ],
-                                    currentIndex: hist.knowledge.currentIndex + 1
-                                }
-                            }));
-                            setEditedAgent(prev.agentStream);
-                            setHasAgentChanges(true);
-                        }
-
-                        return {
-                            ...prev,
-                            isProcessing: false
-                        };
-                    });
+                    setAIEditState(prev => ({
+                        ...prev,
+                        isProcessing: false,
+                        scriptStream: aiEditState.targets.speech ? accumulatedScript : '',
+                        agentStream: aiEditState.targets.knowledge ? accumulatedAgent : ''
+                    }));
 
                     eventSource.close();
                     return;
@@ -508,41 +453,30 @@ export const SlideScriptPanel: React.FC<SlideScriptPanelProps> = ({
                             ...prev,
                             isProcessing: false,
                             error: parsed.error,
-                            scriptStream: '',  // Reset on error
-                            agentStream: '',   // Reset on error
+                            scriptStream: '',
+                            agentStream: '',
                             hasReceivedFirstToken: false
                         }));
                         eventSource.close();
                         return;
                     }
 
-                    // Handle token-by-token updates
-                    if (parsed.type === 'script' && parsed.token) {
+                    // Update only the content that's being edited
+                    if (parsed.type === 'script' && parsed.token && aiEditState.targets.speech) {
+                        accumulatedScript = accumulatedScript + parsed.token;
                         setAIEditState(prev => ({
                             ...prev,
                             hasReceivedFirstToken: true,
-                            scriptStream: prev.scriptStream + parsed.token
+                            scriptStream: accumulatedScript
                         }));
-                    } else if (parsed.type === 'agent' && parsed.token) {
+                    } else if (parsed.type === 'agent' && parsed.token && aiEditState.targets.knowledge) {
+                        accumulatedAgent = accumulatedAgent + parsed.token;
                         setAIEditState(prev => ({
                             ...prev,
                             hasReceivedFirstToken: true,
-                            agentStream: prev.agentStream + parsed.token
+                            agentStream: accumulatedAgent
                         }));
                     }
-
-                    // Handle final content
-                    if (parsed.final) {
-                        if (parsed.final.script && aiEditState.targets.speech) {
-                            setEditedScript(parsed.final.script);
-                            setHasScriptChanges(true);
-                        }
-                        if (parsed.final.agent && aiEditState.targets.knowledge) {
-                            setEditedAgent(parsed.final.agent);
-                            setHasAgentChanges(true);
-                        }
-                    }
-
                 } catch (e) {
                     console.error('Error processing message:', e);
                 }
@@ -554,8 +488,8 @@ export const SlideScriptPanel: React.FC<SlideScriptPanelProps> = ({
                     ...prev,
                     isProcessing: false,
                     error: 'Connection error occurred',
-                    scriptStream: '',  // Reset on error
-                    agentStream: '',   // Reset on error
+                    scriptStream: '',
+                    agentStream: '',
                     hasReceivedFirstToken: false
                 }));
                 eventSource.close();
@@ -571,7 +505,15 @@ export const SlideScriptPanel: React.FC<SlideScriptPanelProps> = ({
                 error: 'Failed to process AI edit'
             }));
         }
-    }, [brdgeId, currentSlide, editedScript, editedAgent, aiEditState.targets, history]);
+    }, [brdgeId, currentSlide, editedScript, editedAgent, aiEditState.targets, originalScript, originalAgent]);
+
+    // Remove the effect that was causing double updates
+    useEffect(() => {
+        if (!aiEditState.isProcessing && aiEditState.hasReceivedFirstToken) {
+            // We don't need this effect anymore as we're handling updates in the stream
+            return;
+        }
+    }, [aiEditState.isProcessing, aiEditState.hasReceivedFirstToken]);
 
     // Update the textarea styles to make the generating text more prominent
     const generatingTextStyles = `
@@ -586,20 +528,6 @@ export const SlideScriptPanel: React.FC<SlideScriptPanelProps> = ({
         after:tracking-wide
         after:shadow-[0_0_10px_rgba(34,211,238,0.3)]
     `;
-
-    // Add effect to update edited content when streaming is complete
-    useEffect(() => {
-        if (!aiEditState.isProcessing && aiEditState.hasReceivedFirstToken) {
-            if (aiEditState.targets.speech && aiEditState.scriptStream) {
-                setEditedScript(aiEditState.scriptStream);
-                setHasScriptChanges(true);
-            }
-            if (aiEditState.targets.knowledge && aiEditState.agentStream) {
-                setEditedAgent(aiEditState.agentStream);
-                setHasAgentChanges(true);
-            }
-        }
-    }, [aiEditState.isProcessing, aiEditState.hasReceivedFirstToken]);
 
     // Update the textarea value based on streaming state
     const textareaValue = useMemo(() => {
@@ -818,7 +746,7 @@ export const SlideScriptPanel: React.FC<SlideScriptPanelProps> = ({
                                     <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
                                     <h3 className="text-sm font-medium text-cyan-400">AI Edit</h3>
                                 </div>
-                                <div className="flex gap-2">
+                                <div className="flex items-center gap-2">
                                     <button
                                         onClick={() => setAIEditState(prev => ({
                                             ...prev,
@@ -850,7 +778,7 @@ export const SlideScriptPanel: React.FC<SlideScriptPanelProps> = ({
                                     <input
                                         type="text"
                                         name="aiEdit"
-                                        placeholder="Type instructions like 'Make this longer' or 'Simplify'..."
+                                        placeholder="Instructions like 'Make this longer' or 'Simplify'..."
                                         className="flex-1 bg-gray-900/80 border border-gray-700/50 rounded-md p-2 text-xs text-gray-100 
                                             focus:outline-none focus:ring-1 focus:ring-cyan-500/30 
                                             placeholder:text-gray-500 placeholder:text-xs 
@@ -885,21 +813,12 @@ export const SlideScriptPanel: React.FC<SlideScriptPanelProps> = ({
                                                 </div>
                                             </motion.button>
                                         </Tooltip.Trigger>
-                                        <Tooltip.Portal>
-                                            <Tooltip.Content
-                                                className="bg-gray-900 text-gray-300 text-xs px-2 py-1 rounded shadow-lg border border-gray-800"
-                                                sideOffset={5}
-                                            >
-                                                Generate AI response
-                                                <Tooltip.Arrow className="fill-gray-900" />
-                                            </Tooltip.Content>
-                                        </Tooltip.Portal>
                                     </Tooltip.Root>
                                 </form>
                             </div>
                             <AnimatePresence>
                                 <motion.div
-                                    className="flex flex-wrap gap-1"
+                                    className="flex flex-wrap gap-1 mb-3"
                                     initial={{ opacity: 0, y: -5 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: 0.1 }}
@@ -924,6 +843,54 @@ export const SlideScriptPanel: React.FC<SlideScriptPanelProps> = ({
                                     ))}
                                 </motion.div>
                             </AnimatePresence>
+                            <Tooltip.Root>
+                                <Tooltip.Trigger asChild>
+                                    <motion.button
+                                        onClick={() => {
+                                            // TODO: Implement presentation functionality
+                                            console.log('Present This Slide clicked');
+                                        }}
+                                        className="text-[11px] rounded-md 
+                                            bg-cyan-500/10 text-cyan-400
+                                            border border-cyan-500/20
+                                            hover:bg-cyan-500/20
+                                            transition-all duration-300
+                                            flex items-center gap-1.5
+                                            px-2 py-1
+                                            group
+                                            relative
+                                            overflow-hidden
+                                            shadow-[0_0_15px_rgba(34,211,238,0.1)]
+                                            hover:shadow-[0_0_20px_rgba(34,211,238,0.2)]"
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                    >
+                                        <svg
+                                            className="w-3 h-3 transition-transform duration-300 group-hover:scale-110"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth={1.5}
+                                        >
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                        </svg>
+                                        Present This Slide
+                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-all duration-1000 ease-out" />
+                                    </motion.button>
+                                </Tooltip.Trigger>
+                                <Tooltip.Portal>
+                                    <Tooltip.Content
+                                        className="bg-gray-900 text-gray-300 text-xs px-3 py-2 rounded-lg shadow-lg border border-gray-800 max-w-[240px] z-[100]"
+                                        sideOffset={5}
+                                    >
+                                        <div className="space-y-1">
+                                            <p className="font-medium text-cyan-400">Quick Presentation Mode</p>
+                                            <p>Speak naturally about what's shown on this slide. Your presentation will be used to generate the script and AI knowledge.</p>
+                                        </div>
+                                        <Tooltip.Arrow className="fill-gray-900" />
+                                    </Tooltip.Content>
+                                </Tooltip.Portal>
+                            </Tooltip.Root>
                         </motion.div>
                     </motion.div>
                 )}
