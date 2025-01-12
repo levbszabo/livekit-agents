@@ -458,10 +458,12 @@ export default function Playground({
     // Implement sharing functionality
   }, []);
 
-  const handleScriptsGenerated = useCallback((newScripts: Record<string, any>) => {
-    setScripts(newScripts);
-    if (onScriptsGenerated) {
-      onScriptsGenerated(newScripts);
+  const handleScriptsGenerated = useCallback((newScripts?: Record<string, any>) => {
+    if (newScripts) {
+      setScripts(newScripts);
+      if (onScriptsGenerated) {
+        onScriptsGenerated(newScripts);
+      }
     }
 
     if (send && roomState === ConnectionState.Connected) {

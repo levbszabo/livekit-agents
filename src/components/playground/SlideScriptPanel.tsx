@@ -49,9 +49,9 @@ interface HistoryState {
 export interface SlideScriptPanelProps {
     currentSlide: number;
     scripts: any;
-    onScriptChange: (script: any) => void;
+    onScriptChange: (slideId: string, newScript: string) => void;
     onScriptsUpdate: (scripts: any) => void;
-    onScriptsGenerated: () => void;
+    onScriptsGenerated: (newScripts?: Record<string, any>) => void;
     brdgeId: string;
     isGenerating: boolean;
     onAIEdit: (fn: (instruction: string) => Promise<void>) => void;
