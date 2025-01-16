@@ -37,7 +37,6 @@ export interface PlaygroundProps {
   logo?: ReactNode;
   themeColors: string[];
   onConnect: (connect: boolean, opts?: { token: string; url: string }) => void;
-  onScriptsGenerated?: (scripts: Record<string, any>) => void;
 }
 
 const headerHeight = 56;
@@ -85,6 +84,12 @@ interface DataChannelMessage {
 interface ScriptContent {
   script: string;
   agent: string;
+}
+
+interface RecordingData {
+  url: string;
+  format: string;
+  duration: number;
 }
 
 const useIsMobile = () => {
@@ -205,143 +210,93 @@ export default function Playground({
   logo,
   themeColors,
   onConnect,
-  onScriptsGenerated
 }: PlaygroundProps) {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [configTab, setConfigTab] = useState<ConfigTab>('content');
   const isMobile = useIsMobile();
+  const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
+  const [selectedVoice, setSelectedVoice] = useState<string | null>(null);
+  const [isCreatingVoice, setIsCreatingVoice] = useState(false);
+  const [savedVoices, setSavedVoices] = useState<SavedVoice[]>([]);
 
+  // Existing state
   const [params, setParams] = useState({
     brdgeId: null as string | null,
-    numSlides: 0,
     apiBaseUrl: null as string | null,
     coreApiUrl: API_BASE_URL,
-    currentSlide: 1,
     userId: null as string | null
   });
 
+  // Video URL state and fetching
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+
+  const fetchVideoUrl = useCallback(async () => {
+    if (!params.brdgeId || !params.apiBaseUrl) return;
+
+    try {
+      const response = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/recordings/latest/signed-url`);
+      if (!response.ok) throw new Error('Failed to fetch video URL');
+
+      const { url } = await response.json();
+      setVideoUrl(url);
+    } catch (error) {
+      console.error('Error fetching video URL:', error);
+    }
+  }, [params.brdgeId, params.apiBaseUrl]);
+
+  useEffect(() => {
+    fetchVideoUrl();
+  }, [fetchVideoUrl]);
+
+  // Load saved voices on mount
+  useEffect(() => {
+    const loadVoices = async () => {
+      if (!params.brdgeId) return;
+      try {
+        const response = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/voices`);
+        if (!response.ok) throw new Error('Failed to fetch voices');
+
+        const data = await response.json();
+        if (data.voices) {
+          setSavedVoices(data.voices);
+          // Auto-select first voice if available and none selected
+          if (data.voices.length > 0 && !selectedVoice) {
+            setSelectedVoice(data.voices[0].id);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading voices:', error);
+      }
+    };
+
+    loadVoices();
+  }, [params.brdgeId, params.apiBaseUrl, selectedVoice]);
+
+  // LiveKit related hooks
+  const { localParticipant } = useLocalParticipant();
+  const voiceAssistant = useVoiceAssistant();
+  const roomState = useConnectionState();
+  const [transcripts, setTranscripts] = useState<ChatMessageType[]>([]);
+  const chat = useChat();
+
+  // Get URL params
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
       const token = urlParams.get('token');
       const newParams = {
         brdgeId: urlParams.get('brdgeId'),
-        numSlides: parseInt(urlParams.get('numSlides') || '0'),
         apiBaseUrl: urlParams.get('apiBaseUrl'),
         coreApiUrl: API_BASE_URL,
-        currentSlide: 1,
         userId: token ?
           jwtDecode<JWTPayload>(token).sub :
           `anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       };
-
       setParams(newParams);
     }
   }, []);
 
-  useEffect(() => {
-    const fetchScripts = async () => {
-      if (!params.brdgeId) return;
-
-      try {
-        const response = await fetch(`${params.coreApiUrl}/brdges/${params.brdgeId}/scripts`, {
-          headers: {
-            'Content-Type': 'application/json',
-            // Add authorization header if token exists
-            ...(localStorage.getItem('token') && {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            })
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch scripts: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        if (data.has_scripts) {
-          setScripts(data.scripts);
-          // Also update edited scripts to match current scripts
-          setEditedScripts(data.scripts);
-          // Reset changes flag
-          setHasScriptChanges(false);
-          // Call the callback if provided
-          if (onScriptsGenerated) {
-            onScriptsGenerated(data.scripts);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching scripts:', error);
-      }
-    };
-
-    fetchScripts();
-  }, [params.brdgeId, params.coreApiUrl, onScriptsGenerated]);
-
-  const { config, setUserSettings } = useConfig();
-  const { name } = useRoomInfo();
-  const { localParticipant } = useLocalParticipant();
-  const voiceAssistant = useVoiceAssistant();
-  const roomState = useConnectionState();
-  const [transcripts, setTranscripts] = useState<ChatMessageType[]>([]);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastSentSlide = useRef<number | null>(null);
-  const [brdgeMetadata, setBrdgeMetadata] = useState<BrdgeMetadata | null>(null);
-  const [showInfo, setShowInfo] = useState(true);
-  const [currentAgentType, setCurrentAgentType] = useState<AgentType>('edit');
-  const [selectedWalkthrough, setSelectedWalkthrough] = useState<number | null>(null);
-  const [scripts, setScripts] = useState<Record<string, ScriptContent> | null>(null);
-  const [isGeneratingScripts, setIsGeneratingScripts] = useState(false);
-  const [editedScripts, setEditedScripts] = useState<Record<string, ScriptContent>>({});
-  const [hasScriptChanges, setHasScriptChanges] = useState(false);
-  const [walkthroughs, setWalkthroughs] = useState<any[]>([]);
-  const [rightPanelView, setRightPanelView] = useState<'chat' | 'info'>('info');
-  const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [forceUpdate, setForceUpdate] = useState(0);
-  const [isConfigDrawerOpen, setIsConfigDrawerOpen] = useState(false);
-  const [mobileTab, setMobileTab] = useState<MobileTab>('chat');
-  const [isCloning, setIsCloning] = useState(false);
-  const [savedVoices, setSavedVoices] = useState<SavedVoice[]>([]);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const router = useRouter();
-  const walkthroughSelectorRef = useRef<WalkthroughSelectorRef>(null);
-  const [isEditPage, setIsEditPage] = useState(false);
-  const [handleAIEdit, setHandleAIEdit] = useState<((instruction: string) => Promise<void>) | null>(null);
-  const [isCreatingVoice, setIsCreatingVoice] = useState(false);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const urlParams = new URLSearchParams(window.location.search);
-      setIsEditPage(window.location.pathname.includes('/edit') || urlParams.get('agentType') === 'edit');
-    }
-  }, []);
-
-  useEffect(() => {
-    if (roomState === ConnectionState.Connected) {
-      setShowInfo(false);
-    } else {
-      setShowInfo(true);
-    }
-  }, [roomState]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const urlParams = new URLSearchParams(window.location.search);
-      const agentType = urlParams.get('agentType') as AgentType;
-      if (agentType && (agentType === 'edit' || agentType === 'view')) {
-        setCurrentAgentType(agentType);
-      }
-    }
-  }, []);
-
-  const chat = useChat();
-
+  // Handle chat messages
   const handleChatMessage = useCallback(async (message: string) => {
     if (!chat) return;
-
     try {
       await chat.send(message);
       setTranscripts(prev => [...prev, {
@@ -355,1546 +310,257 @@ export default function Playground({
     }
   }, [chat]);
 
-  const { send } = useDataChannel("slide_updates", (message: DataChannelMessage) => {
+  // Add these state variables at the top with other states
+  const [transcript, setTranscript] = useState<{
+    content: { transcript: string; segments: any[] };
+    status: string;
+    metadata: any;
+  } | null>(null);
+  const [isLoadingTranscript, setIsLoadingTranscript] = useState(false);
+
+  // Add this function to fetch the transcript
+  const fetchTranscript = useCallback(async () => {
+    if (!params.brdgeId || !params.apiBaseUrl) return;
+
+    setIsLoadingTranscript(true);
     try {
-      const decoded = JSON.parse(new TextDecoder().decode(message.payload));
-      if (decoded.type === "SCRIPTS_UPDATED") {
-        loadInitialScripts();
-      }
+      const response = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/script`);
+      if (!response.ok) throw new Error('Failed to fetch transcript');
+
+      const data = await response.json();
+      setTranscript(data);
     } catch (error) {
-      console.error("Error processing data channel message:", error);
-    }
-  });
-
-  const onDataReceived = useCallback((msg: any) => {
-    try {
-      if (msg.topic === "transcription") {
-        const decoded = JSON.parse(new TextDecoder().decode(msg.payload));
-        const timestamp = decoded.timestamp > 0 ? decoded.timestamp : Date.now();
-
-        setTranscripts(prev => [...prev, {
-          name: "You",
-          message: decoded.text,
-          timestamp: timestamp,
-          isSelf: true,
-        }]);
-      } else if (msg.topic === "chat") {
-        const decoded = JSON.parse(new TextDecoder().decode(msg.payload));
-        setTranscripts(prev => [...prev, {
-          name: "Assistant",
-          message: decoded.text,
-          timestamp: Date.now(),
-          isSelf: false,
-        }]);
-      } else if (msg.topic === "walkthrough_completed") {
-        console.log("Walkthrough completed, checking for new walkthrough...");
-        walkthroughSelectorRef.current?.checkForNewWalkthrough();
-      }
-    } catch (error) {
-      console.error("Error processing message:", error);
-    }
-  }, []);
-
-  useDataChannel(onDataReceived);
-
-  const handleWalkthroughClick = useCallback(async (agentType: AgentType = 'edit') => {
-    try {
-      setIsConnecting(true);
-      setCurrentAgentType(agentType);
-
-      if (roomState === ConnectionState.Connected) {
-        await onConnect(false);
-
-        // Wait a bit for the backend to process
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // Try to get the new walkthrough
-        await walkthroughSelectorRef.current?.checkForNewWalkthrough();
-      } else {
-        await onConnect(true);
-        if (agentType === 'edit') {
-          setCurrentStep(1);
-        }
-      }
-    } catch (error) {
-      console.error('Error in handleWalkthroughClick:', error);
+      console.error('Error fetching transcript:', error);
     } finally {
-      setIsConnecting(false);
+      setIsLoadingTranscript(false);
     }
-  }, [roomState, onConnect]);
+  }, [params.brdgeId, params.apiBaseUrl]);
 
-  const handleStartWalkthrough = useCallback(() => {
-    setCurrentStep(1);
-    handleWalkthroughClick('edit');
-  }, [handleWalkthroughClick]);
-
-  const handleGenerateScripts = useCallback(async () => {
-    if (!selectedWalkthrough) return;
-
-    setCurrentStep(2);
-    setIsGeneratingScripts(true);
-
-    try {
-      const response = await api.post(`/brdges/${params.brdgeId}/generate-slide-scripts`, {
-        walkthrough_id: selectedWalkthrough
-      });
-
-      if (response.data.scripts) {
-        setScripts(response.data.scripts);
-        if (onScriptsGenerated) {
-          onScriptsGenerated(response.data.scripts);
-        }
-        setCurrentStep(3);
-      }
-    } catch (error) {
-      console.error('Error generating scripts:', error);
-    } finally {
-      setIsGeneratingScripts(false);
-    }
-  }, [selectedWalkthrough, params.brdgeId, onScriptsGenerated]);
-
-  const handleShareBrdge = useCallback(() => {
-    setCurrentStep(4);
-    // Implement sharing functionality
-  }, []);
-
-  const handleScriptsGenerated = useCallback((newScripts?: Record<string, any>) => {
-    if (newScripts) {
-      setScripts(newScripts);
-      if (onScriptsGenerated) {
-        onScriptsGenerated(newScripts);
-      }
-    }
-
-    if (send && roomState === ConnectionState.Connected) {
-      try {
-        const message = {
-          type: "SCRIPTS_UPDATED",
-          brdgeId: params.brdgeId,
-          timestamp: Date.now()
-        };
-        send(new TextEncoder().encode(JSON.stringify(message)), { reliable: true });
-      } catch (error) {
-        console.error('Error sending script update:', error);
-      }
-    }
-  }, [send, roomState, params.brdgeId, onScriptsGenerated]);
-
-  const loadInitialScripts = useCallback(async () => {
-    if (!params.brdgeId) return;
-
-    try {
-      const response = await api.get(`/brdges/${params.brdgeId}/scripts`);
-      if (response.data.has_scripts) {
-        setScripts(response.data.scripts);
-      }
-    } catch (error) {
-      console.error('Error loading initial scripts:', error);
-    }
-  }, [params.brdgeId]);
-
+  // Add useEffect to fetch transcript when component mounts
   useEffect(() => {
-    loadInitialScripts();
-  }, [loadInitialScripts]);
-
-  const handleWalkthroughSelect = useCallback((walkthroughId: number) => {
-    setSelectedWalkthrough(walkthroughId);
-  }, []);
-
-  const sendSlideUpdate = useCallback(() => {
-    if (!params.brdgeId || roomState !== ConnectionState.Connected) {
-      return;
-    }
-
-    if (updateTimeoutRef.current) {
-      clearTimeout(updateTimeoutRef.current);
-    }
-
-    if (lastSentSlide.current !== params.currentSlide) {
-      updateTimeoutRef.current = setTimeout(() => {
-        try {
-          if (roomState === ConnectionState.Connected) {
-            const slideUrl = `${params.apiBaseUrl}/brdges/${params.brdgeId}/slides/${params.currentSlide}`;
-            const message = {
-              type: "SLIDE_UPDATE",
-              brdgeId: params.brdgeId,
-              numSlides: params.numSlides,
-              apiBaseUrl: params.apiBaseUrl,
-              currentSlide: params.currentSlide,
-              slideUrl: slideUrl,
-              agentType: currentAgentType,
-              userId: params.userId
-            };
-
-            const encoder = new TextEncoder();
-            const data = encoder.encode(JSON.stringify(message));
-            send(data, { reliable: true });
-            lastSentSlide.current = params.currentSlide;
-          }
-        } catch (e) {
-          console.error("Error sending slide update:", e);
-        }
-      }, 300);
-    }
-  }, [params, roomState, send, currentAgentType]);
-
-  useEffect(() => {
-    if (roomState === ConnectionState.Connected && params.brdgeId) {
-      lastSentSlide.current = null;
-      sendSlideUpdate();
-    }
-  }, [roomState, params.brdgeId, sendSlideUpdate]);
-
-  useEffect(() => {
-    return () => {
-      if (updateTimeoutRef.current) {
-        clearTimeout(updateTimeoutRef.current);
-      }
-      lastSentSlide.current = null;
-    };
-  }, [roomState]);
-
-  const handlePrevSlide = () => {
-    if (params.currentSlide > 1) {
-      setParams(prev => ({ ...prev, currentSlide: prev.currentSlide - 1 }));
-    }
-  };
-
-  const handleNextSlide = () => {
-    if (params.currentSlide < params.numSlides) {
-      setParams(prev => ({ ...prev, currentSlide: prev.currentSlide + 1 }));
-    }
-  };
-
-  const hasRequiredParams = useMemo(() => {
-    const valid = Boolean(params.brdgeId && params.numSlides > 0 && params.apiBaseUrl);
-    if (!valid) {
-      console.error('Missing required parameters:', params);
-    }
-    return valid;
-  }, [params]);
-
-  const handleScriptChange = useCallback((slideId: string, newScript: string) => {
-    setEditedScripts((prevScripts) => ({
-      ...prevScripts,
-      [slideId]: {
-        script: newScript,
-        agent: (prevScripts[slideId]?.agent || '')
-      }
-    }));
-    setHasScriptChanges(true);
-  }, []);
-
-  const updateScripts = useCallback((newScripts: Record<string, ScriptContent>) => {
-    setScripts(newScripts);
-    setEditedScripts({});
-    setHasScriptChanges(false);
-  }, []);
-
-  const saveScriptChanges = async () => {
-    try {
-      await api.put(`/brdges/${params.brdgeId}/scripts/update`, {
-        scripts: editedScripts,
-      });
-      setScripts(editedScripts);
-      setHasScriptChanges(false);
-    } catch (error) {
-      console.error('Error updating scripts:', error);
-    }
-  };
-
-  const slideTileContent = useMemo(() => {
-    if (!hasRequiredParams) {
-      return (
-        <div className="flex items-center justify-center text-gray-700 text-center w-full h-full">
-          <div className="flex flex-col items-center gap-4">
-            <div>Missing required parameters to display slides</div>
-            <div className="text-sm text-gray-500">
-              brdgeId: {params.brdgeId || 'missing'}<br />
-              numSlides: {params.numSlides || 'missing'}<br />
-              apiBaseUrl: {params.apiBaseUrl || 'missing'}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (roomState === ConnectionState.Disconnected) {
-      return (
-        <div className="flex items-center justify-center text-gray-700 text-center w-full h-full">
-          Connect to start the session
-        </div>
-      );
-    }
-
-    const slideUrl = `${params.apiBaseUrl}/brdges/${params.brdgeId}/slides/${params.currentSlide}`;
-
-    return (
-      <div className="flex flex-col w-full h-full">
-        <div className={`flex-1 relative bg-gray-900 flex items-center justify-center transition-all duration-300 ${isRightPanelCollapsed ? 'mr-0' : 'mr-[400px]'}`}>
-          <Image
-            key={slideUrl}
-            src={slideUrl}
-            alt={`Slide ${params.currentSlide}`}
-            className="max-w-full max-h-full object-contain"
-            priority={true}
-            width={1920}
-            height={1080}
-            onError={(e) => {
-              console.error('Error loading slide image:', slideUrl);
-              const target = e.target as HTMLImageElement;
-              target.onerror = null;
-              target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="50%" y="50%" text-anchor="middle" fill="gray">Error loading slide</text></svg>';
-            }}
-          />
-        </div>
-        <div className="p-4 bg-gray-900 border-t border-gray-800">
-          <div className="flex justify-between items-center">
-            <span className="text-gray-400 text-sm">
-              Slide {params.currentSlide} of {params.numSlides}
-            </span>
-            <div className="flex gap-3">
-              {scripts && (
-                <button
-                  onClick={() => {
-                    if (roomState === ConnectionState.Connected) {
-                      onConnect(false);
-                    } else {
-                      handleWalkthroughClick('view');
-                    }
-                  }}
-                  className={`
-                    ${isMobile ? 'p-1 scale-90' : 'p-2'} 
-                    rounded-lg transition-all duration-300
-                    ${roomState === ConnectionState.Connected
-                      ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 shadow-[0_0_15px_rgba(255,0,0,0.1)]'
-                      : `
-                        bg-cyan-500/20 text-cyan-400 
-                        hover:bg-cyan-500/30 
-                        shadow-[0_0_15px_rgba(0,255,255,0.1)]
-                        relative
-                        after:content-['']
-                        after:absolute after:inset-0
-                        after:rounded-lg
-                        after:bg-cyan-500/20
-                        after:animate-[glowPulse_2s_ease-in-out_infinite]
-                        after:-z-10
-                        after:transform
-                        after:origin-center
-                        hover:after:bg-cyan-500/30
-                        hover:shadow-[0_0_25px_rgba(0,255,255,0.2)]
-                        before:content-['']
-                        before:absolute before:inset-0
-                        before:rounded-lg
-                        before:bg-cyan-500/10
-                        before:animate-[glowPulse_2s_ease-in-out_infinite]
-                        before:-z-20
-                        before:transform
-                        before:scale-110
-                        before:origin-center
-                        before:blur-[8px]
-                        group
-                      `
-                    }
-                  `}
-                >
-                  {roomState === ConnectionState.Connected ? (
-                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M6 6h12v12H6z" />
-                    </svg>
-                  ) : (
-                    <svg
-                      className="w-5 h-5 relative z-10 transition-transform duration-300 group-hover:scale-110"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                    >
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                  )}
-                </button>
-              )}
-
-              <button
-                onClick={handlePrevSlide}
-                disabled={params.currentSlide === 1}
-                className="p-2 rounded-lg transition-all duration-300
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                  bg-gray-800/50 text-gray-400 
-                  hover:bg-gray-700 hover:text-cyan-400
-                  hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]
-                  transform hover:-translate-y-0.5
-                  disabled:hover:transform-none"
-              >
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
-                </svg>
-              </button>
-
-              <span className={`
-                ${isMobile ? 'text-xs' : 'text-sm'} 
-                font-medium text-gray-400 select-none
-              `}>
-                {params.currentSlide} / {params.numSlides}
-              </span>
-
-              <button
-                onClick={handleNextSlide}
-                disabled={params.currentSlide === params.numSlides}
-                className="p-2 rounded-lg transition-all duration-300
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                  bg-gray-800/50 text-gray-400 
-                  hover:bg-gray-700 hover:text-cyan-400
-                  hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]
-                  transform hover:-translate-y-0.5
-                  disabled:hover:transform-none"
-              >
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z" />
-                </svg>
-              </button>
-
-              <button
-                onClick={() => {
-                  if (roomState === ConnectionState.Connected) {
-                    localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
-                  }
-                }}
-                className={`p-2 rounded-lg transition-colors ${localParticipant?.isMicrophoneEnabled
-                  ? 'bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30'
-                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                  }`}
-                disabled={roomState !== ConnectionState.Connected}
-              >
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5z" />
-                  <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-        {/* No additional chat/transcription here; it's moved to the bottom panel only */}
-      </div>
-    );
-  }, [params, roomState, hasRequiredParams, scripts, handlePrevSlide, handleNextSlide, onConnect, handleWalkthroughClick, currentAgentType]);
-
-  useEffect(() => {
-    document.body.style.setProperty(
-      "--lk-theme-color",
-      // @ts-ignore
-      tailwindTheme.colors[config.settings.theme_color]["500"]
-    );
-    document.body.style.setProperty(
-      "--lk-drop-shadow",
-      `var(--lk-theme-color) 0px 0px 18px`
-    );
-  }, [config.settings.theme_color]);
-
-  const audioTileContent = useMemo(() => {
-    const disconnectedContent = (
-      <div className="flex flex-col items-center justify-center gap-2 text-gray-700 text-center w-full">
-        No audio track. Connect to get started.
-      </div>
-    );
-
-    const waitingContent = (
-      <div className="flex flex-col items-center gap-2 text-gray-700 text-center w-full">
-        <LoadingSVG />
-        Waiting for audio track
-      </div>
-    );
-
-    const visualizerContent = (
-      <div
-        className={`flex items-center justify-center w-full h-48 [--lk-va-bar-width:30px] [--lk-va-bar-gap:20px] [--lk-fg:var(--lk-theme-color)]`}
-      >
-        <BarVisualizer
-          state={voiceAssistant.state}
-          trackRef={voiceAssistant.audioTrack}
-          barCount={5}
-          options={{ minHeight: 20 }}
-        />
-      </div>
-    );
-
-    if (roomState === ConnectionState.Disconnected) {
-      return disconnectedContent;
-    }
-
-    if (!voiceAssistant.audioTrack) {
-      return waitingContent;
-    }
-
-    return visualizerContent;
-  }, [
-    voiceAssistant.audioTrack,
-    config.settings.theme_color,
-    roomState,
-    voiceAssistant.state,
-  ]);
-
-  const settingsTileContent = useMemo(() => {
-    return (
-      <div className="flex flex-col gap-4 h-full w-full items-start overflow-y-auto">
-        {config.description && (
-          <ConfigurationPanelItem title="Description">
-            {config.description}
-          </ConfigurationPanelItem>
-        )}
-
-        <ConfigurationPanelItem title="Settings">
-          {localParticipant && (
-            <div className="flex flex-col gap-2">
-              <NameValueRow
-                name="Room"
-                value={name}
-                valueColor={`${config.settings.theme_color}-500`}
-              />
-              <NameValueRow
-                name="Participant"
-                value={localParticipant.identity}
-              />
-            </div>
-          )}
-        </ConfigurationPanelItem>
-        <ConfigurationPanelItem title="Status">
-          <div className="flex flex-col gap-2">
-            <NameValueRow
-              name="Room connected"
-              value={
-                roomState === ConnectionState.Connecting ? (
-                  <LoadingSVG diameter={16} strokeWidth={2} />
-                ) : (
-                  roomState.toUpperCase()
-                )
-              }
-              valueColor={
-                roomState === ConnectionState.Connected
-                  ? `${config.settings.theme_color}-500`
-                  : "gray-500"
-              }
-            />
-            <NameValueRow
-              name="Microphone"
-              value={localParticipant?.isMicrophoneEnabled ? "ENABLED" : "DISABLED"}
-              valueColor={
-                localParticipant?.isMicrophoneEnabled
-                  ? `${config.settings.theme_color}-500`
-                  : "gray-500"
-              }
-            />
-          </div>
-        </ConfigurationPanelItem>
-        <div className="w-full">
-          <ConfigurationPanelItem title="Color">
-            <ColorPicker
-              colors={themeColors}
-              selectedColor={config.settings.theme_color}
-              onSelect={(color) => {
-                const userSettings = { ...config.settings };
-                userSettings.theme_color = color;
-                setUserSettings(userSettings);
-              }}
-            />
-          </ConfigurationPanelItem>
-        </div>
-      </div>
-    );
-  }, [
-    config.description,
-    config.settings.theme_color,
-    localParticipant,
-    name,
-    roomState,
-    themeColors,
-    setUserSettings,
-  ]);
-
-  const THEME = {
-    primary: 'cyan',
-    bgDark: 'gray-900',
-    bgLight: 'gray-50',
-    text: 'gray-100',
-  };
-
-  useEffect(() => {
-    if (roomState === ConnectionState.Connected && localParticipant) {
-      localParticipant.setMicrophoneEnabled(true);
-    }
-  }, [roomState, localParticipant]);
-
-  const getSlideUrl = useCallback((): string => {
-    if (!params.apiBaseUrl || !params.brdgeId || !params.currentSlide) {
-      return '';
-    }
-    return `${params.apiBaseUrl}/brdges/${params.brdgeId}/slides/${params.currentSlide}`;
-  }, [params.apiBaseUrl, params.brdgeId, params.currentSlide]);
-
-  useEffect(() => {
-    const fetchBrdgeMetadata = async () => {
-      if (!params.brdgeId || !params.apiBaseUrl) return;
-
-      try {
-        const response = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}`);
-        if (!response.ok) throw new Error('Failed to fetch Brdge metadata');
-
-        const data = await response.json();
-        setBrdgeMetadata({
-          id: params.brdgeId,
-          name: data.name || params.brdgeId,
-          numSlides: params.numSlides
-        });
-      } catch (error) {
-        console.error('Error fetching Brdge metadata:', error);
-        setBrdgeMetadata({
-          id: params.brdgeId!,
-          name: params.brdgeId!,
-          numSlides: params.numSlides
-        });
-      }
-    };
-
-    fetchBrdgeMetadata();
-  }, [params.brdgeId, params.apiBaseUrl, params.numSlides]);
-
-  useEffect(() => {
-    const checkExistingScripts = async () => {
-      if (!params.brdgeId) return;
-
-      try {
-        const response = await api.get(`/brdges/${params.brdgeId}/scripts`);
-        if (response.data.has_scripts) {
-          setScripts(response.data.scripts);
-          setEditedScripts(response.data.scripts);
-
-          const walkthrough_id = parseInt(response.data.metadata.source_walkthrough_id);
-          if (walkthrough_id) {
-            setSelectedWalkthrough(walkthrough_id);
-          }
-        }
-      } catch (error) {
-        console.error('Error checking for existing scripts:', error);
-      }
-    };
-
-    checkExistingScripts();
-  }, [params.brdgeId]);
-
-  const renderRightPanelContent = () => {
-    return (
-      <div className="flex-1 overflow-hidden">
-        <div className={`h-full ${rightPanelView === 'info' ? 'block' : 'hidden'}`}>
-          <InfoPanel
-            walkthroughCount={walkthroughs.length}
-            agentType={currentAgentType}
-            brdgeId={params.brdgeId!}
-            scripts={scripts}
-            isGenerating={isGeneratingScripts}
-          />
-        </div>
-      </div>
-    );
-  };
-
-  // Add voice-related state
-  const [selectedVoice, setSelectedVoice] = useState<string | null>(null);
-  const [voiceName, setVoiceName] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
-  const [currentRecording, setCurrentRecording] = useState<Blob | null>(null);
-
-  // Add voice-related handlers
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          setCurrentRecording(new Blob([e.data], { type: 'audio/wav' }));
-        }
-      };
-
-      mediaRecorder.start();
-      setIsRecording(true);
-      timerRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
-      }, 1000);
-    } catch (err) {
-      console.error('Error accessing microphone:', err);
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
-      setIsRecording(false);
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        setRecordingTime(0);
-      }
-
-      // Refresh the page by re-navigating to current URL
-      router.replace(router.asPath);
-    }
-  };
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const handleCloneVoice = async () => {
-    if (!currentRecording || !voiceName || !params.brdgeId) return;
-    setIsCloning(true);
-    try {
-      const formData = new FormData();
-      formData.append('audio', currentRecording);
-      formData.append('name', voiceName);
-
-      const response = await api.post(`/brdges/${params.brdgeId}/voice/clone`, formData);
-
-      // Refresh voice list
-      const voicesResponse = await api.get(`/brdges/${params.brdgeId}/voices`);
-      if (voicesResponse.data?.voices) {
-        setSavedVoices(voicesResponse.data.voices);
-        if (response.data?.voice?.id) {
-          setSelectedVoice(response.data.voice.id);
-          setIsCreatingVoice(false);
-        }
-      }
-
-      // Reset recording state
-      setCurrentRecording(null);
-      setVoiceName('');
-    } catch (error) {
-      console.error('Error cloning voice:', error);
-    } finally {
-      setIsCloning(false);
-    }
-  };
-
-  // Load saved voices on mount
-  useEffect(() => {
-    const loadVoices = async () => {
-      if (!params.brdgeId) return;
-      try {
-        const response = await api.get(`/brdges/${params.brdgeId}/voices`);
-        if (response.data?.voices) {
-          const voices = response.data.voices;
-          setSavedVoices(voices);
-          console.log('Loaded voices:', voices);
-
-          // Only auto-select if we're not in creation mode and no voice is selected
-          if (voices.length > 0 && !selectedVoice && !isCreatingVoice) {
-            setSelectedVoice(voices[0].id);
-          }
-        }
-      } catch (error) {
-        console.error('Error loading voices:', error);
-      }
-    };
-
-    loadVoices();
-  }, [params.brdgeId]);
-
-  // Move renderChatMessage inside the component
-  const renderChatMessage = useCallback((message: ChatMessageType) => (
-    <div
-      className={`
-        ${message.isSelf ? 'ml-auto bg-cyan-950/30' : 'mr-auto bg-gray-800/30'} 
-        max-w-[70%] rounded-2xl p-4 
-        backdrop-blur-sm
-        border border-gray-700/50
-        transition-all duration-300
-        hover:border-cyan-500/30
-        animate-[fadeIn_0.3s_ease-out]
-        shadow-lg hover:shadow-[0_0_20px_rgba(0,255,255,0.1)]
-        group
-      `}
-    >
-      <div
-        className={`
-          text-sm leading-relaxed
-          ${message.isSelf
-            ? 'text-cyan-300 group-hover:text-cyan-200'
-            : 'text-gray-300 group-hover:text-cyan-100'
-          }
-          ${!message.isSelf && 'animate-[glow_2s_ease-in-out_infinite]'}
-          transition-all duration-300
-        `}
-        style={{
-          textShadow: message.isSelf
-            ? '0 0 10px rgba(34,211,238,0.3)'
-            : '0 0 15px rgba(34,211,238,0.2)'
-        }}
-      >
-        {message.message}
-      </div>
-    </div>
-  ), []);
+    fetchTranscript();
+  }, [fetchTranscript]);
 
   return (
-    <div key={refreshKey} className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
-      {/* Minimal Header with glow effect */}
-      <div className={`
-        flex-shrink-0 
-        ${isMobile ? 'h-[36px]' : 'h-[48px]'} 
-        border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm 
-        flex items-center 
-        ${isMobile ? 'px-3' : 'px-6'}
-      `}>
-        <h1 className={`
-          ${isMobile ? 'text-base' : 'text-lg'} 
-          font-medium text-cyan-400 transition-all duration-300 
-          hover:text-cyan-300 hover:shadow-[0_0_10px_rgba(0,255,255,0.3)]
-        `}>
-          {brdgeMetadata?.name || params.brdgeId || 'Loading...'}
-        </h1>
-      </div>
-
-      {/* Main Content Area with Resizable Panels */}
-      <div className="flex-1 flex overflow-hidden transition-all duration-300">
-        <PanelGroup direction="horizontal">
-          <div className={`
+    <div className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
+      <div className="flex-1 flex overflow-hidden">
+        {/* Main Content */}
+        <div className={`
             flex-1 transition-all duration-300
-            ${!isMobile && isEditPage ? (isRightPanelCollapsed ? 'mr-0' : 'mr-[400px]') : 'mr-0'}
+          ${!isMobile ? (isRightPanelCollapsed ? 'mr-0' : 'mr-[400px]') : 'mr-0'}
           `}>
-            <PanelGroup direction="vertical">
-              {/* Slides Area */}
-              <Panel
-                defaultSize={isMobile ? 85 : isRightPanelCollapsed ? 85 : 70}
-                minSize={isMobile ? 70 : 30}
-              >
-                <div className="h-full w-full overflow-hidden bg-black">
-                  <div className="h-full w-full flex items-center justify-center p-0">
-                    {getSlideUrl() ? (
-                      <div className="relative w-full h-full flex items-center justify-center">
-                        <Image
-                          key={getSlideUrl()}
-                          src={getSlideUrl()}
-                          alt={`Slide ${params.currentSlide}`}
-                          className="max-w-full max-h-full object-contain"
-                          priority={true}
-                          width={1920}
-                          height={1080}
-                          onError={(e) => {
-                            console.error('Error loading slide image:', getSlideUrl());
-                            const target = e.target as HTMLImageElement;
-                            target.onerror = null;
-                            target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="50%" y="50%" text-anchor="middle" fill="gray">Error loading slide</text></svg>';
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="text-gray-500">No slide available</div>
-                    )}
+          <PanelGroup direction="vertical">
+            {/* Video Panel */}
+            <Panel defaultSize={70}>
+              <div className="h-full w-full overflow-hidden bg-black">
+                <video
+                  src={videoUrl || ''}
+                  className="w-full h-full object-contain"
+                  controls
+                  autoPlay={false}
+                  playsInline
+                />
+              </div>
+            </Panel>
+
+            <PanelResizeHandle className={resizeHandleStyles.horizontal}>
+              <div className="w-8 h-0.5 bg-gray-700 group-hover:bg-cyan-500 transition-colors duration-150" />
+            </PanelResizeHandle>
+
+            {/* Chat Panel */}
+            <Panel defaultSize={30}>
+              <div className="h-full flex flex-col bg-gray-900/50 backdrop-blur-md">
+                {/* Chat controls */}
+                <div className="border-b border-gray-800 p-2">
+                  <div className="flex items-center gap-3">
+                    {/* LiveKit connection button */}
+                    <button
+                      onClick={() => {
+                        if (roomState === ConnectionState.Connected) {
+                          onConnect(false);
+                        } else {
+                          onConnect(true);
+                        }
+                      }}
+                      className={`p-2 rounded-lg transition-colors
+                            ${roomState === ConnectionState.Connected
+                          ? 'bg-red-500/20 text-red-400'
+                          : 'bg-cyan-500/20 text-cyan-400'
+                        }`}
+                    >
+                      {roomState === ConnectionState.Connected ? 'Disconnect' : 'Connect'}
+                    </button>
+
+                    {/* Mic toggle */}
+                    <button
+                      onClick={() => {
+                        if (roomState === ConnectionState.Connected) {
+                          localParticipant?.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
+                        }
+                      }}
+                      disabled={roomState !== ConnectionState.Connected}
+                      className={`p-2 rounded-lg transition-colors
+                        ${localParticipant?.isMicrophoneEnabled
+                          ? 'bg-cyan-500/20 text-cyan-300'
+                          : 'bg-gray-800 text-gray-400'
+                        }`}
+                    >
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
-              </Panel>
 
-              <PanelResizeHandle
-                className={`${isMobile ? 'hidden' : ''} ${resizeHandleStyles.horizontal}`}
-              >
-                <div className="w-8 h-0.5 bg-gray-700 group-hover:bg-cyan-500 transition-colors duration-150" />
-              </PanelResizeHandle>
-
-              {/* Bottom Chat Panel */}
-              <Panel
-                defaultSize={isMobile ? 15 : isRightPanelCollapsed ? 15 : 30}
-                minSize={isMobile ? 8 : 15}
-              >
-                <div className="h-full flex flex-col bg-gray-900/50 backdrop-blur-md overflow-x-hidden">
-                  {/* Controls */}
-                  <div className={`
-                    border-b border-gray-800 bg-gray-900/80 backdrop-blur-md
-                    ${isMobile ? 'sticky top-0 z-10 py-0' : ''}
-                  `}>
-                    <div className={`
-                      ${isMobile ? 'px-0.5 py-0.5' : 'px-4 py-2'} 
-                      flex items-center justify-between
-                      ${isMobile ? 'gap-0.5' : 'gap-2'}
-                    `}>
-                      <div className="flex items-center gap-3">
-                        {/* Play/Stop Button */}
-                        <button
-                          onClick={() => {
-                            if (roomState === ConnectionState.Connected) {
-                              onConnect(false);
-                            } else {
-                              handleWalkthroughClick('view');
-                            }
-                          }}
-                          className={`
-                            ${isMobile ? 'p-1 scale-90' : 'p-2'} 
-                            rounded-lg transition-all duration-300
-                            ${roomState === ConnectionState.Connected
-                              ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 shadow-[0_0_15px_rgba(255,0,0,0.1)]'
-                              : `
-                                bg-cyan-500/20 text-cyan-400 
-                                hover:bg-cyan-500/30 
-                                shadow-[0_0_15px_rgba(0,255,255,0.1)]
-                                relative
-                                after:content-['']
-                                after:absolute after:inset-0
-                                after:rounded-lg
-                                after:bg-cyan-500/20
-                                after:animate-[glowPulse_2s_ease-in-out_infinite]
-                                after:-z-10
-                                after:transform
-                                after:origin-center
-                                hover:after:bg-cyan-500/30
-                                hover:shadow-[0_0_25px_rgba(0,255,255,0.2)]
-                                before:content-['']
-                                before:absolute before:inset-0
-                                before:rounded-lg
-                                before:bg-cyan-500/10
-                                before:animate-[glowPulse_2s_ease-in-out_infinite]
-                                before:-z-20
-                                before:transform
-                                before:scale-110
-                                before:origin-center
-                                before:blur-[8px]
-                                group
-                              `
-                            }
-                          `}
-                        >
-                          {roomState === ConnectionState.Connected ? (
-                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M6 6h12v12H6z" />
-                            </svg>
-                          ) : (
-                            <svg
-                              className="w-5 h-5 relative z-10 transition-transform duration-300 group-hover:scale-110"
-                              viewBox="0 0 24 24"
-                              fill="currentColor"
-                            >
-                              <path d="M8 5v14l11-7z" />
-                            </svg>
-                          )}
-                        </button>
-
-                        {/* Slide Navigation - Moved here */}
-                        <button
-                          onClick={handlePrevSlide}
-                          disabled={params.currentSlide === 1}
-                          className="p-2 rounded-lg transition-all duration-300
-                            disabled:opacity-50 disabled:cursor-not-allowed
-                            bg-gray-800/50 text-gray-400 
-                            hover:bg-gray-700 hover:text-cyan-400
-                            hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]
-                            transform hover:-translate-y-0.5
-                            disabled:hover:transform-none"
-                        >
-                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
-                          </svg>
-                        </button>
-
-                        <span className={`
-                          ${isMobile ? 'text-xs' : 'text-sm'} 
-                          font-medium text-gray-400 select-none
-                        `}>
-                          {params.currentSlide} / {params.numSlides}
-                        </span>
-
-                        <button
-                          onClick={handleNextSlide}
-                          disabled={params.currentSlide === params.numSlides}
-                          className="p-2 rounded-lg transition-all duration-300
-                            disabled:opacity-50 disabled:cursor-not-allowed
-                            bg-gray-800/50 text-gray-400 
-                            hover:bg-gray-700 hover:text-cyan-400
-                            hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]
-                            transform hover:-translate-y-0.5
-                            disabled:hover:transform-none"
-                        >
-                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z" />
-                          </svg>
-                        </button>
-
-                        {/* Mic Toggle */}
-                        <button
-                          onClick={() => {
-                            if (roomState === ConnectionState.Connected) {
-                              localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
-                            }
-                          }}
-                          className={`p-2 rounded-lg transition-colors ${localParticipant?.isMicrophoneEnabled
-                            ? 'bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30'
-                            : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                            }`}
-                          disabled={roomState !== ConnectionState.Connected}
-                        >
-                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5z" />
-                            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Chat Messages and Transcription */}
-                  <div className={`
-                    flex-1 overflow-y-auto 
-                    ${isMobile ? 'p-0.5 pb-1' : 'p-2'}
-                  `}>
-                    {voiceAssistant?.audioTrack && (
-                      <div className={`
+                {/* Chat messages and transcription */}
+                <div className="flex-1 overflow-y-auto p-4">
+                  {voiceAssistant?.audioTrack && (
+                    <TranscriptionTile
+                      agentAudioTrack={voiceAssistant.audioTrack}
+                      accentColor="cyan"
+                    />
+                  )}
+                  {transcripts.map((message) => (
+                    <div
+                      key={message.timestamp}
+                      className={`
+                        ${message.isSelf ? 'ml-auto bg-cyan-950/30' : 'mr-auto bg-gray-800/30'} 
+                        max-w-[70%] rounded-2xl p-4 
+                        backdrop-blur-sm
+                        border border-gray-700/50
                         transition-all duration-300
                         hover:border-cyan-500/30
-                        shadow-[0_0_20px_rgba(0,255,255,0.05)]
-                        hover:shadow-[0_0_30px_rgba(0,255,255,0.1)]
-                        ${isMobile ? 'mx-0.5 rounded-lg' : ''}
-                      `}>
-                        <TranscriptionTile
-                          agentAudioTrack={voiceAssistant.audioTrack}
-                          accentColor="cyan"
-                        />
+                        mb-4
+                      `}
+                    >
+                      <div className={`text-sm ${message.isSelf ? 'text-cyan-300' : 'text-gray-300'}`}>
+                        {message.message}
                       </div>
-                    )}
-                  </div>
-                </div>
-              </Panel>
-            </PanelGroup>
-          </div>
-
-          {/* Right Panel - Only show on desktop in edit mode */}
-          {!isMobile && isEditPage && (
-            <div className={`
-              fixed right-0 top-[48px] bottom-0 w-[400px] 
-              transition-all duration-300 ease-in-out
-              transform ${isRightPanelCollapsed ? 'translate-x-[400px]' : 'translate-x-0'}
-              bg-gray-900/50 backdrop-blur-md
-              border-l border-gray-800
-              z-30
-            `}>
-              {/* Collapse Toggle Button */}
-              <button
-                onClick={() => setIsRightPanelCollapsed(!isRightPanelCollapsed)}
-                className="absolute -left-8 top-1/2 transform -translate-y-1/2
-                  w-8 h-16 
-                  bg-gray-900/80 backdrop-blur-sm
-                  rounded-l-lg 
-                  flex items-center justify-center
-                  text-gray-400 
-                  transition-all duration-300
-                  border-t border-b border-l border-gray-800/50
-                  hover:border-cyan-500/30
-                  hover:text-cyan-400
-                  hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]
-                  group
-                  z-40
-                "
-              >
-                <div className="relative w-5 h-5">
-                  <div className={`
-                    absolute inset-0
-                    transition-all duration-300 ease-in-out
-                    transform ${isRightPanelCollapsed ? 'rotate-180' : ''}
-                    group-hover:scale-110
-                  `}>
-                    <svg
-                      className="w-full h-full"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={1.5}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M9 5l7 7-7 7"
-                      />
-                    </svg>
-                  </div>
-                  <div className="
-                    absolute inset-0 
-                    bg-cyan-500/0 
-                    group-hover:bg-cyan-500/10 
-                    rounded-full 
-                    transition-all duration-300
-                    blur-xl
-                    -z-10
-                  "/>
-                </div>
-              </button>
-
-              {/* Right Panel Content */}
-              <div className="h-full flex flex-col bg-gray-900/50 backdrop-blur-md overflow-x-hidden">
-                {/* Tab Navigation */}
-                <div className="flex border-b border-gray-800">
-                  {['Content', 'Voice', 'Workflow'].map((tab) => (
-                    <button
-                      key={tab}
-                      onClick={() => setConfigTab(tab.toLowerCase() as any)}
-                      className={`px-4 py-2 text-xs font-medium transition-colors ${configTab === tab.toLowerCase()
-                        ? 'bg-cyan-500/10 text-cyan-400 border-b-2 border-cyan-500'
-                        : 'text-gray-400 hover:text-gray-300 hover:bg-gray-800/50'
-                        }`}
-                      title={
-                        tab === 'Content'
-                          ? 'Manage presentation content and AI knowledge'
-                          : tab === 'Voice'
-                            ? 'Configure voice settings'
-                            : 'Recording workflow settings'
-                      }
-                    >
-                      {tab}
-                    </button>
+                    </div>
                   ))}
                 </div>
+              </div>
+            </Panel>
+          </PanelGroup>
+        </div>
 
-                {/* Tab Content */}
-                <div className="flex-1 overflow-y-auto">
-                  {/* Content Tab */}
-                  {configTab === 'content' && (
-                    <div className="relative">
-                      <SlideScriptPanel
-                        currentSlide={params.currentSlide}
-                        scripts={scripts}
-                        // @ts-ignore
-                        onScriptChange={handleScriptChange}
-                        onScriptsUpdate={updateScripts}
-                        onScriptsGenerated={handleScriptsGenerated}
-                        // @ts-ignore
-                        brdgeId={params.brdgeId}
-                        isGenerating={isGeneratingScripts}
-                        onAIEdit={(fn) => setHandleAIEdit(() => fn)}
-                        isEditPage={isEditPage}
-                        setScripts={setScripts}
-                        onConnect={onConnect}
-                      />
-                    </div>
-                  )}
+        {/* Right Panel - Voice Configuration */}
+        {!isMobile && (
+          <div className={`
+            fixed right-0 top-[48px] bottom-0 w-[400px] 
+            transition-all duration-300 ease-in-out
+            transform ${isRightPanelCollapsed ? 'translate-x-[400px]' : 'translate-x-0'}
+            bg-gray-900/50 backdrop-blur-md
+            border-l border-gray-800
+            z-30
+          `}>
+            {/* Collapse Toggle Button */}
+            <button
+              onClick={() => setIsRightPanelCollapsed(!isRightPanelCollapsed)}
+              className="absolute -left-8 top-1/2 transform -translate-y-1/2
+                w-8 h-16 
+                bg-gray-900/80 backdrop-blur-sm
+                rounded-l-lg 
+                flex items-center justify-center
+                text-gray-400 
+                transition-all duration-300
+                border-t border-b border-l border-gray-800/50
+                hover:border-cyan-500/30
+                hover:text-cyan-400
+                hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]
+                group
+              "
+            >
+              <div className={`
+                transform transition-transform duration-300
+                ${isRightPanelCollapsed ? 'rotate-180' : ''}
+              `}>
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            </button>
 
-                  {/* Voice Tab */}
-                  {configTab === 'voice' && (
-                    <div className="p-4 space-y-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-sm font-medium text-gray-300">Voice Setup</h3>
-                        {selectedVoice && (
-                          <button
-                            onClick={() => {
-                              setSelectedVoice(null);
-                              setIsCreatingVoice(true);
-                            }}
-                            className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
-                          >
-                            Create New Voice
-                          </button>
-                        )}
-                      </div>
+            {/* Panel Content */}
+            <div className="h-full p-4 overflow-y-auto space-y-4">
+              {/* Transcript Section */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium text-gray-300">Transcript</h3>
+                  <div className="text-xs text-gray-500">
+                    {transcript?.status === 'completed' ? 'Completed' :
+                      transcript?.status === 'pending' ? 'Processing...' :
+                        transcript?.status === 'failed' ? 'Failed' : 'Loading...'}
+                  </div>
+                </div>
 
-                      {/* Voice Selection */}
-                      {savedVoices.length > 0 && (
-                        <select
-                          className="w-full bg-gray-800/50 border border-gray-700 rounded-lg
+                {isLoadingTranscript ? (
+                  <div className="flex items-center justify-center h-20 text-gray-400">
+                    <div className="animate-spin w-5 h-5 border-2 border-cyan-500 border-t-transparent rounded-full" />
+                  </div>
+                ) : transcript?.content?.transcript ? (
+                  <div className="relative">
+                    <textarea
+                      value={transcript.content.transcript}
+                      readOnly
+                      className="w-full h-[400px] bg-gray-800/50 border border-gray-700 rounded-lg
+                        px-3 py-2 text-sm text-gray-300
+                        focus:ring-2 focus:ring-cyan-500 focus:border-transparent
+                        hover:border-cyan-500/50
+                        transition-all duration-300
+                        resize-none
+                      "
+                    />
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-gray-500 text-sm">
+                    No transcript available
+                  </div>
+                )}
+              </div>
+
+              {/* Voice Configuration Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium text-gray-300">Voice Setup</h3>
+                  <button
+                    onClick={() => setIsCreatingVoice(true)}
+                    className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+                  >
+                    Create New Voice
+                  </button>
+                </div>
+
+                {/* Voice Selection */}
+                {savedVoices.length > 0 && (
+                  <select
+                    value={selectedVoice || ''}
+                    onChange={(e) => setSelectedVoice(e.target.value)}
+                    className="w-full bg-gray-800/50 border border-gray-700 rounded-lg
                             px-3 py-2 text-xs text-gray-300
                             transition-all duration-300
                             focus:ring-2 focus:ring-cyan-500 focus:border-transparent
-                            hover:border-cyan-500/50
-                            hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]"
-                          value={selectedVoice || ''}
-                          onChange={(e) => setSelectedVoice(e.target.value)}
-                        >
-                          <option value="">Select a voice...</option>
-                          {savedVoices.map(voice => (
-                            <option key={voice.id} value={voice.id}>
-                              {voice.name}
-                            </option>
-                          ))}
-                        </select>
-                      )}
+                      hover:border-cyan-500/50"
+                  >
+                    <option value="">Select a voice...</option>
+                    {savedVoices.map(voice => (
+                      <option key={voice.id} value={voice.id}>{voice.name}</option>
+                    ))}
+                  </select>
+                )}
 
-                      {/* Voice Creation Section */}
-                      {(isCreatingVoice || !selectedVoice) && (
-                        <div className="space-y-3">
-                          <div className="bg-gray-800/30 rounded-lg p-3">
-                            <p className="text-xs text-gray-300 leading-relaxed mb-2">
-                              Create an AI voice clone with a short voice sample:
-                            </p>
-                            <ul className="space-y-1.5">
-                              {[
-                                'Record 10-20 seconds of clear speech',
-                                'Speak naturally at your normal pace',
-                                'Avoid background noise and echoes'
-                              ].map((tip, i) => (
-                                <li key={i} className="flex items-center gap-2 text-xs text-gray-400">
-                                  <span className="w-1 h-1 rounded-full bg-cyan-400/60" />
-                                  {tip}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-
-                          <div className="space-y-2">
-                            <input
-                              type="text"
-                              value={voiceName}
-                              onChange={(e) => setVoiceName(e.target.value)}
-                              placeholder="Enter voice name"
-                              className="w-full bg-gray-800/50 border border-gray-700 rounded-lg
-                                px-3 py-2 text-xs text-gray-300
-                                transition-all duration-300
-                                focus:ring-2 focus:ring-cyan-500 focus:border-transparent
-                                hover:border-cyan-500/50
-                                hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]"
-                            />
-
-                            <button
-                              onClick={isRecording ? stopRecording : startRecording}
-                              className={`
-                                w-full px-4 py-2 rounded-lg text-xs font-medium
-                                transition-all duration-300
-                                flex items-center justify-center gap-2
-                                ${isRecording
-                                  ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                                  : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
-                                }
-                                shadow-[0_0_15px_rgba(0,255,255,0.1)]
-                                hover:shadow-[0_0_20px_rgba(0,255,255,0.15)]
-                                transform hover:-translate-y-0.5
-                              `}
-                            >
-                              <span className={`
-                                w-1.5 h-1.5 rounded-full 
-                                ${isRecording
-                                  ? 'bg-red-500 animate-[pulse_1s_ease-in-out_infinite]'
-                                  : 'bg-cyan-500'
-                                }
-                              `} />
-                              {isRecording ? (
-                                <>Recording... {formatTime(recordingTime)}</>
-                              ) : (
-                                'Start Recording'
-                              )}
-                            </button>
-                          </div>
-
-                          {currentRecording && (
-                            <div className="space-y-2 pt-1">
-                              <div className="bg-gray-800/30 rounded-lg p-2">
-                                <audio
-                                  src={URL.createObjectURL(currentRecording)}
-                                  controls
-                                  className="w-full h-7"
-                                />
-                              </div>
-                              <button
-                                onClick={handleCloneVoice}
-                                disabled={!voiceName || isCloning}
-                                className={`
-                                  w-full px-4 py-2 rounded-lg text-xs font-medium
-                                  transition-all duration-300
-                                  transform hover:-translate-y-0.5
-                                  bg-cyan-500/20 text-cyan-400 
-                                  hover:bg-cyan-500/30 
-                                  shadow-[0_0_15px_rgba(0,255,255,0.1)]
-                                  hover:shadow-[0_0_20px_rgba(0,255,255,0.15)]
-                                  disabled:opacity-50 disabled:cursor-not-allowed
-                                  disabled:hover:transform-none
-                                `}
-                              >
-                                {isCloning ? (
-                                  <div className="flex items-center justify-center gap-2">
-                                    <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                    Creating Voice Clone...
-                                  </div>
-                                ) : (
-                                  'Create Voice Clone'
-                                )}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Selected Voice Details */}
-                      {selectedVoice && savedVoices.find(v => v.id === selectedVoice) && (
-                        <div className="bg-gray-800/30 rounded-lg p-3">
-                          {(() => {
-                            const voice = savedVoices.find(v => v.id === selectedVoice);
-                            return voice ? (
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between text-xs">
-                                  <span className="text-gray-400">Voice Name</span>
-                                  <span className="text-cyan-400 font-medium">{voice.name}</span>
-                                </div>
-                                <div className="flex items-center justify-between text-xs">
-                                  <span className="text-gray-400">Created</span>
-                                  <span className="text-cyan-400">
-                                    {new Date(voice.created_at).toLocaleDateString()}
-                                  </span>
-                                </div>
-                              </div>
-                            ) : null;
-                          })()}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Workflow Tab */}
-                  {configTab === 'workflow' && (
-                    <div className="p-4 space-y-6">
-                      {/* Getting Started Section */}
-                      <div className="space-y-4">
-                        <h3 className="text-[16px] font-semibold text-gray-200 tracking-tight">Recording Walkthrough</h3>
-
-                        <div className="relative px-4">
-                          <div className="absolute top-4 left-0 right-0 h-0.5 bg-gray-800" />
-                          <div className="relative z-10 flex justify-between">
-                            {[
-                              {
-                                step: 1,
-                                title: "Present",
-                                description: [
-                                  "Walk through your slides",
-                                  "Explain naturally",
-                                  "Take your time"
-                                ]
-                              },
-                              {
-                                step: 2,
-                                title: "Interact",
-                                description: [
-                                  "Answer AI questions",
-                                  "Provide context",
-                                  "Clarify details"
-                                ]
-                              },
-                              {
-                                step: 3,
-                                title: "Review",
-                                description: [
-                                  "Check accuracy",
-                                  "Verify content",
-                                  "Approve scripts"
-                                ]
-                              }
-                            ].map(({ step, title, description }) => (
-                              <div key={step} className="flex flex-col items-center w-1/3">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-3
-                                  ${step <= currentStep
-                                    ? 'bg-cyan-500/20 text-cyan-400'
-                                    : 'bg-gray-800 text-gray-500'
-                                  }`}>
-                                  {step}
-                                </div>
-                                <div className="text-center space-y-2">
-                                  <p className="text-sm font-medium text-gray-300">{title}</p>
-                                  <div className="space-y-1">
-                                    {description.map((text, idx) => (
-                                      <p key={idx} className="text-xs text-gray-400 font-light">{text}</p>
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Walkthrough Controls */}
-                      <div className="space-y-4">
-                        <WalkthroughSelector
-                          ref={walkthroughSelectorRef}
-                          brdgeId={params.brdgeId}
-                          apiBaseUrl={params.apiBaseUrl}
-                          selectedWalkthrough={selectedWalkthrough}
-                          onWalkthroughSelect={handleWalkthroughSelect}
-                          onWalkthroughsLoaded={(walkthroughs) => setWalkthroughs(walkthroughs)}
-                        />
-
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => {
-                              if (roomState === ConnectionState.Connected) {
-                                onConnect(false);
-                              } else {
-                                handleWalkthroughClick('edit');
-                              }
-                            }}
-                            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium 
-                              transition-colors flex items-center justify-center gap-2
-                              ${roomState === ConnectionState.Connected
-                                ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                                : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
-                              }`}
-                          >
-                            {roomState === ConnectionState.Connected ? (
-                              <>
-                                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                                Stop Walkthrough
-                              </>
-                            ) : (
-                              'Record Walkthrough'
-                            )}
-                          </button>
-                          <button
-                            onClick={handleGenerateScripts}
-                            disabled={!selectedWalkthrough || isGeneratingScripts}
-                            className="flex-1 px-3 py-2 bg-cyan-500/20 text-cyan-400
-                                rounded-lg text-sm font-medium hover:bg-cyan-500/30 transition-colors
-                                disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            {isGeneratingScripts ? 'Generating...' : 'Generate Scripts'}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </PanelGroup>
-      </div>
-
-      {isMobile && isEditPage && (
-        <button
-          onClick={() => setIsConfigDrawerOpen(true)}
-          className="fixed right-2 top-[40px] z-40 p-1.5 rounded-lg 
-            bg-gray-800/80 backdrop-blur-sm text-gray-400
-            hover:text-cyan-400 transition-colors
-            scale-90
-          "
-        >
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        </button>
-      )}
-
-      {isMobile && (
-        <MobileConfigDrawer
-          isOpen={isConfigDrawerOpen}
-          onClose={() => setIsConfigDrawerOpen(false)}
-          configTab={configTab}
-          setConfigTab={setConfigTab}
-        >
-          {configTab === 'content' && (
-            <div className="relative">
-              <SlideScriptPanel
-                currentSlide={params.currentSlide}
-                scripts={scripts}
-                // @ts-ignore
-                onScriptChange={handleScriptChange}
-                onScriptsUpdate={updateScripts}
-                onScriptsGenerated={handleScriptsGenerated}
-                // @ts-ignore
-                brdgeId={params.brdgeId}
-                isGenerating={isGeneratingScripts}
-                onAIEdit={(fn) => setHandleAIEdit(() => fn)}
-                isEditPage={isEditPage}
-                setScripts={setScripts}
-                onConnect={onConnect}
-              />
-            </div>
-          )}
-          {configTab === 'voice' && (
-            <div className="p-4 space-y-6">
-              <div className="space-y-4">
-                <select
-                  value={selectedVoice || ''}
-                  onChange={(e) => setSelectedVoice(e.target.value)}
-                  className="w-full bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-300
-                    transition-all duration-300
-                    focus:ring-2 focus:ring-cyan-500 focus:border-transparent
-                    hover:border-cyan-500/50
-                    hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]"
-                >
-                  <option value="">Select Voice</option>
-                  {savedVoices.map(voice => (
-                    <option key={voice.id} value={voice.id}>{voice.name}</option>
-                  ))}
-                </select>
-                {/* Voice configuration content stays in the right panel */}
-                {selectedVoice && savedVoices.find(v => v.id === selectedVoice) && (
-                  <div className="bg-gray-800/30 rounded-lg p-3">
-                    {(() => {
-                      const voice = savedVoices.find(v => v.id === selectedVoice);
-                      return voice ? (
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-gray-400">Voice Name</span>
-                            <span className="text-cyan-400 font-medium">{voice.name}</span>
-                          </div>
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-gray-400">Created</span>
-                            <span className="text-cyan-400">
-                              {new Date(voice.created_at).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-                      ) : null;
-                    })()}
+                {/* Voice Creation Form */}
+                {isCreatingVoice && (
+                  <div className="space-y-3">
+                    {/* ... existing voice creation form ... */}
                   </div>
                 )}
               </div>
             </div>
-          )}
-          {configTab === 'workflow' && (
-            <div className="p-4 space-y-6">
-              <div className="space-y-4">
-                <WalkthroughSelector
-                  ref={walkthroughSelectorRef}
-                  brdgeId={params.brdgeId}
-                  apiBaseUrl={params.apiBaseUrl}
-                  selectedWalkthrough={selectedWalkthrough}
-                  onWalkthroughSelect={handleWalkthroughSelect}
-                  onWalkthroughsLoaded={(walkthroughs) => setWalkthroughs(walkthroughs)}
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      if (roomState === ConnectionState.Connected) {
-                        onConnect(false);
-                      } else {
-                        handleWalkthroughClick('edit');
-                      }
-                    }}
-                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium 
-                      transition-colors flex items-center justify-center gap-2
-                      ${roomState === ConnectionState.Connected
-                        ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                        : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
-                      }`}
-                  >
-                    {roomState === ConnectionState.Connected ? (
-                      <>
-                        <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                        Stop Walkthrough
-                      </>
-                    ) : (
-                      'Record Walkthrough'
-                    )}
-                  </button>
-                  <button
-                    onClick={handleGenerateScripts}
-                    disabled={!selectedWalkthrough || isGeneratingScripts}
-                    className="flex-1 px-3 py-2 bg-cyan-500/20 text-cyan-400
-                        rounded-lg text-sm font-medium hover:bg-cyan-500/30 transition-colors
-                        disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isGeneratingScripts ? 'Generating...' : 'Generate Scripts'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </MobileConfigDrawer>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
