@@ -639,17 +639,45 @@ const VideoPlayer = ({
   onTimeUpdate: () => void;
   setDuration: (duration: number) => void;
 }) => {
+  const handleLoadedMetadata = () => {
+    if (videoRef.current) {
+      const videoDuration = videoRef.current.duration;
+      if (!isNaN(videoDuration)) {
+        setDuration(videoDuration);
+        setCurrentTime(videoRef.current.currentTime);
+      }
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    if (videoRef.current) {
+      const newTime = videoRef.current.currentTime;
+      if (!isNaN(newTime)) {
+        setCurrentTime(newTime);
+      }
+    }
+    onTimeUpdate();
+  };
+
+  const handleSeek = (time: number) => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = time;
+      setCurrentTime(time);
+    }
+  };
+
   return (
     <div className="relative w-full h-full bg-black">
       <video
         ref={videoRef}
         src={videoUrl || ''}
         className="absolute inset-0 w-full h-full object-cover"
-        onTimeUpdate={onTimeUpdate}
-        onLoadedMetadata={(e) => {
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={handleLoadedMetadata}
+        onDurationChange={handleLoadedMetadata}
+        onSeeked={() => {
           if (videoRef.current) {
             setCurrentTime(videoRef.current.currentTime);
-            setDuration(videoRef.current.duration);
           }
         }}
       />
@@ -1278,17 +1306,30 @@ export default function Playground({
 
                   {/* TimeAlignedTranscript */}
                   <div className="flex-1 overflow-y-auto bg-black/90">
-                    <TimeAlignedTranscript
-                      segments={transcript?.content?.segments || []}
-                      currentTime={currentTime}
-                      onTimeClick={(time) => {
-                        if (videoRef.current) {
-                          videoRef.current.currentTime = time;
-                          videoRef.current.play();
-                          setIsPlaying(true);
-                        }
-                      }}
-                    />
+                    {transcript?.content?.words && (
+                      <TimeAlignedTranscript
+                        segments={[
+                          {
+                            text: transcript.content.transcript || '',
+                            start: 0,
+                            end: transcript.content.words[transcript.content.words.length - 1]?.end || 0,
+                            words: transcript.content.words.map(word => ({
+                              word: word.punctuated_word || word.word,
+                              start: word.start,
+                              end: word.end,
+                              confidence: word.confidence || 1.0
+                            }))
+                          }
+                        ]}
+                        currentTime={currentTime}
+                        onTimeClick={(time) => {
+                          if (videoRef.current) {
+                            videoRef.current.currentTime = time;
+                            setCurrentTime(time);
+                          }
+                        }}
+                      />
+                    )}
                   </div>
                 </div>
 
