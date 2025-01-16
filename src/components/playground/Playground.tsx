@@ -32,6 +32,9 @@ import {
 } from 'react-resizable-panels';
 import { useRouter } from 'next/router';
 import { WalkthroughSelector, WalkthroughSelectorRef } from './WalkthroughSelector';
+import { TimeAlignedTranscript } from '@/components/transcript/TimeAlignedTranscript';
+import { Plus, FileText, X, Edit2, Save, ChevronDown, ChevronUp } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export interface PlaygroundProps {
   logo?: ReactNode;
@@ -73,7 +76,7 @@ interface SavedVoice {
 }
 
 type MobileTab = 'chat' | 'script' | 'voice' | 'info';
-type ConfigTab = 'content' | 'voice' | 'workflow';
+type ConfigTab = 'content' | 'ai-agent' | 'voice-clone';
 
 interface DataChannelMessage {
   payload: Uint8Array;
@@ -92,6 +95,17 @@ interface RecordingData {
   duration: number;
 }
 
+interface Brdge {
+  id: number;
+  name: string;
+  presentation_filename: string;
+  audio_filename: string;
+  folder: string;
+  user_id: number;
+  shareable: boolean;
+  public_id: string | null;
+}
+
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(false);
 
@@ -108,56 +122,160 @@ const useIsMobile = () => {
   return isMobile;
 };
 
-const componentStyles = {
-  button: `
-    relative overflow-hidden
-    px-6 py-3 rounded-xl font-medium
-    transition-all duration-300 ease-out
-    hover:scale-[1.02] active:scale-[0.98]
-    disabled:opacity-50 disabled:cursor-not-allowed
-    bg-gradient-to-r from-cyan-500 to-cyan-600
-    hover:from-cyan-400 hover:to-cyan-500
-    text-white shadow-lg shadow-cyan-500/20
-    hover:shadow-xl hover:shadow-cyan-500/30
-    disabled:hover:scale-100 disabled:hover:shadow-lg
-    transform hover:-translate-y-0.5
-  `,
-  tabButton: `
-    flex-1 px-4 py-3 text-sm font-medium
-    transition-all duration-300 ease-out
-    hover:bg-gray-800/50
-    border border-transparent
-    hover:border-cyan-500/30
-    hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]
-  `,
-  activeTab: `
-    bg-gradient-to-r from-cyan-500/20 to-cyan-400/20
-    border-b-2 border-cyan-500
+const styles = {
+  heading: `font-satoshi text-[20px] font-medium tracking-[-0.02em] text-white/90`,
+  subheading: `font-satoshi text-[16px] font-normal tracking-[-0.01em] text-white/80`,
+  sectionTitle: `font-satoshi text-[13px] font-medium tracking-[-0.01em] text-white/90`,
+  label: `font-satoshi text-[11px] font-normal tracking-wide text-gray-400/70`,
+  input: {
+    base: `
+      font-satoshi w-full
+      bg-[#1E1E1E]/50 backdrop-blur-sm
+      border border-gray-800/50 rounded-lg
+      px-3 py-2.5 text-[14px] leading-relaxed
+      text-cyan-400/90
+      transition-all duration-300
+      focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30
+      focus:shadow-[0_0_15px_rgba(34,211,238,0.1)]
+      hover:border-cyan-500/20
+      placeholder:text-gray-600/50
+    `,
+    textarea: `
+      min-h-[120px] resize-none
+      bg-transparent
+      border border-gray-800/50 rounded-lg
+      transition-all duration-300
+      focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30
+      focus:shadow-[0_0_15px_rgba(34,211,238,0.1)]
+      hover:border-cyan-500/20
+      scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-700/30
+      hover:scrollbar-thumb-cyan-500/20
+      text-shadow-[0_0_10px_rgba(34,211,238,0.3)]
+    `
+  },
+  button: {
+    primary: `
+      group
+      flex items-center gap-2
+      px-4 py-2 rounded-lg text-[13px]
+      bg-gradient-to-r from-cyan-500/10 to-cyan-400/5
+      text-cyan-400
+      border border-cyan-500/20
+      transition-all duration-300
+      hover:border-cyan-400/40
+      hover:shadow-[0_0_15px_rgba(34,211,238,0.15)]
+      hover:bg-gradient-to-r hover:from-cyan-500/20 hover:to-cyan-400/10
+    `,
+    icon: `
+      p-1.5 rounded-md
+      transition-all duration-300
+      hover:bg-cyan-500/10
+      hover:shadow-[0_0_10px_rgba(34,211,238,0.15)]
+      group-hover:text-cyan-400
+    `
+  },
+  tab: {
+    base: `
+      relative px-4 py-2 
+      font-satoshi text-[13px] font-medium tracking-[-0.01em]
+      transition-all duration-300
+    `,
+    active: `
     text-cyan-400
-    shadow-[0_0_10px_rgba(0,255,255,0.2)]
-  `,
-  chatBubble: `
-    max-w-[70%] rounded-2xl p-3
-    backdrop-blur-sm shadow-lg
-    animate-[fadeIn_0.3s_ease-out]
-    bg-gray-900/50
-    border border-gray-800/50
-    hover:border-cyan-500/20
+      after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px]
+      after:bg-gradient-to-r after:from-cyan-500/80 after:to-cyan-400/20
+      after:shadow-[0_0_8px_rgba(34,211,238,0.3)]
+    `,
+    inactive: `text-gray-400/70 hover:text-gray-300`
+  },
+  voiceClone: {
+    title: `font-satoshi text-[13px] font-medium tracking-[-0.01em] text-white/90 mb-4`,
+    subtitle: `font-satoshi text-[12px] font-medium tracking-[-0.01em] text-gray-300/90 mb-3`,
+    instruction: `font-satoshi text-[12px] leading-relaxed tracking-wide text-gray-400/80`,
+    sampleText: `
+      font-satoshi text-[12px] leading-relaxed tracking-wide
+      bg-black/20 rounded-lg p-3
+      border border-gray-800
+      text-gray-300/80
+    `
+  },
+  knowledgeBase: {
+    bubble: `
+      relative z-10
+      bg-[#1E1E1E]/50 backdrop-blur-sm
+      border border-gray-800/50 rounded-lg p-2.5
     transition-all duration-300
+      hover:border-cyan-500/30
+      hover:shadow-[0_0_15px_rgba(34,211,238,0.07)]
+      before:absolute before:inset-0 before:z-[-1]
+      before:bg-gradient-to-r before:from-cyan-500/[0.02] before:to-transparent
+      before:opacity-0 before:transition-opacity before:duration-300
+      hover:before:opacity-100
+      cursor-pointer
   `,
-  input: `
-    w-full bg-gray-900/50 backdrop-blur-sm
-    border border-gray-700 rounded-xl
-    px-4 py-3 text-gray-300
+    input: `
+      flex-1 bg-transparent z-20
+      font-satoshi text-[13px] text-gray-300
+      border border-gray-700/50 rounded-md px-2 py-1
+      focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30
+      hover:border-cyan-500/20
     transition-all duration-300
-    focus:ring-2 focus:ring-cyan-500 focus:border-transparent
-    hover:border-cyan-500/50
-    hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]
-  `,
-  scrollArea: `
-    scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent
-    hover:scrollbar-thumb-gray-600
-    scroll-smooth
+    `,
+    content: `
+      w-full bg-black/20 z-20
+      font-satoshi text-[13px] text-gray-300
+      border border-gray-800/50 rounded-lg
+      p-2 min-h-[45px]
+      focus:ring-1 focus:ring-cyan-500/50
+      focus:border-cyan-500/30
+      hover:border-cyan-500/20
+      resize-none
+      transition-all duration-300
+    `
+  },
+  card: {
+    base: `
+      bg-[#1E1E1E] 
+      border border-gray-800
+      rounded-lg p-2.5
+      transition-all duration-300
+      hover:border-cyan-500/30
+      hover:shadow-[0_0_20px_rgba(34,211,238,0.1)]
+      backdrop-blur-sm
+    `,
+    active: `
+      border-cyan-500/30
+      shadow-[0_0_20px_rgba(34,211,238,0.1)]
+      bg-gradient-to-b from-cyan-500/10 to-transparent
+    `
+  },
+  section: {
+    wrapper: `
+      relative p-2
+      before:absolute before:inset-0
+      before:border before:border-gray-800/50 before:rounded-lg
+      before:transition-all before:duration-300
+      hover:before:border-cyan-500/20
+      hover:before:shadow-[0_0_20px_rgba(34,211,238,0.05)]
+      after:absolute after:inset-0
+      after:bg-gradient-to-b after:from-cyan-500/[0.02] after:to-transparent
+      after:opacity-0 after:transition-opacity after:duration-300
+      hover:after:opacity-100
+      rounded-lg
+      mb-2
+    `,
+    title: `
+      font-satoshi text-[14px] font-medium tracking-[-0.01em] 
+      text-white/90 mb-2
+      flex items-center gap-2
+      before:content-[''] before:w-1 before:h-1 before:rounded-full
+      before:bg-cyan-400/50 before:shadow-[0_0_5px_rgba(34,211,238,0.5)]
+    `
+  },
+  divider: `
+    h-px w-full
+    bg-gradient-to-r from-transparent via-gray-800/50 to-transparent
+    my-6
   `
 };
 
@@ -203,6 +321,163 @@ const MobileConfigDrawer = ({
     >
       {/* Rest of the MobileConfigDrawer implementation */}
     </div>
+  );
+};
+
+// First, let's define a proper interface for our agent config
+interface AgentConfig {
+  personality: string;
+  knowledgeBase: Array<{
+    id: string;
+    type: string;
+    name: string;
+    content: string;
+  }>;
+}
+
+// Add new interfaces for knowledge management
+interface KnowledgeBubbleProps {
+  entry: AgentConfig['knowledgeBase'][0];
+  onEdit: (id: string, content: string, name?: string) => void;
+  onRemove: (id: string) => void;
+}
+
+// Add this new component for knowledge bubbles
+const KnowledgeBubble: React.FC<KnowledgeBubbleProps> = ({ entry, onEdit, onRemove }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [content, setContent] = useState(entry.content);
+  const [name, setName] = useState(entry.name);
+
+  const handleBubbleClick = () => {
+    if (!isEditing) {
+      setIsExpanded(!isExpanded);
+    }
+  };
+
+  const handleSave = () => {
+    onEdit(entry.id, content, name);
+    setIsEditing(false);
+  };
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 5 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -5 }}
+      className="group relative"
+    >
+      <motion.div
+        layout
+        className={`
+          ${styles.knowledgeBase.bubble}
+          ${isEditing ? 'cursor-default' : 'cursor-pointer'}
+        `}
+      >
+        <div className="relative">
+          {/* Title section */}
+          <div
+            className="flex items-center justify-between gap-2"
+            onClick={!isEditing ? handleBubbleClick : undefined}
+          >
+            {isEditing ? (
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSave();
+                }}
+                className={`${styles.knowledgeBase.input} z-50`}
+                autoFocus
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <span className="font-satoshi text-[12px] text-gray-300 group-hover:text-cyan-400/90 transition-colors duration-300">
+                {name}
+              </span>
+            )}
+
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isEditing) handleSave();
+                  else setIsEditing(true);
+                }}
+                className="p-1.5 rounded-md hover:bg-cyan-500/10 z-50"
+              >
+                {isEditing ? (
+                  <Save size={11} className="text-cyan-400" />
+                ) : (
+                  <Edit2 size={11} className="text-gray-400 group-hover:text-cyan-400" />
+                )}
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemove(entry.id);
+                }}
+                className="p-1.5 rounded-md hover:bg-cyan-500/10 z-50"
+              >
+                <X size={11} className="text-gray-400 group-hover:text-red-400" />
+              </motion.button>
+              {!isEditing && (
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsExpanded(!isExpanded);
+                  }}
+                  className="p-1.5 rounded-md hover:bg-cyan-500/10 z-50"
+                >
+                  {isExpanded ? (
+                    <ChevronUp size={11} className="text-gray-400 group-hover:text-cyan-400" />
+                  ) : (
+                    <ChevronDown size={11} className="text-gray-400 group-hover:text-cyan-400" />
+                  )}
+                </motion.button>
+              )}
+            </div>
+          </div>
+
+          {/* Content section */}
+          <AnimatePresence>
+            {(isEditing || isExpanded) && (
+              <motion.div
+                layout
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className="mt-2"
+              >
+                <textarea
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  onBlur={() => {
+                    if (isEditing) handleSave();
+                  }}
+                  readOnly={!isEditing}
+                  onClick={(e) => e.stopPropagation()}
+                  className={`
+                    ${styles.knowledgeBase.content}
+                    ${!isEditing && 'border-transparent bg-transparent cursor-default'}
+                    z-50
+                  `}
+                  placeholder={isEditing ? "Enter knowledge content..." : ""}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 };
 
@@ -341,24 +616,195 @@ export default function Playground({
     fetchTranscript();
   }, [fetchTranscript]);
 
+  // Add state for video current time
+  const [currentTime, setCurrentTime] = useState(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Add these state variables
+  const [agentConfig, setAgentConfig] = useState<AgentConfig>({
+    personality: "",
+    knowledgeBase: [
+      { id: "presentation", type: "presentation", name: "", content: "" }
+    ]
+  });
+
+  // Update the useEffect that fetches agent config
+  useEffect(() => {
+    const fetchAgentConfig = async () => {
+      if (!params.brdgeId || !params.apiBaseUrl) return;
+
+      try {
+        console.log('Fetching agent config...');
+        const response = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/agent-config`);
+
+        if (!response.ok) throw new Error('Failed to fetch agent config');
+
+        const data = await response.json();
+        console.log('Received agent config:', data);
+
+        setAgentConfig(data);
+      } catch (error) {
+        console.error('Error fetching agent config:', error);
+      }
+    };
+
+    fetchAgentConfig();
+  }, [params.brdgeId, params.apiBaseUrl]);
+
+  // Add this function to handle config updates
+  const updateAgentConfig = async (newConfig: typeof agentConfig) => {
+    try {
+      const response = await fetch(
+        `${params.apiBaseUrl}/brdges/${params.brdgeId}/agent-config`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newConfig),
+        }
+      );
+      if (response.ok) {
+        setAgentConfig(newConfig);
+      }
+    } catch (error) {
+      console.error('Error updating agent config:', error);
+    }
+  };
+
+  // Add this state for voice cloning
+  const [isVoiceCloning, setIsVoiceCloning] = useState(false);
+  const [voiceCloneProgress, setVoiceCloneProgress] = useState(0);
+
+  // Add voice cloning function
+  const cloneVoice = async (name: string) => {
+    if (!params.brdgeId || !params.apiBaseUrl) return;
+
+    try {
+      setIsVoiceCloning(true);
+      const response = await fetch(
+        `${params.apiBaseUrl}/brdges/${params.brdgeId}/voices/clone`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name })
+        }
+      );
+
+      if (!response.ok) throw new Error('Failed to clone voice');
+
+      // Refresh voice list
+      const voicesResponse = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/voices`);
+      if (voicesResponse.ok) {
+        const data = await voicesResponse.json();
+        setSavedVoices(data.voices);
+      }
+    } catch (error) {
+      console.error('Error cloning voice:', error);
+    } finally {
+      setIsVoiceCloning(false);
+      setVoiceCloneProgress(0);
+    }
+  };
+
+  // Add these state variables where other states are defined
+  const [brdge, setBrdge] = useState<Brdge | null>(null);
+  const [isLoadingBrdge, setIsLoadingBrdge] = useState(false);
+
+  // Add this useEffect to fetch the brdge data
+  useEffect(() => {
+    const fetchBrdge = async () => {
+      if (!params.brdgeId || !params.apiBaseUrl) {
+        console.log('Missing params:', { brdgeId: params.brdgeId, apiBaseUrl: params.apiBaseUrl });
+        return;
+      }
+
+      setIsLoadingBrdge(true);
+      try {
+        const url = `${params.apiBaseUrl}/brdges/${params.brdgeId}`;
+        console.log('Fetching brdge from:', url);
+
+        const response = await fetch(url);
+        console.log('Response status:', response.status);
+
+        if (!response.ok) throw new Error('Failed to fetch brdge');
+
+        const data = await response.json();
+        console.log('Fetched brdge data:', data); // Let's see exactly what we get
+        setBrdge(data);
+      } catch (error) {
+        console.error('Error fetching brdge:', error);
+      } finally {
+        setIsLoadingBrdge(false);
+      }
+    };
+
+    fetchBrdge();
+  }, [params.brdgeId, params.apiBaseUrl]);
+
+  useEffect(() => {
+    console.log('Current params:', params);
+  }, [params]);
+
+  // Handler for editing knowledge entries
+  const handleKnowledgeEdit = useCallback((id: string, content: string, name?: string) => {
+    setAgentConfig(prev => ({
+      ...prev,
+      knowledgeBase: prev.knowledgeBase.map(entry =>
+        entry.id === id
+          ? { ...entry, content, ...(name && { name }) }
+          : entry
+      )
+    }));
+
+    // Update the backend
+    updateAgentConfig({
+      ...agentConfig,
+      knowledgeBase: agentConfig.knowledgeBase.map(entry =>
+        entry.id === id
+          ? { ...entry, content, ...(name && { name }) }
+          : entry
+      )
+    });
+  }, [agentConfig, updateAgentConfig]);
+
+  // Handler for removing knowledge entries
+  const handleKnowledgeRemove = useCallback((id: string) => {
+    setAgentConfig(prev => ({
+      ...prev,
+      knowledgeBase: prev.knowledgeBase.filter(entry => entry.id !== id)
+    }));
+
+    // Update the backend
+    updateAgentConfig({
+      ...agentConfig,
+      knowledgeBase: agentConfig.knowledgeBase.filter(entry => entry.id !== id)
+    });
+  }, [agentConfig, updateAgentConfig]);
+
+  // Add this inside the Playground component, with other state variables
+  const [activeTab, setActiveTab] = useState<ConfigTab>('content');
+
   return (
     <div className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
       <div className="flex-1 flex overflow-hidden">
         {/* Main Content */}
         <div className={`
             flex-1 transition-all duration-300
-          ${!isMobile ? (isRightPanelCollapsed ? 'mr-0' : 'mr-[400px]') : 'mr-0'}
+          ${!isMobile ? (isRightPanelCollapsed ? 'mr-0' : 'mr-[500px]') : 'mr-0'}
           `}>
           <PanelGroup direction="vertical">
             {/* Video Panel */}
             <Panel defaultSize={70}>
               <div className="h-full w-full overflow-hidden bg-black">
                 <video
+                  ref={videoRef}
                   src={videoUrl || ''}
                   className="w-full h-full object-contain"
                   controls
                   autoPlay={false}
                   playsInline
+                  onTimeUpdate={() => {
+                    setCurrentTime(videoRef.current?.currentTime || 0);
+                  }}
                 />
               </div>
             </Panel>
@@ -448,29 +894,29 @@ export default function Playground({
         {/* Right Panel - Voice Configuration */}
         {!isMobile && (
           <div className={`
-            fixed right-0 top-[48px] bottom-0 w-[400px] 
-            transition-all duration-300 ease-in-out
-            transform ${isRightPanelCollapsed ? 'translate-x-[400px]' : 'translate-x-0'}
-            bg-gray-900/50 backdrop-blur-md
-            border-l border-gray-800
-            z-30
-          `}>
+              fixed right-0 top-[48px] bottom-0 w-[500px] 
+              transition-all duration-300 ease-in-out
+              transform ${isRightPanelCollapsed ? 'translate-x-[500px]' : 'translate-x-0'}
+              bg-gray-900/50 backdrop-blur-md
+              border-l border-gray-800
+              z-30
+            `}>
             {/* Collapse Toggle Button */}
             <button
               onClick={() => setIsRightPanelCollapsed(!isRightPanelCollapsed)}
               className="absolute -left-8 top-1/2 transform -translate-y-1/2
-                w-8 h-16 
-                bg-gray-900/80 backdrop-blur-sm
-                rounded-l-lg 
-                flex items-center justify-center
-                text-gray-400 
-                transition-all duration-300
-                border-t border-b border-l border-gray-800/50
-                hover:border-cyan-500/30
-                hover:text-cyan-400
-                hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]
-                group
-              "
+                  w-8 h-16 
+                  bg-gray-900/80 backdrop-blur-sm
+                  rounded-l-lg 
+                  flex items-center justify-center
+                  text-gray-400 
+                  transition-all duration-300
+                  border-t border-b border-l border-gray-800/50
+                  hover:border-cyan-500/30
+                  hover:text-cyan-400
+                  hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]
+                  group
+                "
             >
               <div className={`
                 transform transition-transform duration-300
@@ -483,79 +929,357 @@ export default function Playground({
             </button>
 
             {/* Panel Content */}
-            <div className="h-full p-4 overflow-y-auto space-y-4">
-              {/* Transcript Section */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-medium text-gray-300">Transcript</h3>
-                  <div className="text-xs text-gray-500">
-                    {transcript?.status === 'completed' ? 'Completed' :
-                      transcript?.status === 'pending' ? 'Processing...' :
-                        transcript?.status === 'failed' ? 'Failed' : 'Loading...'}
-                  </div>
+            <div className="h-full p-4 overflow-y-auto space-y-6">
+              {/* Agent Configuration Section */}
+              <div className="h-full flex flex-col">
+                {/* Tabs */}
+                <div className="flex items-center px-2 border-b border-gray-800/50">
+                  {[
+                    { id: 'content', label: 'Content' },
+                    { id: 'ai-agent', label: 'AI Agent' },
+                    { id: 'voice-clone', label: 'Voice Clone' }
+                  ].map((tab) => (
+                    <motion.button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id as ConfigTab)}
+                      className={`
+                        ${styles.tab.base}
+                        ${activeTab === tab.id ? styles.tab.active : styles.tab.inactive}
+                      `}
+                    >
+                      {tab.label}
+                      {activeTab === tab.id && (
+                        <motion.div
+                          layoutId="activeTab"
+                          className="
+                            absolute bottom-0 left-0 right-0 h-[2px]
+                            bg-gradient-to-r from-cyan-500 via-cyan-400 to-cyan-500/50
+                            shadow-[0_0_10px_rgba(34,211,238,0.3)]
+                          "
+                          initial={false}
+                          transition={{
+                            type: "spring",
+                            stiffness: 500,
+                            damping: 30
+                          }}
+                        />
+                      )}
+                    </motion.button>
+                  ))}
                 </div>
 
-                {isLoadingTranscript ? (
-                  <div className="flex items-center justify-center h-20 text-gray-400">
-                    <div className="animate-spin w-5 h-5 border-2 border-cyan-500 border-t-transparent rounded-full" />
-                  </div>
-                ) : transcript?.content?.transcript ? (
-                  <div className="relative">
-                    <textarea
-                      value={transcript.content.transcript}
-                      readOnly
-                      className="w-full h-[400px] bg-gray-800/50 border border-gray-700 rounded-lg
-                        px-3 py-2 text-sm text-gray-300
-                        focus:ring-2 focus:ring-cyan-500 focus:border-transparent
-                        hover:border-cyan-500/50
-                        transition-all duration-300
-                        resize-none
-                      "
-                    />
-                  </div>
-                ) : (
-                  <div className="text-center py-4 text-gray-500 text-sm">
-                    No transcript available
-                  </div>
-                )}
-              </div>
+                {/* Tab Content */}
+                <div className="flex-1 overflow-y-auto p-3 space-y-4">
+                  {activeTab === 'content' && (
+                    <>
+                      {/* Transcript Section */}
+                      <section className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h2 className={styles.sectionTitle}>Transcript</h2>
+                          <span className={styles.label}>
+                            {transcript?.status === 'completed' ? 'Completed' : 'Processing...'}
+                          </span>
+                        </div>
 
-              {/* Voice Configuration Section */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-medium text-gray-300">Voice Setup</h3>
-                  <button
-                    onClick={() => setIsCreatingVoice(true)}
-                    className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
-                  >
-                    Create New Voice
-                  </button>
-                </div>
+                        {isLoadingTranscript ? (
+                          <div className="flex items-center justify-center h-20">
+                            <div className="animate-spin w-4 h-4 border-2 border-cyan-500 border-t-transparent rounded-full" />
+                          </div>
+                        ) : transcript?.content?.segments ? (
+                          <TimeAlignedTranscript
+                            segments={transcript.content.segments}
+                            currentTime={currentTime}
+                            onTimeClick={(time: number) => {
+                              if (videoRef.current) {
+                                videoRef.current.currentTime = time;
+                                videoRef.current.play();
+                              }
+                            }}
+                          />
+                        ) : (
+                          <div className="text-center py-4 text-[12px] text-gray-500">
+                            No transcript available
+                          </div>
+                        )}
+                      </section>
+                    </>
+                  )}
 
-                {/* Voice Selection */}
-                {savedVoices.length > 0 && (
-                  <select
-                    value={selectedVoice || ''}
-                    onChange={(e) => setSelectedVoice(e.target.value)}
-                    className="w-full bg-gray-800/50 border border-gray-700 rounded-lg
-                            px-3 py-2 text-xs text-gray-300
+                  {activeTab === 'ai-agent' && (
+                    <>
+                      <div className="flex items-center justify-between mb-4">
+                        <h2 className={styles.section.title}>AI Agent Configuration</h2>
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => updateAgentConfig(agentConfig)}
+                          className={`
+                            group flex items-center gap-1.5
+                            px-3 py-1.5 rounded-lg
+                            bg-gradient-to-r from-cyan-500/10 to-transparent
+                            text-cyan-400 border border-cyan-500/20
                             transition-all duration-300
-                            focus:ring-2 focus:ring-cyan-500 focus:border-transparent
-                      hover:border-cyan-500/50"
-                  >
-                    <option value="">Select a voice...</option>
-                    {savedVoices.map(voice => (
-                      <option key={voice.id} value={voice.id}>{voice.name}</option>
-                    ))}
-                  </select>
-                )}
+                            hover:border-cyan-500/40
+                            hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]
+                          `}
+                        >
+                          <Save size={12} className="group-hover:rotate-12 transition-transform duration-300" />
+                          <span className="text-[11px]">Save Changes</span>
+                        </motion.button>
+                      </div>
 
-                {/* Voice Creation Form */}
-                {isCreatingVoice && (
-                  <div className="space-y-3">
-                    {/* ... existing voice creation form ... */}
-                  </div>
-                )}
+                      {/* Agent Personality Section */}
+                      <section className={styles.section.wrapper}>
+                        <h2 className={styles.section.title}>Agent Personality</h2>
+                        <div className="
+                          relative group
+                          before:absolute before:inset-0
+                          before:bg-gradient-to-r before:from-cyan-500/[0.02] before:to-transparent
+                          before:opacity-0 before:transition-opacity before:duration-300
+                          hover:before:opacity-100
+                        ">
+                          <textarea
+                            value={agentConfig.personality}
+                            onChange={(e) => setAgentConfig({
+                              ...agentConfig,
+                              personality: e.target.value
+                            })}
+                            placeholder="Describe the agent's personality and behavior..."
+                            className={`${styles.input.base} ${styles.input.textarea}`}
+                          />
+                        </div>
+                      </section>
+
+                      {/* Knowledge Base Section */}
+                      <section className={styles.section.wrapper}>
+                        <div className="flex items-center justify-between mb-4">
+                          <h2 className={styles.section.title}>Knowledge Base</h2>
+                          <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => {
+                              const newEntry = {
+                                id: `kb_${Date.now()}`,
+                                type: "custom",
+                                name: "New Knowledge Entry",
+                                content: ""
+                              };
+                              setAgentConfig(prev => ({
+                                ...prev,
+                                knowledgeBase: [...prev.knowledgeBase, newEntry]
+                              }));
+                            }}
+                            className="
+                              relative z-20
+                              group flex items-center gap-1.5
+                              px-3 py-1.5 rounded-lg text-[11px]
+                              bg-gradient-to-r from-cyan-500/10 to-transparent
+                              text-cyan-400/90 border border-cyan-500/20
+                              transition-all duration-300
+                              hover:border-cyan-500/40
+                              hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]
+                            "
+                          >
+                            <Plus size={12} className="group-hover:rotate-90 transition-transform duration-300" />
+                            <span>Add Knowledge</span>
+                          </motion.button>
+                        </div>
+
+                        {/* Core Presentation */}
+                        <motion.div
+                          layout
+                          className="
+                            relative group
+                            bg-[#1E1E1E]/50 backdrop-blur-sm
+                            border border-gray-800/50 rounded-lg p-3
+                            transition-all duration-300
+                            hover:border-cyan-500/30
+                            hover:shadow-[0_0_20px_rgba(34,211,238,0.07)]
+                            before:absolute before:inset-0
+                            before:bg-gradient-to-r before:from-cyan-500/[0.02] before:to-transparent
+                            before:opacity-0 before:transition-opacity before:duration-300
+                            hover:before:opacity-100
+                          "
+                        >
+                          <div className="relative z-10 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <FileText size={12} className="text-cyan-400 group-hover:animate-pulse" />
+                              <span className="text-[12px] text-gray-300 group-hover:text-cyan-400/90 transition-colors duration-300">
+                                {agentConfig.knowledgeBase[0]?.name || "No presentation file"}
+                              </span>
+                            </div>
+                            <span className="
+                              text-[10px] text-gray-600/70 
+                              px-2 py-0.5 
+                              bg-black/20 rounded-md
+                              border border-gray-800/50
+                              group-hover:border-cyan-500/20
+                              transition-all duration-300
+                            ">
+                              PDF
+                            </span>
+                          </div>
+                        </motion.div>
+
+                        {/* Supplementary Knowledge */}
+                        <div className="mt-4 space-y-3">
+                          <h3 className="
+                            font-satoshi text-[11px] text-gray-400/70
+                            flex items-center gap-2
+                            before:content-[''] before:w-1 before:h-1 before:rounded-full
+                            before:bg-cyan-400/30
+                          ">
+                            Supplementary Knowledge
+                          </h3>
+                          <motion.div layout className="grid grid-cols-1 gap-2">
+                            <AnimatePresence>
+                              {agentConfig.knowledgeBase
+                                .filter(entry => entry.type !== "presentation")
+                                .map((entry) => (
+                                  <KnowledgeBubble
+                                    key={entry.id}
+                                    entry={entry}
+                                    onEdit={handleKnowledgeEdit}
+                                    onRemove={handleKnowledgeRemove}
+                                  />
+                                ))}
+                            </AnimatePresence>
+                          </motion.div>
+                        </div>
+                      </section>
+                    </>
+                  )}
+
+                  {activeTab === 'voice-clone' && (
+                    <>
+                      <div className="flex items-center justify-between mb-4">
+                        <h2 className={styles.section.title}>Voice Clone Configuration</h2>
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => cloneVoice("New Voice")}
+                          className={`
+                            group flex items-center gap-1.5
+                            px-3 py-1.5 rounded-lg
+                            bg-gradient-to-r from-cyan-500/10 to-transparent
+                            text-cyan-400 border border-cyan-500/20
+                            transition-all duration-300
+                            hover:border-cyan-500/40
+                            hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]
+                          `}
+                        >
+                          <Plus size={12} className="group-hover:rotate-12 transition-transform duration-300" />
+                          <span className="text-[11px]">Create Voice</span>
+                        </motion.button>
+                      </div>
+
+                      {/* Voice Setup Section */}
+                      <section className={styles.section.wrapper}>
+                        <h2 className={styles.section.title}>Voice Setup</h2>
+                        <div className="
+                          relative group space-y-4
+                          before:absolute before:inset-0
+                          before:bg-gradient-to-r before:from-cyan-500/[0.02] before:to-transparent
+                          before:opacity-0 before:transition-opacity before:duration-300
+                          hover:before:opacity-100
+                        ">
+                          {/* Recording Instructions */}
+                          <div className="space-y-3">
+                            <h3 className="font-satoshi text-[12px] text-gray-300/90">
+                              Create an AI voice clone with a short voice sample:
+                            </h3>
+                            <ul className="space-y-2">
+                              {[
+                                'Record 10-20 seconds of clear speech',
+                                'Speak naturally at your normal pace',
+                                'Avoid background noise and echoes'
+                              ].map((text, i) => (
+                                <li key={i} className="flex items-start gap-2">
+                                  <span className="text-cyan-400/80 mt-1 text-[8px]">•</span>
+                                  <span className="font-satoshi text-[11px] text-gray-400/80">{text}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+
+                          {/* Sample Text Section */}
+                          <div className="space-y-2">
+                            <h3 className="font-satoshi text-[12px] text-gray-300/90">
+                              Sample Text to Read:
+                            </h3>
+                            <div className={`
+                              ${styles.knowledgeBase.content}
+                              min-h-0
+                              text-[11px]
+                              bg-black/20
+                              border border-gray-800/50
+                              group-hover:border-cyan-500/20
+                              transition-all duration-300
+                            `}>
+                              "In just a few quick steps my voice based AI assistant will be integrated into my content, how cool is that?"
+                            </div>
+                          </div>
+                        </div>
+                      </section>
+
+                      {/* Saved Voices Section */}
+                      <section className={styles.section.wrapper}>
+                        <div className="flex items-center justify-between mb-4">
+                          <h2 className={styles.section.title}>Saved Voices</h2>
+                        </div>
+                        <div className="space-y-2">
+                          {savedVoices.length === 0 ? (
+                            <div className="text-center py-4 text-[11px] text-gray-500">
+                              No saved voices yet
+                            </div>
+                          ) : (
+                            savedVoices.map((voice) => (
+                              <motion.div
+                                key={voice.id}
+                                layout
+                                className={`
+                                  ${styles.knowledgeBase.bubble}
+                                  flex items-center justify-between
+                                  ${selectedVoice === voice.id ? styles.card.active : ''}
+                                `}
+                                onClick={() => setSelectedVoice(voice.id)}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[11px] text-gray-300 group-hover:text-cyan-400/90 transition-colors duration-300">
+                                    {voice.name}
+                                  </span>
+                                  {voice.active && (
+                                    <span className="
+                                      text-[10px] text-cyan-400/70
+                                      px-2 py-0.5
+                                      bg-cyan-500/10 rounded-md
+                                      border border-cyan-500/20
+                                    ">
+                                      Active
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <motion.button
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      // Handle voice deletion
+                                    }}
+                                    className="p-1.5 rounded-md hover:bg-cyan-500/10 z-50"
+                                  >
+                                    <X size={11} className="text-gray-400 group-hover:text-red-400" />
+                                  </motion.button>
+                                </div>
+                              </motion.div>
+                            ))
+                          )}
+                        </div>
+                      </section>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
