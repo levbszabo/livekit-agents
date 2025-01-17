@@ -1,37 +1,23 @@
 "use client";
-
-import { LoadingSVG } from "@/components/button/LoadingSVG";
 import { ChatMessageType } from "@/components/chat/ChatTile";
-import { ColorPicker } from "@/components/colorPicker/ColorPicker";
-import { ConfigurationPanelItem } from "@/components/config/ConfigurationPanelItem";
-import { NameValueRow } from "@/components/config/NameValueRow";
-import { useConfig } from "@/hooks/useConfig";
 import { TranscriptionTile } from "@/transcriptions/TranscriptionTile";
 import {
-  BarVisualizer,
   useConnectionState,
   useDataChannel,
   useLocalParticipant,
-  useRoomInfo,
   useVoiceAssistant,
   useChat,
 } from "@livekit/components-react";
 import { ConnectionState, LocalParticipant, Track, DataPacket_Kind } from "livekit-client";
 import { ReactNode, useCallback, useEffect, useMemo, useState, useRef } from "react";
-import tailwindTheme from "../../lib/tailwindTheme.preval";
-import { InfoPanel } from "./InfoPanel";
 import { API_BASE_URL } from '@/config';
 import { api } from '@/api';
-import { SlideScriptPanel } from './SlideScriptPanel';
 import { jwtDecode } from "jwt-decode";
-import Image from 'next/image';
 import {
   Panel,
   PanelGroup,
   PanelResizeHandle
 } from 'react-resizable-panels';
-import { useRouter } from 'next/router';
-import { WalkthroughSelector, WalkthroughSelectorRef } from './WalkthroughSelector';
 import { TimeAlignedTranscript } from '@/components/transcript/TimeAlignedTranscript';
 import { Plus, FileText, X, Edit2, Save, ChevronDown, ChevronUp, Play, Pause, Volume2, VolumeX, Maximize2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -72,11 +58,11 @@ interface SavedVoice {
   id: string;
   name: string;
   created_at: string;
-  active: boolean;
+  status: string;
 }
 
 type MobileTab = 'chat' | 'script' | 'voice' | 'info';
-type ConfigTab = 'ai-agent' | 'voice-clone';
+type ConfigTab = 'ai-agent' | 'voice-clone' | 'chat';
 
 interface DataChannelMessage {
   payload: Uint8Array;
@@ -104,6 +90,38 @@ interface Brdge {
   user_id: number;
   shareable: boolean;
   public_id: string | null;
+}
+
+interface TranscriptWord {
+  word: string;
+  punctuated_word?: string;
+  start: number;
+  end: number;
+  confidence?: number;
+}
+
+interface TranscriptContent {
+  transcript: string;
+  segments: Array<{
+    text: string;
+    start: number;
+    end: number;
+  }>;
+  words: TranscriptWord[];
+}
+
+interface Transcript {
+  content: TranscriptContent;
+  status: string;
+  metadata: any;
+}
+
+interface DataChannelPayload {
+  transcript_position?: {
+    read: string[];
+    remaining: string[];
+  };
+  // Add other payload types as needed
 }
 
 const useIsMobile = () => {
@@ -608,17 +626,6 @@ const TranscriptTimeline = ({ transcript, currentTime, onTimeClick }: {
           </div>
         </div>
       </div>
-
-      {/* Playhead indicator */}
-      <motion.div
-        className="absolute top-0 left-1/2 w-px h-full bg-cyan-500/50"
-        initial={false}
-        animate={{
-          boxShadow: currentTime > 0 ? '0 0 10px rgba(34,211,238,0.3)' : 'none',
-          opacity: currentTime > 0 ? 1 : 0
-        }}
-        style={{ transform: 'translateX(-50%)' }}
-      />
     </div>
   );
 };
@@ -683,6 +690,31 @@ const VideoPlayer = ({
       />
     </div>
   );
+};
+
+// Add this helper function at the top of the file
+const formatTimeWithDecimals = (time: number | null | undefined, totalDuration: number | null | undefined): string => {
+  // Handle invalid/initial states
+  if (time === null || time === undefined) return '0:00.00';
+  if (totalDuration === null || totalDuration === undefined || !isFinite(totalDuration)) {
+    totalDuration = 0;
+  }
+
+  // Format current time
+  const minutes = Math.floor(time / 60);
+  const seconds = time % 60;
+  const formattedSeconds = seconds.toFixed(2);
+
+  // Format total duration
+  const totalMinutes = Math.floor(totalDuration / 60);
+  const totalSeconds = totalDuration % 60;
+  const formattedTotalSeconds = totalSeconds.toFixed(2);
+
+  // Ensure proper padding for seconds less than 10
+  const paddedSeconds = formattedSeconds.padStart(5, '0');
+  const paddedTotalSeconds = formattedTotalSeconds.padStart(5, '0');
+
+  return `${minutes}:${paddedSeconds} / ${totalMinutes}:${paddedTotalSeconds}`;
 };
 
 export default function Playground({
@@ -790,11 +822,7 @@ export default function Playground({
   }, [chat]);
 
   // Add these state variables at the top with other states
-  const [transcript, setTranscript] = useState<{
-    content: { transcript: string; segments: any[] };
-    status: string;
-    metadata: any;
-  } | null>(null);
+  const [transcript, setTranscript] = useState<Transcript | null>(null);
   const [isLoadingTranscript, setIsLoadingTranscript] = useState(false);
 
   // Add this function to fetch the transcript
@@ -1079,14 +1107,14 @@ export default function Playground({
     if (savedVoices.length === 1) {
       // If there's only one voice, make it active
       const voice = savedVoices[0];
-      if (!voice.active) {
+      if (voice.status !== 'active') {
         api.post(`/brdges/${params.brdgeId}/voices/${voice.id}/activate`)
           .then(() => {
-            setSavedVoices([{ ...voice, active: true }]);
+            setSavedVoices([{ ...voice, status: 'active' }]);
           })
           .catch(error => console.error('Error activating single voice:', error));
       }
-    } else if (savedVoices.length > 1 && !savedVoices.some(v => v.active)) {
+    } else if (savedVoices.length > 1 && !savedVoices.some(v => v.status === 'active')) {
       // If there are multiple voices and none are active, activate the most recent one
       const mostRecent = savedVoices.reduce((prev, current) => {
         return new Date(current.created_at) > new Date(prev.created_at) ? current : prev;
@@ -1096,7 +1124,7 @@ export default function Playground({
         .then(() => {
           setSavedVoices(prev => prev.map(v => ({
             ...v,
-            active: v.id === mostRecent.id
+            status: v.id === mostRecent.id ? 'active' : 'inactive'
           })));
         })
         .catch(error => console.error('Error activating most recent voice:', error));
@@ -1106,8 +1134,71 @@ export default function Playground({
   // Update tabs array
   const tabs = [
     { id: 'ai-agent', label: 'AI Agent' },
-    { id: 'voice-clone', label: 'Voice Clone' }
+    { id: 'voice-clone', label: 'Voice Clone' },
+    { id: 'chat', label: 'Chat' }
   ];
+
+  // Update the data channel usage
+  const { send: sendData } = useDataChannel("agent_data_channel", (msg: DataChannelMessage) => {
+    try {
+      const data = JSON.parse(new TextDecoder().decode(msg.payload));
+      console.log("Data Channel received:", data);
+    } catch (error) {
+      console.error("Error parsing data channel message:", error);
+    }
+  });
+
+  // Compute transcript position for the agent
+  const computeTranscriptPosition = useCallback((time: number) => {
+    if (!transcript?.content?.segments) return { read: [], remaining: [] };
+
+    const read = transcript.content.segments
+      .filter(seg => seg.end <= time)
+      .map(seg => seg.text);
+
+    const remaining = transcript.content.segments
+      .filter(seg => seg.start > time)
+      .map(seg => seg.text);
+
+    return { read, remaining };
+  }, [transcript]);
+
+  // Send transcript position through data channel when time changes
+  useEffect(() => {
+    if (roomState === ConnectionState.Connected) {
+      const position = computeTranscriptPosition(currentTime);
+      const payload: DataChannelPayload = {
+        transcript_position: position
+      };
+
+      sendData(new TextEncoder().encode(JSON.stringify(payload)));
+    }
+  }, [currentTime, roomState, sendData, computeTranscriptPosition]);
+
+  // Update connect handler to use LiveKit connection
+  const handleConnect = useCallback(async () => {
+    if (roomState === ConnectionState.Connected) {
+      onConnect(false);
+    } else {
+      // The parent component (index.tsx) handles the token and url
+      // Just pass the connection request up
+      onConnect(true);
+    }
+  }, [roomState, onConnect]);
+
+  // Update the connect button to use the new handler
+  const connectButton = (
+    <button
+      onClick={handleConnect}
+      className={`p-1.5 rounded-lg transition-colors text-xs
+        ${roomState === ConnectionState.Connected
+          ? 'bg-red-500/20 text-red-400'
+          : 'bg-cyan-500/20 text-cyan-400'
+        }`}
+    >
+      {roomState === ConnectionState.Connected ? 'Disconnect' : 'Connect'}
+    </button>
+  );
 
   return (
     <div className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
@@ -1198,8 +1289,8 @@ export default function Playground({
                     </div>
 
                     {/* Time Display */}
-                    <div className="text-xs text-white/80 min-w-[80px] text-center">
-                      {formatTime(currentTime)} / {formatTime(duration)}
+                    <div className="flex items-center gap-2 text-[11px] text-gray-400 font-medium tracking-wider">
+                      {formatTimeWithDecimals(currentTime, videoRef.current?.duration)}
                     </div>
 
                     {/* Volume Control */}
@@ -1228,51 +1319,9 @@ export default function Playground({
                             videoRef.current.volume = newVolume;
                           }
                         }}
-                        className="
-                          w-0 group-hover:w-20
-                          transition-all duration-300
-                          accent-cyan-500
-                        "
+                        className="w-0 group-hover:w-20 transition-all duration-300 accent-cyan-500"
                       />
                     </div>
-
-                    {/* Connect Button */}
-                    <button
-                      onClick={() => {
-                        if (roomState === ConnectionState.Connected) {
-                          onConnect(false);
-                        } else {
-                          onConnect(true);
-                        }
-                      }}
-                      className={`p-1.5 rounded-lg transition-colors text-xs
-                        ${roomState === ConnectionState.Connected
-                          ? 'bg-red-500/20 text-red-400'
-                          : 'bg-cyan-500/20 text-cyan-400'
-                        }`}
-                    >
-                      {roomState === ConnectionState.Connected ? 'Disconnect' : 'Connect'}
-                    </button>
-
-                    {/* Mic Toggle */}
-                    <button
-                      onClick={() => {
-                        if (roomState === ConnectionState.Connected) {
-                          localParticipant?.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
-                        }
-                      }}
-                      disabled={roomState !== ConnectionState.Connected}
-                      className={`p-1.5 rounded-lg transition-colors
-                        ${localParticipant?.isMicrophoneEnabled
-                          ? 'bg-cyan-500/20 text-cyan-300'
-                          : 'bg-gray-800 text-gray-400'
-                        }`}
-                    >
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
-                        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
-                      </svg>
-                    </button>
 
                     {/* Fullscreen Toggle */}
                     <button
@@ -1288,77 +1337,32 @@ export default function Playground({
                   </div>
                 </div>
 
-                {/* Transcript Timeline */}
-                <div className="flex-1 overflow-hidden flex flex-col">
-                  {/* Time Ruler */}
-                  <div className="h-4 border-b border-gray-800 flex items-end px-2 bg-black/90">
-                    <div className="flex-1 flex items-center">
-                      {Array.from({ length: 12 }).map((_, i) => (
-                        <div key={i} className="flex-1 flex items-center justify-between">
-                          <div className="h-2 w-px bg-gray-800" />
-                          <div className="h-1.5 w-px bg-gray-800" />
-                          <div className="h-1.5 w-px bg-gray-800" />
-                          <div className="h-1.5 w-px bg-gray-800" />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* TimeAlignedTranscript */}
-                  <div className="flex-1 overflow-y-auto bg-black/90">
-                    {transcript?.content?.words && (
-                      <TimeAlignedTranscript
-                        segments={[
-                          {
-                            text: transcript.content.transcript || '',
-                            start: 0,
-                            end: transcript.content.words[transcript.content.words.length - 1]?.end || 0,
-                            words: transcript.content.words.map(word => ({
-                              word: word.punctuated_word || word.word,
-                              start: word.start,
-                              end: word.end,
-                              confidence: word.confidence || 1.0
-                            }))
-                          }
-                        ]}
-                        currentTime={currentTime}
-                        onTimeClick={(time) => {
-                          if (videoRef.current) {
-                            videoRef.current.currentTime = time;
-                            setCurrentTime(time);
-                          }
-                        }}
-                      />
-                    )}
-                  </div>
-                </div>
-
-                {/* Chat messages */}
-                <div className="h-20 overflow-y-auto p-2 border-t border-gray-800 bg-black/90">
-                  {voiceAssistant?.audioTrack && (
-                    <TranscriptionTile
-                      agentAudioTrack={voiceAssistant.audioTrack}
-                      accentColor="cyan"
+                {/* Transcript section - Keep this! */}
+                <div className="h-12 bg-black/90">
+                  {transcript?.content?.words && (
+                    <TimeAlignedTranscript
+                      segments={[
+                        {
+                          text: transcript.content.transcript || '',
+                          start: 0,
+                          end: transcript.content.words[transcript.content.words.length - 1]?.end || 0,
+                          words: transcript.content.words.map((word: TranscriptWord) => ({
+                            word: word.punctuated_word || word.word,
+                            start: word.start,
+                            end: word.end,
+                            confidence: word.confidence || 1.0
+                          }))
+                        }
+                      ]}
+                      currentTime={currentTime}
+                      onTimeClick={(time) => {
+                        if (videoRef.current) {
+                          videoRef.current.currentTime = time;
+                          setCurrentTime(time);
+                        }
+                      }}
                     />
                   )}
-                  {transcripts.map((message) => (
-                    <div
-                      key={message.timestamp}
-                      className={`
-                        ${message.isSelf ? 'ml-auto bg-cyan-950/30' : 'mr-auto bg-gray-800/30'} 
-                        max-w-[70%] rounded-xl p-2
-                        backdrop-blur-sm
-                        border border-gray-700/50
-                        transition-all duration-300
-                        hover:border-cyan-500/30
-                        mb-1.5
-                      `}
-                    >
-                      <div className={`text-[10px] ${message.isSelf ? 'text-cyan-300' : 'text-gray-300'}`}>
-                        {message.message}
-                      </div>
-                    </div>
-                  ))}
                 </div>
               </div>
             </Panel>
@@ -1369,7 +1373,7 @@ export default function Playground({
         {!isMobile && (
           <motion.div
             className={`
-              fixed right-0 top-[48px] bottom-0 w-[400px] 
+              fixed right-0 top-0 bottom-0 w-[400px] 
               bg-gray-900/50 backdrop-blur-md
               border-l border-gray-800
               z-30
@@ -1509,7 +1513,7 @@ export default function Playground({
                                 knowledgeBase: [...prev.knowledgeBase, newEntry]
                               }));
                             }}
-                            className="
+                            className={`
                               relative z-20
                               group flex items-center gap-1.5
                               px-3 py-1.5 rounded-lg text-[11px]
@@ -1518,7 +1522,7 @@ export default function Playground({
                               transition-all duration-300
                               hover:border-cyan-500/40
                               hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]
-                            "
+                            `}
                           >
                             <Plus size={12} className="group-hover:rotate-90 transition-transform duration-300" />
                             <span>Add Knowledge</span>
@@ -1771,11 +1775,11 @@ export default function Playground({
                                     hover:border-cyan-500/30
                                     hover:shadow-[0_0_20px_rgba(34,211,238,0.07)]
                                     cursor-pointer
-                                    ${voice.active ? 'border-cyan-500/30 bg-cyan-500/5' : ''}
+                                    ${voice.status === 'active' ? 'border-cyan-500/30 bg-cyan-500/5' : ''}
                                   `}
                                   onClick={async () => {
                                     try {
-                                      if (!voice.active) {
+                                      if (voice.status !== 'active') {
                                         // Activate this voice
                                         const response = await api.post(`/brdges/${params.brdgeId}/voice/activate`, {
                                           voice_id: voice.id
@@ -1783,7 +1787,7 @@ export default function Playground({
                                         if (response.data?.voice) {
                                           setSavedVoices(prev => prev.map(v => ({
                                             ...v,
-                                            active: v.id === voice.id
+                                            status: v.id === voice.id ? 'active' : 'inactive'
                                           })));
                                         }
                                       } else {
@@ -1794,7 +1798,7 @@ export default function Playground({
                                         if (response.data?.voice) {
                                           setSavedVoices(prev => prev.map(v => ({
                                             ...v,
-                                            active: v.id === voice.id ? false : v.active
+                                            status: v.id === voice.id ? 'inactive' : v.status
                                           })));
                                         }
                                       }
@@ -1807,7 +1811,7 @@ export default function Playground({
                                     <div className="flex items-center gap-2">
                                       <div className={`
                                         w-2.5 h-2.5 rounded-full
-                                        ${voice.active ? 'bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)]' : 'bg-gray-600'}
+                                        ${voice.status === 'active' ? 'bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)]' : 'bg-gray-600'}
                                         transition-all duration-300
                                         group-hover:scale-110
                                       `} />
@@ -1819,7 +1823,7 @@ export default function Playground({
                                       <span className={`
                                         text-[10px] px-2 py-0.5 rounded-md
                                         transition-all duration-300
-                                        ${voice.active ? `
+                                        ${voice.status === 'active' ? `
                                           text-cyan-400/70
                                           bg-cyan-500/10
                                           border border-cyan-500/20
@@ -1831,14 +1835,14 @@ export default function Playground({
                                           opacity-0 group-hover:opacity-100
                                         `}
                                       `}>
-                                        {voice.active ? 'Active' : 'Click to Toggle'}
+                                        {voice.status === 'active' ? 'Active' : 'Click to Toggle'}
                                       </span>
                                     </div>
                                   </div>
                                   <div className={`
                                     mt-2 text-[11px] text-gray-500
                                     transition-all duration-300
-                                    ${voice.active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}
+                                    ${voice.status === 'active' ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}
                                   `}>
                                     Created {new Date(voice.created_at).toLocaleDateString()}
                                   </div>
@@ -1849,6 +1853,72 @@ export default function Playground({
                         </div>
                       )}
                     </>
+                  )}
+
+                  {activeTab === 'chat' && (
+                    <div className="h-full flex flex-col">
+                      {/* Connection Controls */}
+                      <div className="flex items-center gap-2 p-2 border-b border-gray-800/50">
+                        {connectButton}
+                        <button
+                          onClick={() => {
+                            if (roomState === ConnectionState.Connected) {
+                              localParticipant?.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
+                            }
+                          }}
+                          disabled={roomState !== ConnectionState.Connected}
+                          className={`
+                            p-1.5 rounded-lg transition-colors
+                            ${localParticipant?.isMicrophoneEnabled
+                              ? 'bg-cyan-500/20 text-cyan-300'
+                              : 'bg-gray-800 text-gray-400'
+                            }
+                          `}
+                        >
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+                          </svg>
+                        </button>
+                      </div>
+
+                      {/* Voice Assistant Transcription */}
+                      {voiceAssistant?.audioTrack && (
+                        <div className="p-2">
+                          <TranscriptionTile
+                            agentAudioTrack={voiceAssistant.audioTrack}
+                            accentColor="cyan"
+                          />
+                        </div>
+                      )}
+
+                      {/* Chat Messages */}
+                      <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                        {transcripts.map((message) => (
+                          <div
+                            key={message.timestamp}
+                            className={`
+                              ${message.isSelf ? 'ml-auto bg-cyan-950/30' : 'mr-auto bg-gray-800/30'} 
+                              max-w-[90%] rounded-xl p-2
+                              backdrop-blur-sm
+                              border border-gray-700/50
+                              transition-all duration-300
+                              hover:border-cyan-500/30
+                              group
+                            `}
+                          >
+                            <div className={`
+                              text-[12px] 
+                              ${message.isSelf ? 'text-cyan-300' : 'text-gray-300'}
+                              group-hover:text-cyan-400/90
+                              transition-colors duration-300
+                            `}>
+                              {message.message}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
