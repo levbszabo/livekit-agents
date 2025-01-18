@@ -28,7 +28,8 @@ export interface PlaygroundProps {
   onConnect: (connect: boolean, opts?: { token: string; url: string }) => void;
 }
 
-const headerHeight = 56;
+// Update the header height constant at the top of the file
+const headerHeight = 16; // Changed from 28 to 16
 
 interface BrdgeMetadata {
   id: string;
@@ -638,6 +639,8 @@ const VideoPlayer = ({
   setCurrentTime,
   onTimeUpdate,
   setDuration,
+  isPlaying,
+  setIsPlaying,
 }: {
   videoRef: React.RefObject<HTMLVideoElement>;
   videoUrl: string | null;
@@ -645,11 +648,13 @@ const VideoPlayer = ({
   setCurrentTime: (time: number) => void;
   onTimeUpdate: () => void;
   setDuration: (duration: number) => void;
+  isPlaying: boolean;
+  setIsPlaying: (playing: boolean) => void;
 }) => {
   const handleLoadedMetadata = () => {
     if (videoRef.current) {
       const videoDuration = videoRef.current.duration;
-      if (!isNaN(videoDuration)) {
+      if (!isNaN(videoDuration) && isFinite(videoDuration)) {
         setDuration(videoDuration);
         setCurrentTime(videoRef.current.currentTime);
       }
@@ -659,22 +664,32 @@ const VideoPlayer = ({
   const handleTimeUpdate = () => {
     if (videoRef.current) {
       const newTime = videoRef.current.currentTime;
-      if (!isNaN(newTime)) {
+      if (isFinite(newTime) && newTime >= 0) {
         setCurrentTime(newTime);
       }
     }
     onTimeUpdate();
   };
 
-  const handleSeek = (time: number) => {
+  const handleClick = () => {
     if (videoRef.current) {
-      videoRef.current.currentTime = time;
-      setCurrentTime(time);
+      if (isPlaying) {
+        videoRef.current.pause();
+      } else {
+        videoRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
     }
   };
 
+  useEffect(() => {
+    if (videoRef.current && videoUrl) {
+      videoRef.current.load(); // Force reload when URL changes
+    }
+  }, [videoUrl]);
+
   return (
-    <div className="relative w-full h-full bg-black">
+    <div className="relative w-full h-full bg-black cursor-pointer" onClick={handleClick}>
       <video
         ref={videoRef}
         src={videoUrl || ''}
@@ -682,11 +697,9 @@ const VideoPlayer = ({
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
         onDurationChange={handleLoadedMetadata}
-        onSeeked={() => {
-          if (videoRef.current) {
-            setCurrentTime(videoRef.current.currentTime);
-          }
-        }}
+        onLoadedData={handleLoadedMetadata}
+        onCanPlay={handleLoadedMetadata}
+        playsInline
       />
     </div>
   );
@@ -1171,7 +1184,7 @@ export default function Playground({
         transcript_position: position
       };
 
-      sendData(new TextEncoder().encode(JSON.stringify(payload)));
+      sendData(new TextEncoder().encode(JSON.stringify(payload)), DataPacket_Kind.RELIABLE);
     }
   }, [currentTime, roomState, sendData, computeTranscriptPosition]);
 
@@ -1200,17 +1213,98 @@ export default function Playground({
     </button>
   );
 
+  // Add this effect to handle video playback state
+  useEffect(() => {
+    if (videoRef.current) {
+      if (isPlaying) {
+        videoRef.current.play().catch(error => {
+          console.error('Error playing video:', error);
+          setIsPlaying(false);
+        });
+      } else {
+        videoRef.current.pause();
+      }
+    }
+  }, [isPlaying]);
+
+  // Add this effect to update duration when video is loaded
+  useEffect(() => {
+    if (videoRef.current && videoRef.current.duration) {
+      setDuration(videoRef.current.duration);
+    }
+  }, [videoUrl]);
+
+  // Update progress bar click handler
+  const handleProgressBarClick = useCallback((e: React.MouseEvent) => {
+    if (!progressBarRef.current || !videoRef.current || !duration) return;
+
+    const rect = progressBarRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percentage = x / rect.width;
+    const newTime = percentage * duration;
+
+    if (isFinite(newTime) && newTime >= 0) {
+      try {
+        videoRef.current.currentTime = newTime;
+        setCurrentTime(newTime);
+      } catch (error) {
+        console.error('Error setting video time:', error);
+      }
+    }
+  }, [duration]);
+
   return (
     <div className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
-      <div className="flex-1 flex overflow-hidden">
-        {/* Main Content */}
+      {/* Enhanced futuristic header */}
+      <div className="h-[20px] flex items-center px-4 relative">
+        {logo}
+        {/* Multi-layered border effect */}
+        <div className="absolute bottom-0 left-0 right-0">
+          {/* Primary glowing line */}
+          <div className="absolute bottom-0 left-0 right-0 h-[1px] 
+            bg-gradient-to-r from-transparent via-cyan-500/80 to-transparent 
+            shadow-[0_0_10px_rgba(34,211,238,0.4)]
+            animate-pulse"
+          />
+
+          {/* Secondary accent lines */}
+          <div className="absolute bottom-[1px] left-1/4 right-1/4 h-[1px] 
+            bg-gradient-to-r from-transparent via-cyan-400/40 to-transparent
+            shadow-[0_0_8px_rgba(34,211,238,0.3)]"
+          />
+
+          {/* Animated scanning effect */}
+          <div className="absolute bottom-0 left-0 right-0 h-[1px] overflow-hidden">
+            <div className="absolute inset-0 
+              bg-gradient-to-r from-transparent via-cyan-300/60 to-transparent
+              animate-[scan_4s_ease-in-out_infinite]
+              w-1/2 translate-x-full"
+            />
+          </div>
+
+          {/* Edge accents */}
+          <div className="absolute bottom-0 left-0 w-8 h-[2px]
+            bg-gradient-to-r from-cyan-400/80 to-transparent
+            shadow-[0_0_10px_rgba(34,211,238,0.4)]"
+          />
+          <div className="absolute bottom-0 right-0 w-8 h-[2px]
+            bg-gradient-to-l from-cyan-400/80 to-transparent
+            shadow-[0_0_10px_rgba(34,211,238,0.4)]"
+          />
+        </div>
+      </div>
+
+      {/* Main container - Add relative positioning */}
+      <div className="flex-1 relative">
+        {/* Main Content - Use absolute positioning to respect right panel */}
         <div className={`
-          flex-1 transition-all duration-300
-          ${!isMobile ? (isRightPanelCollapsed ? 'mr-0' : 'mr-[400px]') : 'mr-0'}
+          absolute inset-0
+          ${!isMobile && !isRightPanelCollapsed ? 'right-[360px]' : 'right-0'}
+          transition-all duration-300
         `}>
           <PanelGroup direction="vertical">
-            {/* Video Panel */}
-            <Panel defaultSize={75} minSize={60}>
+            {/* Video Panel - Increase size to push transcript down */}
+            <Panel defaultSize={85} minSize={60}>
               <div className="h-full w-full flex flex-col bg-black">
                 <div className="flex-1 relative">
                   {/* Video container that maintains full size regardless of panel state */}
@@ -1226,6 +1320,8 @@ export default function Playground({
                         }
                       }}
                       setDuration={setDuration}
+                      isPlaying={isPlaying}
+                      setIsPlaying={setIsPlaying}
                     />
                   </div>
                 </div>
@@ -1233,14 +1329,35 @@ export default function Playground({
             </Panel>
 
             <PanelResizeHandle className={resizeHandleStyles.horizontal}>
-              <div className="w-8 h-0.5 bg-gray-700 group-hover:bg-cyan-500 transition-colors duration-150" />
+              <div className="relative w-full h-2 group">
+                {/* Main resize line with glow */}
+                <div className="absolute left-1/2 -translate-x-1/2 w-8 h-0.5 
+                  bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent 
+                  group-hover:via-cyan-400
+                  shadow-[0_0_8px_rgba(34,211,238,0.3)]
+                  transition-all duration-300"
+                />
+                {/* Animated accent lines */}
+                <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-[1px] overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <div className="absolute inset-0 w-1/3
+                    bg-gradient-to-r from-transparent via-cyan-300/40 to-transparent
+                    animate-[scan_3s_ease-in-out_infinite]"
+                  />
+                </div>
+              </div>
             </PanelResizeHandle>
 
-            {/* Timeline and Chat Panel */}
-            <Panel defaultSize={25} minSize={20} maxSize={40}>
+            {/* Transcript Panel - Reduce size to sit at bottom */}
+            <Panel defaultSize={15} minSize={15} maxSize={40}>
               <div className="h-full flex flex-col bg-black/90">
                 {/* Unified Control Bar */}
-                <div className="border-b border-gray-800 bg-black/90 p-2">
+                <div className="border-b border-gray-800 bg-black/90 p-2 relative">
+                  <div className="absolute bottom-0 left-0 right-0">
+                    <div className="absolute bottom-0 left-0 right-0 h-[1px]
+                      bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent
+                      shadow-[0_0_8px_rgba(34,211,238,0.2)]"
+                    />
+                  </div>
                   <div className="flex items-center gap-4">
                     {/* Play/Pause */}
                     <button
@@ -1264,19 +1381,11 @@ export default function Playground({
                       <div
                         ref={progressBarRef}
                         className="relative w-full h-1 bg-gray-800/50 rounded-full cursor-pointer group"
-                        onClick={(e) => {
-                          if (!progressBarRef.current || !videoRef.current) return;
-                          const rect = progressBarRef.current.getBoundingClientRect();
-                          const x = e.clientX - rect.left;
-                          const percentage = x / rect.width;
-                          const newTime = percentage * duration;
-                          videoRef.current.currentTime = newTime;
-                          setCurrentTime(newTime);
-                        }}
+                        onClick={handleProgressBarClick}
                       >
                         <div
-                          className="absolute top-0 left-0 h-full bg-cyan-500 rounded-full"
-                          style={{ width: `${(currentTime / duration) * 100}%` }}
+                          className="absolute top-0 left-0 h-full bg-cyan-500 rounded-full transition-all duration-150"
+                          style={{ width: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }}
                         />
                         <div className="
                           absolute top-1/2 -translate-y-1/2
@@ -1284,7 +1393,7 @@ export default function Playground({
                           opacity-0 group-hover:opacity-100
                           transition-all duration-300
                           shadow-[0_0_10px_rgba(34,211,238,0.5)]
-                        " style={{ left: `${(currentTime / duration) * 100}%` }} />
+                        " style={{ left: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }} />
                       </div>
                     </div>
 
@@ -1337,8 +1446,8 @@ export default function Playground({
                   </div>
                 </div>
 
-                {/* Transcript section - Keep this! */}
-                <div className="h-12 bg-black/90">
+                {/* Updated transcript container */}
+                <div className="flex-1 bg-black/90">
                   {transcript?.content?.words && (
                     <TimeAlignedTranscript
                       segments={[
@@ -1356,9 +1465,13 @@ export default function Playground({
                       ]}
                       currentTime={currentTime}
                       onTimeClick={(time) => {
-                        if (videoRef.current) {
-                          videoRef.current.currentTime = time;
-                          setCurrentTime(time);
+                        if (videoRef.current && isFinite(time) && time >= 0) {
+                          try {
+                            videoRef.current.currentTime = time;
+                            setCurrentTime(time);
+                          } catch (error) {
+                            console.error('Error setting video time:', error);
+                          }
                         }
                       }}
                     />
@@ -1369,36 +1482,40 @@ export default function Playground({
           </PanelGroup>
         </div>
 
-        {/* Right Panel - Configuration */}
+        {/* Right Panel */}
         {!isMobile && (
           <motion.div
             className={`
-              fixed right-0 top-0 bottom-0 w-[400px] 
+              absolute right-0 top-0 bottom-0 w-[360px]
               bg-gray-900/50 backdrop-blur-md
               border-l border-gray-800
               z-30
               transition-transform duration-300 ease-in-out
+              before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[1px]
+              before:bg-gradient-to-b before:from-transparent before:via-cyan-500/30 before:to-transparent
+              before:shadow-[0_0_10px_rgba(34,211,238,0.2)]
             `}
             initial={false}
             animate={{
-              transform: isRightPanelCollapsed ? 'translateX(400px)' : 'translateX(0)'
+              transform: isRightPanelCollapsed ? 'translateX(360px)' : 'translateX(0)'
             }}
           >
             {/* Collapse Toggle Button */}
             <button
               onClick={() => setIsRightPanelCollapsed(!isRightPanelCollapsed)}
               className="absolute -left-8 top-1/2 transform -translate-y-1/2
-                w-8 h-16 
-                bg-gray-900/80 backdrop-blur-sm
-                rounded-l-lg 
-                flex items-center justify-center
-                text-gray-400 
-                transition-all duration-300
-                border-t border-b border-l border-gray-800/50
-                hover:border-cyan-500/30
-                hover:text-cyan-400
+                w-8 h-16 bg-gray-900/80 backdrop-blur-sm
+                rounded-l-lg flex items-center justify-center
+                text-gray-400 transition-all duration-300
+                border-y border-l border-gray-800/50
+                hover:border-cyan-500/30 hover:text-cyan-400
                 hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]
                 group
+                before:absolute before:inset-0 before:rounded-l-lg
+                before:border-y before:border-l
+                before:border-cyan-500/0 before:transition-all before:duration-300
+                hover:before:border-cyan-500/30
+                hover:before:shadow-[0_0_10px_rgba(34,211,238,0.2)]
               "
             >
               <motion.div
@@ -1411,12 +1528,19 @@ export default function Playground({
               </motion.div>
             </button>
 
-            {/* Panel Content */}
-            <div className="h-full p-4 overflow-y-auto space-y-6">
+            {/* Panel Content - Remove right padding */}
+            <div className="h-full pl-4 pr-0 overflow-y-auto space-y-6">
               {/* Agent Configuration Section */}
               <div className="h-full flex flex-col">
                 {/* Tabs */}
-                <div className="flex items-center px-2 border-b border-gray-800/50">
+                <div className="flex items-center px-2 border-b border-gray-800/50 relative">
+                  {/* Add glowing border effect */}
+                  <div className="absolute bottom-0 left-0 right-0">
+                    <div className="absolute bottom-0 left-0 right-0 h-[1px]
+                      bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent
+                      shadow-[0_0_8px_rgba(34,211,238,0.2)]"
+                    />
+                  </div>
                   {tabs.map((tab) => (
                     <motion.button
                       key={tab.id}
@@ -1539,29 +1663,105 @@ export default function Playground({
                             transition-all duration-300
                             hover:border-cyan-500/30
                             hover:shadow-[0_0_20px_rgba(34,211,238,0.07)]
-                            before:absolute before:inset-0
-                            before:bg-gradient-to-r before:from-cyan-500/[0.02] before:to-transparent
-                            before:opacity-0 before:transition-opacity before:duration-300
-                            hover:before:opacity-100
+                            z-10 // Ensure parent has lower z-index
                           "
                         >
-                          <div className="relative z-10 flex items-center justify-between">
+                          {/* Background gradient effect */}
+                          <div className="
+                            absolute inset-0 
+                            bg-gradient-to-r from-cyan-500/[0.02] to-transparent
+                            opacity-0 transition-opacity duration-300
+                            group-hover:opacity-100
+                            pointer-events-none
+                          "/>
+
+                          <div className="relative flex items-center justify-between pointer-events-auto">
                             <div className="flex items-center gap-2">
                               <FileText size={12} className="text-cyan-400 group-hover:animate-pulse" />
                               <span className="text-[12px] text-gray-300 group-hover:text-cyan-400/90 transition-colors duration-300">
-                                {agentConfig.knowledgeBase[0]?.name || "No presentation file"}
+                                {/* Check both brdge and agentConfig for presentation name */}
+                                {brdge?.presentation_filename ||
+                                  agentConfig.knowledgeBase.find(k => k.type === 'presentation')?.name ||
+                                  "No presentation file"}
                               </span>
                             </div>
-                            <span className="
-                              text-[10px] text-gray-600/70 
-                              px-2 py-0.5 
-                              bg-black/20 rounded-md
-                              border border-gray-800/50
-                              group-hover:border-cyan-500/20
-                              transition-all duration-300
-                            ">
-                              PDF
-                            </span>
+                            {!brdge?.presentation_filename &&
+                              !agentConfig.knowledgeBase.find(k => k.type === 'presentation')?.name ? (
+                              <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={() => document.getElementById('pdf-upload')?.click()}
+                                className="
+                                  relative z-30 group flex items-center gap-1.5
+                                  px-2 py-1 rounded-md
+                                  bg-cyan-500/10
+                                  text-cyan-400/90 border border-cyan-500/20
+                                  transition-all duration-300
+                                  hover:border-cyan-500/40
+                                  hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]
+                                "
+                              >
+                                <input
+                                  id="pdf-upload"
+                                  type="file"
+                                  accept=".pdf"
+                                  className="hidden"
+                                  onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+
+                                    // Validate file size (20MB limit)
+                                    if (file.size > 20 * 1024 * 1024) {
+                                      console.error('File size exceeds 20MB limit');
+                                      return;
+                                    }
+
+                                    try {
+                                      const formData = new FormData();
+                                      formData.append('presentation', file);
+
+                                      const response = await fetch(
+                                        `${params.apiBaseUrl}/brdges/${params.brdgeId}/presentation`,
+                                        {
+                                          method: 'POST',
+                                          body: formData,
+                                        }
+                                      );
+
+                                      if (!response.ok) {
+                                        throw new Error('Failed to upload presentation');
+                                      }
+
+                                      // Refresh brdge data
+                                      const brdgeResponse = await fetch(
+                                        `${params.apiBaseUrl}/brdges/${params.brdgeId}`
+                                      );
+                                      if (brdgeResponse.ok) {
+                                        const data = await brdgeResponse.json();
+                                        setBrdge(data);
+                                      }
+                                    } catch (error) {
+                                      console.error('Error uploading presentation:', error);
+                                    }
+                                  }}
+                                />
+                                <Plus size={12} className="text-cyan-400/70 group-hover:text-cyan-400 transition-colors duration-300" />
+                                <span className="text-[11px] text-cyan-400/70 group-hover:text-cyan-400 transition-colors duration-300">
+                                  Upload PDF
+                                </span>
+                              </motion.button>
+                            ) : (
+                              <span className="
+                                text-[10px] text-gray-600/70 
+                                px-2 py-0.5 
+                                bg-black/20 rounded-md
+                                border border-gray-800/50
+                                group-hover:border-cyan-500/20
+                                transition-all duration-300
+                              ">
+                                PDF
+                              </span>
+                            )}
                           </div>
                         </motion.div>
 
@@ -1666,7 +1866,7 @@ export default function Playground({
                                   group-hover:border-cyan-500/20
                             transition-all duration-300
                                 `}>
-                                  "In just a few quick steps my voice based AI assistant will be integrated into my content, how cool is that? This way you can speak to others without being there... how cool is that?"
+                                  "In just a few quick steps my voice based AI assistant will be integrated into my content. This way you can speak to others without being there... how cool is that?"
                                 </div>
                               </div>
 

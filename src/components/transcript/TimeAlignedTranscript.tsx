@@ -66,12 +66,14 @@ export const TimeAlignedTranscript: React.FC<TimeAlignedTranscriptProps> = ({
     const activeWord = findActiveWord();
 
     return (
-        <div className="w-full h-full flex items-center">
+        <div className="w-full h-full flex flex-col">
             <div
                 ref={containerRef}
                 className="
-                    w-full overflow-x-auto overflow-y-hidden 
-                    whitespace-nowrap py-2
+                    flex-1
+                    w-full overflow-x-auto overflow-y-auto
+                    whitespace-normal
+                    py-2 px-4
                     scrollbar-thin scrollbar-track-transparent 
                     scrollbar-thumb-gray-700/30 hover:scrollbar-thumb-cyan-500/20
                     relative
@@ -83,10 +85,10 @@ export const TimeAlignedTranscript: React.FC<TimeAlignedTranscriptProps> = ({
 
                 {/* Content container */}
                 <div className="
-                    inline-flex gap-1.5 
+                    flex flex-wrap gap-1.5
                     min-w-full w-full
-                    px-[20%] /* Reduced padding to allow more text visibility */
-                    justify-center items-center
+                    px-[5%]
+                    justify-start items-start
                 ">
                     {segments.map((segment, segmentIndex) => (
                         <div
