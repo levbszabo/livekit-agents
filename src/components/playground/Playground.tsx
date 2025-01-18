@@ -973,8 +973,15 @@ export default function Playground({
         if (!response.ok) throw new Error('Failed to fetch brdge');
 
         const data = await response.json();
-        console.log('Fetched brdge data:', data); // Let's see exactly what we get
+        console.log('Fetched brdge data:', data);
         setBrdge(data);
+
+        // Update agentConfig with the brdge's personality if it exists
+        setAgentConfig(prev => ({
+          ...prev,
+          personality: data.agent_personality || "friendly ai assistant"
+        }));
+
       } catch (error) {
         console.error('Error fetching brdge:', error);
       } finally {
@@ -1252,6 +1259,25 @@ export default function Playground({
       }
     }
   }, [duration]);
+
+  // Add this state near other state declarations
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Update the save button click handler
+  const handleSaveConfig = async () => {
+    setIsSaving(true);
+    try {
+      await updateAgentConfig(agentConfig);
+      setSaveSuccess(true);
+      // Reset success state after 2 seconds
+      setTimeout(() => setSaveSuccess(false), 2000);
+    } catch (error) {
+      console.error('Error saving config:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
@@ -1580,19 +1606,58 @@ export default function Playground({
                         <motion.button
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
-                          onClick={() => updateAgentConfig(agentConfig)}
+                          onClick={handleSaveConfig}
+                          disabled={isSaving}
                           className={`
                             group flex items-center gap-1.5
                             px-3 py-1.5 rounded-lg
-                            bg-gradient-to-r from-cyan-500/10 to-transparent
-                            text-cyan-400 border border-cyan-500/20
+                            bg-gradient-to-r 
+                            ${saveSuccess
+                              ? 'from-green-500/20 to-green-400/10 border-green-500/30'
+                              : 'from-cyan-500/10 to-transparent border-cyan-500/20'
+                            }
+                            ${isSaving ? 'opacity-70 cursor-wait' : ''}
+                            text-cyan-400 border
                             transition-all duration-300
                             hover:border-cyan-500/40
                             hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]
+                            disabled:opacity-50 disabled:cursor-not-allowed
                           `}
                         >
-                          <Save size={12} className="group-hover:rotate-12 transition-transform duration-300" />
-                          <span className="text-[11px]">Save Changes</span>
+                          {isSaving ? (
+                            <>
+                              <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                              <span className="text-[11px]">Saving...</span>
+                            </>
+                          ) : saveSuccess ? (
+                            <>
+                              <motion.div
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                className="text-green-400"
+                              >
+                                <svg
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  className="w-3 h-3"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M5 13l4 4L19 7"
+                                  />
+                                </svg>
+                              </motion.div>
+                              <span className="text-[11px] text-green-400">Saved!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Save size={12} className="group-hover:rotate-12 transition-transform duration-300" />
+                              <span className="text-[11px]">Save Changes</span>
+                            </>
+                          )}
                         </motion.button>
                       </div>
 
