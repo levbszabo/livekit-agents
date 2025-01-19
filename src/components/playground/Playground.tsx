@@ -2169,81 +2169,87 @@ export default function Playground({
 
                   {activeTab === 'chat' && (
                     <div className="h-full flex flex-col">
-                      {/* Top bar with brand icon and mic toggle */}
-                      <div className="flex items-center justify-between p-2 border-b border-gray-800">
-                        {/* Brand icon that pulses when mic/TTS active */}
-                        <div className="flex items-center gap-2">
-                          <div className={`
-                            w-6 h-6 rounded-full bg-cyan-500/20
-                            flex items-center justify-center
-                            text-cyan-400 transition-all
-                            ${(localParticipant?.isMicrophoneEnabled || voiceAssistant?.audioTrack)
-                              ? 'animate-pulse shadow-[0_0_10px_rgba(34,211,238,0.5)]'
-                              : ''
-                            }
-                          `}>
-                            <Radio size={16} />
+                      {/* Sticky header */}
+                      <div className="sticky top-0 z-10 bg-[#121212]/95 backdrop-blur-sm border-b border-gray-800">
+                        <div className="flex items-center justify-between p-2">
+                          {/* Brand icon that pulses when mic/TTS active */}
+                          <div className="flex items-center gap-2">
+                            <div className={`
+                              w-6 h-6 rounded-full bg-cyan-500/20
+                              flex items-center justify-center
+                              text-cyan-400 transition-all
+                              ${(localParticipant?.isMicrophoneEnabled || voiceAssistant?.audioTrack)
+                                ? 'animate-pulse shadow-[0_0_10px_rgba(34,211,238,0.5)]'
+                                : ''
+                              }
+                            `}>
+                              <Radio size={16} />
+                            </div>
+                            <span className="text-sm text-gray-200 font-medium">AI Chat</span>
                           </div>
-                          <span className="text-sm text-gray-200 font-medium">AI Chat</span>
-                        </div>
 
-                        {/* Mic toggle button */}
-                        <button
-                          onClick={() => {
-                            if (roomState === ConnectionState.Connected && localParticipant) {
-                              localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
-                            }
-                          }}
-                          disabled={roomState !== ConnectionState.Connected}
-                          className="
-                            p-1.5 rounded-lg transition-colors text-xs
-                            flex items-center gap-1
-                            bg-cyan-500/20 text-cyan-400
-                            hover:bg-cyan-500/30
-                          "
-                        >
-                          {localParticipant?.isMicrophoneEnabled ? <Mic size={14} /> : <MicOff size={14} />}
-                          <span className="text-[11px]">
-                            {localParticipant?.isMicrophoneEnabled ? 'Mic: On' : 'Mic: Off'}
-                          </span>
-                        </button>
+                          {/* Mic toggle button */}
+                          <button
+                            onClick={() => {
+                              if (roomState === ConnectionState.Connected && localParticipant) {
+                                localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
+                              }
+                            }}
+                            disabled={roomState !== ConnectionState.Connected}
+                            className="
+                              p-1.5 rounded-lg transition-all duration-300
+                              flex items-center gap-1.5
+                              bg-cyan-500/20 text-cyan-400
+                              hover:bg-cyan-500/30 hover:shadow-[0_0_10px_rgba(34,211,238,0.15)]
+                              disabled:opacity-50 disabled:cursor-not-allowed
+                            "
+                          >
+                            {localParticipant?.isMicrophoneEnabled ? <Mic size={14} /> : <MicOff size={14} />}
+                            <span className="text-[11px] font-medium">
+                              {localParticipant?.isMicrophoneEnabled ? 'Mic: On' : 'Mic: Off'}
+                            </span>
+                          </button>
+                        </div>
                       </div>
 
-                      {/* Rest of chat content */}
-                      {voiceAssistant?.audioTrack && (
-                        <div className="p-2">
-                          <TranscriptionTile
-                            agentAudioTrack={voiceAssistant.audioTrack}
-                            accentColor="cyan"
-                          />
-                        </div>
-                      )}
-
-                      {/* Existing chat messages and input */}
-                      <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                        {transcripts.map((message) => (
-                          <div
-                            key={message.timestamp}
-                            className={`
-                              ${message.isSelf ? 'ml-auto bg-cyan-950/30' : 'mr-auto bg-gray-800/30'} 
-                              max-w-[90%] rounded-xl p-2
-                              backdrop-blur-sm
-                              border border-gray-700/50
-                              transition-all duration-300
-                              hover:border-cyan-500/30
-                              group
-                            `}
-                          >
-                            <div className={`
-                              text-[12px] 
-                              ${message.isSelf ? 'text-cyan-300' : 'text-gray-300'}
-                              group-hover:text-cyan-400/90
-                              transition-colors duration-300
-                            `}>
-                              {message.message}
-                            </div>
+                      {/* Scrollable chat content */}
+                      <div className="flex-1 overflow-y-auto">
+                        {/* Voice Assistant Transcription */}
+                        {voiceAssistant?.audioTrack && (
+                          <div className="p-2">
+                            <TranscriptionTile
+                              agentAudioTrack={voiceAssistant.audioTrack}
+                              accentColor="cyan"
+                            />
                           </div>
-                        ))}
+                        )}
+
+                        {/* Chat Messages */}
+                        <div className="flex-1 p-2 space-y-1.5">
+                          {transcripts.map((message) => (
+                            <div
+                              key={message.timestamp}
+                              className={`
+                                ${message.isSelf ? 'ml-auto bg-cyan-950/30' : 'mr-auto bg-gray-800/30'} 
+                                max-w-[85%] rounded-xl p-2
+                                backdrop-blur-sm
+                                border border-gray-700/50
+                                transition-all duration-300
+                                hover:border-cyan-500/30
+                                group
+                              `}
+                            >
+                              <div className={`
+                                text-[11px] leading-relaxed
+                                ${message.isSelf ? 'text-cyan-300' : 'text-gray-300'}
+                                group-hover:text-cyan-400/90
+                                transition-colors duration-300
+                              `}>
+                                {message.message}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   )}
