@@ -125,20 +125,27 @@ interface DataChannelPayload {
   // Add other payload types as needed
 }
 
+// Update the useIsMobile hook to also detect orientation
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(false);
+  const [isLandscape, setIsLandscape] = useState(false);
 
   useEffect(() => {
-    const checkIsMobile = () => {
+    const checkLayout = () => {
       setIsMobile(window.innerWidth < 640);
+      setIsLandscape(window.innerWidth > window.innerHeight);
     };
 
-    checkIsMobile();
-    window.addEventListener('resize', checkIsMobile);
-    return () => window.removeEventListener('resize', checkIsMobile);
+    checkLayout();
+    window.addEventListener('resize', checkLayout);
+    window.addEventListener('orientationchange', checkLayout);
+    return () => {
+      window.removeEventListener('resize', checkLayout);
+      window.removeEventListener('orientationchange', checkLayout);
+    };
   }, []);
 
-  return isMobile;
+  return { isMobile, isLandscape };
 };
 
 const styles = {
@@ -735,7 +742,7 @@ export default function Playground({
   themeColors,
   onConnect,
 }: PlaygroundProps) {
-  const isMobile = useIsMobile();
+  const { isMobile, isLandscape } = useIsMobile();
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
   const [selectedVoice, setSelectedVoice] = useState<string | null>(null);
   const [isCreatingVoice, setIsCreatingVoice] = useState(false);
@@ -1191,7 +1198,7 @@ export default function Playground({
         transcript_position: position
       };
 
-      sendData(new TextEncoder().encode(JSON.stringify(payload)), DataPacket_Kind.RELIABLE);
+      sendData(new TextEncoder().encode(JSON.stringify(payload)), { topic: "agent_data_channel" });
     }
   }, [currentTime, roomState, sendData, computeTranscriptPosition]);
 
@@ -1361,61 +1368,93 @@ export default function Playground({
     }
   }, [localParticipant?.isMicrophoneEnabled, voiceAssistant?.audioTrack]);
 
+  // Add this CSS class for mobile landscape mode
+  const mobileLayoutClass = isMobile
+    ? `fixed inset-0 ${!isLandscape
+      ? 'bg-black flex flex-col items-center justify-center'
+      : 'flex flex-row overflow-hidden'} h-[100dvh]`
+    : '';
+
   return (
     <div className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
-      {/* Enhanced futuristic header */}
-      <div className="h-[20px] flex items-center px-4 relative">
-        {logo}
-        {/* Multi-layered border effect */}
-        <div className="absolute bottom-0 left-0 right-0">
-          {/* Primary glowing line */}
-          <div className="absolute bottom-0 left-0 right-0 h-[1px] 
+      {/* Enhanced futuristic header - Hide on mobile */}
+      {!isMobile && (
+        <div className="h-[20px] flex items-center px-4 relative">
+          {logo}
+          {/* Multi-layered border effect */}
+          <div className="absolute bottom-0 left-0 right-0">
+            {/* Primary glowing line */}
+            <div className="absolute bottom-0 left-0 right-0 h-[1px] 
             bg-gradient-to-r from-transparent via-cyan-500/80 to-transparent 
             shadow-[0_0_10px_rgba(34,211,238,0.4)]
             animate-pulse"
-          />
+            />
 
-          {/* Secondary accent lines */}
-          <div className="absolute bottom-[1px] left-1/4 right-1/4 h-[1px] 
+            {/* Secondary accent lines */}
+            <div className="absolute bottom-[1px] left-1/4 right-1/4 h-[1px] 
             bg-gradient-to-r from-transparent via-cyan-400/40 to-transparent
             shadow-[0_0_8px_rgba(34,211,238,0.3)]"
-          />
+            />
 
-          {/* Animated scanning effect */}
-          <div className="absolute bottom-0 left-0 right-0 h-[1px] overflow-hidden">
-            <div className="absolute inset-0 
+            {/* Animated scanning effect */}
+            <div className="absolute bottom-0 left-0 right-0 h-[1px] overflow-hidden">
+              <div className="absolute inset-0 
               bg-gradient-to-r from-transparent via-cyan-300/60 to-transparent
               animate-[scan_4s_ease-in-out_infinite]
               w-1/2 translate-x-full"
-            />
-          </div>
+              />
+            </div>
 
-          {/* Edge accents */}
-          <div className="absolute bottom-0 left-0 w-8 h-[2px]
+            {/* Edge accents */}
+            <div className="absolute bottom-0 left-0 w-8 h-[2px]
             bg-gradient-to-r from-cyan-400/80 to-transparent
             shadow-[0_0_10px_rgba(34,211,238,0.4)]"
-          />
-          <div className="absolute bottom-0 right-0 w-8 h-[2px]
+            />
+            <div className="absolute bottom-0 right-0 w-8 h-[2px]
             bg-gradient-to-l from-cyan-400/80 to-transparent
             shadow-[0_0_10px_rgba(34,211,238,0.4)]"
-          />
+            />
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Main container - Add relative positioning */}
-      <div className="flex-1 relative">
-        {/* Main Content - Use absolute positioning to respect right panel */}
+      {/* Mobile rotation prompt */}
+      {isMobile && !isLandscape && (
+        <div className="fixed inset-0 bg-black z-50 flex flex-col items-center justify-center p-4 text-center h-[100dvh]">
+          <div className="animate-pulse mb-4">
+            <svg
+              className="w-12 h-12 text-cyan-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v7a2 2 0 002 2h12a2 2 0 002-2V4M4 4h16"
+              />
+            </svg>
+          </div>
+          <p className="text-cyan-400 font-medium mb-2">Please rotate your device</p>
+          <p className="text-gray-400 text-sm">For the best experience, use landscape mode</p>
+        </div>
+      )}
+
+      {/* Main container */}
+      <div className={`flex-1 relative ${mobileLayoutClass}`}>
+        {/* Main Content */}
         <div className={`
-          absolute inset-0
+          ${isMobile && isLandscape ? 'w-[90%] h-[100dvh] overflow-hidden' : 'absolute inset-0'}
           ${!isMobile && !isRightPanelCollapsed ? 'right-[360px]' : 'right-0'}
           transition-all duration-300
+          ${isMobile ? 'touch-none' : ''}
         `}>
           <PanelGroup direction="vertical">
-            {/* Video Panel - Increase size to push transcript down */}
-            <Panel defaultSize={85} minSize={60}>
+            {/* Video Panel */}
+            <Panel defaultSize={isMobile ? 100 : 85} minSize={60}>
               <div className="h-full w-full flex flex-col bg-black">
                 <div className="flex-1 relative">
-                  {/* Video container that maintains full size regardless of panel state */}
                   <div className="absolute inset-0">
                     <VideoPlayer
                       videoRef={videoRef}
@@ -1436,182 +1475,189 @@ export default function Playground({
               </div>
             </Panel>
 
-            <PanelResizeHandle className={resizeHandleStyles.horizontal}>
-              <div className="relative w-full h-2 group">
-                {/* Main resize line with glow */}
-                <div className="absolute left-1/2 -translate-x-1/2 w-8 h-0.5 
+            {/* Hide transcript panel on mobile */}
+            {!isMobile && (
+              <>
+                <PanelResizeHandle className={resizeHandleStyles.horizontal}>
+                  <div className="relative w-full h-2 group">
+                    {/* Main resize line with glow */}
+                    <div className="absolute left-1/2 -translate-x-1/2 w-8 h-0.5 
                   bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent 
                   group-hover:via-cyan-400
                   shadow-[0_0_8px_rgba(34,211,238,0.3)]
                   transition-all duration-300"
-                />
-                {/* Animated accent lines */}
-                <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-[1px] overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                  <div className="absolute inset-0 w-1/3
+                    />
+                    {/* Animated accent lines */}
+                    <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-[1px] overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <div className="absolute inset-0 w-1/3
                     bg-gradient-to-r from-transparent via-cyan-300/40 to-transparent
                     animate-[scan_3s_ease-in-out_infinite]"
-                  />
-                </div>
-              </div>
-            </PanelResizeHandle>
+                      />
+                    </div>
+                  </div>
+                </PanelResizeHandle>
 
-            {/* Transcript Panel - Reduce size to sit at bottom */}
-            <Panel defaultSize={15} minSize={15} maxSize={40}>
-              <div className="h-full flex flex-col bg-black/90">
-                {/* Unified Control Bar */}
-                <div className="border-b border-gray-800 bg-black/90 p-2 relative">
-                  <div className="absolute bottom-0 left-0 right-0">
-                    <div className="absolute bottom-0 left-0 right-0 h-[1px]
+                <Panel defaultSize={15} minSize={15} maxSize={40}>
+                  <div className="h-full flex flex-col bg-black/90">
+                    {/* Unified Control Bar */}
+                    <div className="border-b border-gray-800 bg-black/90 p-2 relative">
+                      <div className="absolute bottom-0 left-0 right-0">
+                        <div className="absolute bottom-0 left-0 right-0 h-[1px]
                       bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent
                       shadow-[0_0_8px_rgba(34,211,238,0.2)]"
-                    />
-                  </div>
-                  <div className="flex items-center gap-4">
-                    {/* Play/Pause */}
-                    <button
-                      onClick={() => {
-                        if (videoRef.current) {
-                          if (isPlaying) {
-                            videoRef.current.pause();
-                          } else {
-                            videoRef.current.play();
-                          }
-                          setIsPlaying(!isPlaying);
-                        }
-                      }}
-                      className="text-white hover:text-cyan-400 transition-colors"
-                    >
-                      {isPlaying ? <Pause size={18} /> : <Play size={18} />}
-                    </button>
-
-                    {/* Progress Bar */}
-                    <div className="flex-1">
-                      <div
-                        ref={progressBarRef}
-                        className="relative w-full h-1 bg-gray-800/50 rounded-full cursor-pointer group"
-                        onClick={handleProgressBarClick}
-                      >
-                        <div
-                          className="absolute top-0 left-0 h-full bg-cyan-500 rounded-full transition-all duration-150"
-                          style={{ width: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }}
                         />
-                        <div className="
+                      </div>
+                      <div className="flex items-center gap-4">
+                        {/* Play/Pause */}
+                        <button
+                          onClick={() => {
+                            if (videoRef.current) {
+                              if (isPlaying) {
+                                videoRef.current.pause();
+                              } else {
+                                videoRef.current.play();
+                              }
+                              setIsPlaying(!isPlaying);
+                            }
+                          }}
+                          className="text-white hover:text-cyan-400 transition-colors"
+                        >
+                          {isPlaying ? <Pause size={18} /> : <Play size={18} />}
+                        </button>
+
+                        {/* Progress Bar */}
+                        <div className="flex-1">
+                          <div
+                            ref={progressBarRef}
+                            className="relative w-full h-1 bg-gray-800/50 rounded-full cursor-pointer group"
+                            onClick={handleProgressBarClick}
+                          >
+                            <div
+                              className="absolute top-0 left-0 h-full bg-cyan-500 rounded-full transition-all duration-150"
+                              style={{ width: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }}
+                            />
+                            <div className="
                           absolute top-1/2 -translate-y-1/2
                           w-2.5 h-2.5 bg-cyan-400 rounded-full
                           opacity-0 group-hover:opacity-100
                           transition-all duration-300
                           shadow-[0_0_10px_rgba(34,211,238,0.5)]
                         " style={{ left: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }} />
+                          </div>
+                        </div>
+
+                        {/* Time Display */}
+                        <div className="flex items-center gap-2 text-[11px] text-gray-400 font-medium tracking-wider">
+                          {formatTimeWithDecimals(currentTime, videoRef.current?.duration)}
+                        </div>
+
+                        {/* Volume Control */}
+                        <div className="flex items-center gap-2 group relative">
+                          <button
+                            onClick={() => {
+                              if (videoRef.current) {
+                                videoRef.current.muted = !isMuted;
+                                setIsMuted(!isMuted);
+                              }
+                            }}
+                            className="text-white hover:text-cyan-400 transition-colors"
+                          >
+                            {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                          </button>
+                          <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.1"
+                            value={isMuted ? 0 : volume}
+                            onChange={(e) => {
+                              const newVolume = parseFloat(e.target.value);
+                              setVolume(newVolume);
+                              if (videoRef.current) {
+                                videoRef.current.volume = newVolume;
+                              }
+                            }}
+                            className="w-0 group-hover:w-20 transition-all duration-300 accent-cyan-500"
+                          />
+                        </div>
+
+                        {/* Fullscreen Toggle */}
+                        <button
+                          onClick={() => {
+                            if (videoRef.current) {
+                              videoRef.current.requestFullscreen();
+                            }
+                          }}
+                          className="text-white hover:text-cyan-400 transition-colors"
+                        >
+                          <Maximize2 size={18} />
+                        </button>
                       </div>
                     </div>
 
-                    {/* Time Display */}
-                    <div className="flex items-center gap-2 text-[11px] text-gray-400 font-medium tracking-wider">
-                      {formatTimeWithDecimals(currentTime, videoRef.current?.duration)}
+                    {/* Updated transcript container */}
+                    <div className="flex-1 bg-black/90">
+                      {transcript?.content?.words && (
+                        <TimeAlignedTranscript
+                          segments={[
+                            {
+                              text: transcript.content.transcript || '',
+                              start: 0,
+                              end: transcript.content.words[transcript.content.words.length - 1]?.end || 0,
+                              words: transcript.content.words.map((word: TranscriptWord) => ({
+                                word: word.punctuated_word || word.word,
+                                start: word.start,
+                                end: word.end,
+                                confidence: word.confidence || 1.0
+                              }))
+                            }
+                          ]}
+                          currentTime={currentTime}
+                          onTimeClick={(time) => {
+                            if (videoRef.current && isFinite(time) && time >= 0) {
+                              try {
+                                videoRef.current.currentTime = time;
+                                setCurrentTime(time);
+                              } catch (error) {
+                                console.error('Error setting video time:', error);
+                              }
+                            }
+                          }}
+                        />
+                      )}
                     </div>
-
-                    {/* Volume Control */}
-                    <div className="flex items-center gap-2 group relative">
-                      <button
-                        onClick={() => {
-                          if (videoRef.current) {
-                            videoRef.current.muted = !isMuted;
-                            setIsMuted(!isMuted);
-                          }
-                        }}
-                        className="text-white hover:text-cyan-400 transition-colors"
-                      >
-                        {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-                      </button>
-                      <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.1"
-                        value={isMuted ? 0 : volume}
-                        onChange={(e) => {
-                          const newVolume = parseFloat(e.target.value);
-                          setVolume(newVolume);
-                          if (videoRef.current) {
-                            videoRef.current.volume = newVolume;
-                          }
-                        }}
-                        className="w-0 group-hover:w-20 transition-all duration-300 accent-cyan-500"
-                      />
-                    </div>
-
-                    {/* Fullscreen Toggle */}
-                    <button
-                      onClick={() => {
-                        if (videoRef.current) {
-                          videoRef.current.requestFullscreen();
-                        }
-                      }}
-                      className="text-white hover:text-cyan-400 transition-colors"
-                    >
-                      <Maximize2 size={18} />
-                    </button>
                   </div>
-                </div>
-
-                {/* Updated transcript container */}
-                <div className="flex-1 bg-black/90">
-                  {transcript?.content?.words && (
-                    <TimeAlignedTranscript
-                      segments={[
-                        {
-                          text: transcript.content.transcript || '',
-                          start: 0,
-                          end: transcript.content.words[transcript.content.words.length - 1]?.end || 0,
-                          words: transcript.content.words.map((word: TranscriptWord) => ({
-                            word: word.punctuated_word || word.word,
-                            start: word.start,
-                            end: word.end,
-                            confidence: word.confidence || 1.0
-                          }))
-                        }
-                      ]}
-                      currentTime={currentTime}
-                      onTimeClick={(time) => {
-                        if (videoRef.current && isFinite(time) && time >= 0) {
-                          try {
-                            videoRef.current.currentTime = time;
-                            setCurrentTime(time);
-                          } catch (error) {
-                            console.error('Error setting video time:', error);
-                          }
-                        }
-                      }}
-                    />
-                  )}
-                </div>
-              </div>
-            </Panel>
+                </Panel>
+              </>
+            )}
           </PanelGroup>
         </div>
 
-        {/* Right Panel */}
-        {!isMobile && (
+        {/* Right Panel - Modified for mobile */}
+        {(!isMobile || (isMobile && isLandscape)) && (
           <motion.div
             className={`
-              absolute right-0 top-0 bottom-0 w-[360px]
+              ${isMobile && isLandscape
+                ? 'w-[10%] h-[100dvh] border-l border-gray-800 touch-none'
+                : 'absolute right-0 top-0 bottom-0 w-[360px] border-l border-gray-800'}
               bg-gray-900/50 backdrop-blur-md
-              border-l border-gray-800
               z-30
               transition-transform duration-300 ease-in-out
               before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[1px]
               before:bg-gradient-to-b before:from-transparent before:via-cyan-500/30 before:to-transparent
               before:shadow-[0_0_10px_rgba(34,211,238,0.2)]
+              ${isMobile ? 'overflow-hidden' : ''}
             `}
             initial={false}
             animate={{
-              transform: isRightPanelCollapsed ? 'translateX(360px)' : 'translateX(0)'
+              transform: (!isMobile && isRightPanelCollapsed) ? 'translateX(360px)' : 'translateX(0)'
             }}
           >
-            {/* Collapse Toggle Button */}
-            <button
-              onClick={() => setIsRightPanelCollapsed(!isRightPanelCollapsed)}
-              className="absolute -left-8 top-1/2 transform -translate-y-1/2
+            {/* Hide collapse button on mobile */}
+            {!isMobile && (
+              <button
+                onClick={() => setIsRightPanelCollapsed(!isRightPanelCollapsed)}
+                className="absolute -left-8 top-1/2 transform -translate-y-1/2
                 w-8 h-16 bg-gray-900/80 backdrop-blur-sm
                 rounded-l-lg flex items-center justify-center
                 text-gray-400 transition-all duration-300
@@ -1619,69 +1665,173 @@ export default function Playground({
                 hover:border-cyan-500/30 hover:text-cyan-400
                 hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]
                 group
-                before:absolute before:inset-0 before:rounded-l-lg
-                before:border-y before:border-l
-                before:border-cyan-500/0 before:transition-all before:duration-300
-                hover:before:border-cyan-500/30
-                hover:before:shadow-[0_0_10px_rgba(34,211,238,0.2)]
               "
-            >
-              <motion.div
-                animate={{ rotate: isRightPanelCollapsed ? 180 : 0 }}
-                transition={{ duration: 0.2 }}
               >
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
-              </motion.div>
-            </button>
+                <motion.div
+                  animate={{ rotate: isRightPanelCollapsed ? 180 : 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </motion.div>
+              </button>
+            )}
 
-            {/* Panel Content - Remove right padding */}
-            <div className="h-full pl-4 pr-0 overflow-y-auto space-y-6">
-              {/* Agent Configuration Section */}
+            {/* Panel Content - Force chat tab on mobile */}
+            <div className={`
+              ${isMobile ? 'h-[100dvh] touch-none' : 'h-full'} 
+              pl-4 pr-0 overflow-hidden
+              ${isMobile ? 'pl-2' : ''}
+            `}>
               <div className="h-full flex flex-col">
-                {/* Tabs */}
-                <div className="flex items-center px-2 border-b border-gray-800/50 relative">
-                  {/* Add glowing border effect */}
-                  <div className="absolute bottom-0 left-0 right-0">
-                    <div className="absolute bottom-0 left-0 right-0 h-[1px]
+                {/* Only show tabs on desktop */}
+                {!isMobile && (
+                  <div className="flex items-center px-2 border-b border-gray-800/50 relative">
+                    {/* Add glowing border effect */}
+                    <div className="absolute bottom-0 left-0 right-0">
+                      <div className="absolute bottom-0 left-0 right-0 h-[1px]
                       bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent
                       shadow-[0_0_8px_rgba(34,211,238,0.2)]"
-                    />
-                  </div>
-                  {tabs.map((tab) => (
-                    <motion.button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id as ConfigTab)}
-                      className={`
+                      />
+                    </div>
+                    {tabs.map((tab) => (
+                      <motion.button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id as ConfigTab)}
+                        className={`
                         ${styles.tab.base}
                         ${activeTab === tab.id ? styles.tab.active : styles.tab.inactive}
                       `}
-                    >
-                      {tab.label}
-                      {activeTab === tab.id && (
-                        <motion.div
-                          layoutId="activeTab"
-                          className="
+                      >
+                        {tab.label}
+                        {activeTab === tab.id && (
+                          <motion.div
+                            layoutId="activeTab"
+                            className="
                             absolute bottom-0 left-0 right-0 h-[2px]
                             bg-gradient-to-r from-cyan-500 via-cyan-400 to-cyan-500/50
                             shadow-[0_0_10px_rgba(34,211,238,0.3)]
                           "
-                          initial={false}
-                          transition={{
-                            type: "spring",
-                            stiffness: 500,
-                            damping: 30
-                          }}
-                        />
-                      )}
-                    </motion.button>
-                  ))}
-                </div>
+                            initial={false}
+                            transition={{
+                              type: "spring",
+                              stiffness: 500,
+                              damping: 30
+                            }}
+                          />
+                        )}
+                      </motion.button>
+                    ))}
+                  </div>
+                )}
 
-                {/* Tab Content */}
-                <div className="flex-1 overflow-y-auto p-3 space-y-4">
-                  {activeTab === 'ai-agent' && (
+                {/* Tab Content - Always show chat on mobile */}
+                <div className={`
+                  flex-1 
+                  ${isMobile ? 'overflow-hidden p-1' : 'overflow-y-auto p-3'} 
+                  space-y-4
+                `}>
+                  {(isMobile || activeTab === 'chat') && (
+                    <div className="h-full flex flex-col">
+                      {/* Sticky header - Simplified for mobile */}
+                      <div className="sticky top-0 z-10 bg-[#121212]/95 backdrop-blur-sm border-b border-gray-800">
+                        <div className={`flex items-center justify-between ${isMobile ? 'p-1' : 'p-2'}`}>
+                          {/* Brand icon - Hide text on mobile */}
+                          <div className="flex items-center gap-2">
+                            <div className={`
+                              ${isMobile ? 'w-4 h-4' : 'w-6 h-6'}
+                              rounded-full bg-cyan-500/20
+                              flex items-center justify-center
+                              text-cyan-400 transition-all
+                              ${(localParticipant?.isMicrophoneEnabled || voiceAssistant?.audioTrack)
+                                ? 'animate-pulse shadow-[0_0_10px_rgba(34,211,238,0.5)]'
+                                : ''
+                              }
+                            `}>
+                              <Radio size={isMobile ? 10 : 16} />
+                            </div>
+                            {!isMobile && <span className="text-sm text-gray-200 font-medium">AI Chat</span>}
+                          </div>
+
+                          {/* Mic toggle button - Simplified for mobile */}
+                          <button
+                            onClick={() => {
+                              if (roomState === ConnectionState.Connected && localParticipant) {
+                                localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
+                              }
+                            }}
+                            disabled={roomState !== ConnectionState.Connected}
+                            className={`
+                              ${isMobile ? 'p-1' : 'p-1.5'}
+                              rounded-lg transition-all duration-300
+                              flex items-center gap-1.5
+                              bg-cyan-500/20 text-cyan-400
+                              hover:bg-cyan-500/30 hover:shadow-[0_0_10px_rgba(34,211,238,0.15)]
+                              disabled:opacity-50 disabled:cursor-not-allowed
+                            `}
+                          >
+                            {localParticipant?.isMicrophoneEnabled ?
+                              <Mic size={isMobile ? 10 : 14} /> :
+                              <MicOff size={isMobile ? 10 : 14} />
+                            }
+                            {!isMobile && (
+                              <span className="text-[11px] font-medium">
+                                {localParticipant?.isMicrophoneEnabled ? 'Mic: On' : 'Mic: Off'}
+                              </span>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Scrollable chat content */}
+                      <div className={`
+                        flex-1 
+                        ${isMobile ? 'overflow-hidden' : 'overflow-y-auto'}
+                        ${isMobile ? 'touch-none' : ''}
+                      `}>
+                        {/* Voice Assistant Transcription */}
+                        {voiceAssistant?.audioTrack && (
+                          <div className={`${isMobile ? 'p-1' : 'p-2'}`}>
+                            <TranscriptionTile
+                              agentAudioTrack={voiceAssistant.audioTrack}
+                              accentColor="cyan"
+                            />
+                          </div>
+                        )}
+
+                        {/* Chat Messages */}
+                        <div className={`flex-1 ${isMobile ? 'p-1' : 'p-2'} space-y-1`}>
+                          {transcripts.map((message) => (
+                            <div
+                              key={message.timestamp}
+                              className={`
+                                ${message.isSelf ? 'ml-auto bg-cyan-950/30' : 'mr-auto bg-gray-800/30'} 
+                                ${isMobile ? 'max-w-[95%]' : 'max-w-[85%]'}
+                                rounded-lg p-1.5
+                                backdrop-blur-sm
+                                border border-gray-700/50
+                                transition-all duration-300
+                                hover:border-cyan-500/30
+                                group
+                              `}
+                            >
+                              <div className={`
+                                ${isMobile ? 'text-[9px]' : 'text-[11px]'}
+                                leading-relaxed
+                                ${message.isSelf ? 'text-cyan-300' : 'text-gray-300'}
+                                group-hover:text-cyan-400/90
+                                transition-colors duration-300
+                              `}>
+                                {message.message}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {!isMobile && activeTab === 'ai-agent' && (
                     <>
                       <div className="flex items-center justify-between mb-4">
                         <h2 className={styles.section.title}>AI Agent Configuration</h2>
@@ -1905,8 +2055,7 @@ export default function Playground({
                       </section>
                     </>
                   )}
-
-                  {activeTab === 'voice-clone' && (
+                  {!isMobile && activeTab === 'voice-clone' && (
                     <>
                       <div className="flex items-center justify-between mb-4">
                         <h2 className={styles.section.title}>Voice Clone Configuration</h2>
@@ -2165,93 +2314,6 @@ export default function Playground({
                         </div>
                       )}
                     </>
-                  )}
-
-                  {activeTab === 'chat' && (
-                    <div className="h-full flex flex-col">
-                      {/* Sticky header */}
-                      <div className="sticky top-0 z-10 bg-[#121212]/95 backdrop-blur-sm border-b border-gray-800">
-                        <div className="flex items-center justify-between p-2">
-                          {/* Brand icon that pulses when mic/TTS active */}
-                          <div className="flex items-center gap-2">
-                            <div className={`
-                              w-6 h-6 rounded-full bg-cyan-500/20
-                              flex items-center justify-center
-                              text-cyan-400 transition-all
-                              ${(localParticipant?.isMicrophoneEnabled || voiceAssistant?.audioTrack)
-                                ? 'animate-pulse shadow-[0_0_10px_rgba(34,211,238,0.5)]'
-                                : ''
-                              }
-                            `}>
-                              <Radio size={16} />
-                            </div>
-                            <span className="text-sm text-gray-200 font-medium">AI Chat</span>
-                          </div>
-
-                          {/* Mic toggle button */}
-                          <button
-                            onClick={() => {
-                              if (roomState === ConnectionState.Connected && localParticipant) {
-                                localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
-                              }
-                            }}
-                            disabled={roomState !== ConnectionState.Connected}
-                            className="
-                              p-1.5 rounded-lg transition-all duration-300
-                              flex items-center gap-1.5
-                              bg-cyan-500/20 text-cyan-400
-                              hover:bg-cyan-500/30 hover:shadow-[0_0_10px_rgba(34,211,238,0.15)]
-                              disabled:opacity-50 disabled:cursor-not-allowed
-                            "
-                          >
-                            {localParticipant?.isMicrophoneEnabled ? <Mic size={14} /> : <MicOff size={14} />}
-                            <span className="text-[11px] font-medium">
-                              {localParticipant?.isMicrophoneEnabled ? 'Mic: On' : 'Mic: Off'}
-                            </span>
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Scrollable chat content */}
-                      <div className="flex-1 overflow-y-auto">
-                        {/* Voice Assistant Transcription */}
-                        {voiceAssistant?.audioTrack && (
-                          <div className="p-2">
-                            <TranscriptionTile
-                              agentAudioTrack={voiceAssistant.audioTrack}
-                              accentColor="cyan"
-                            />
-                          </div>
-                        )}
-
-                        {/* Chat Messages */}
-                        <div className="flex-1 p-2 space-y-1.5">
-                          {transcripts.map((message) => (
-                            <div
-                              key={message.timestamp}
-                              className={`
-                                ${message.isSelf ? 'ml-auto bg-cyan-950/30' : 'mr-auto bg-gray-800/30'} 
-                                max-w-[85%] rounded-xl p-2
-                                backdrop-blur-sm
-                                border border-gray-700/50
-                                transition-all duration-300
-                                hover:border-cyan-500/30
-                                group
-                              `}
-                            >
-                              <div className={`
-                                text-[11px] leading-relaxed
-                                ${message.isSelf ? 'text-cyan-300' : 'text-gray-300'}
-                                group-hover:text-cyan-400/90
-                                transition-colors duration-300
-                              `}>
-                                {message.message}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
                   )}
                 </div>
               </div>
