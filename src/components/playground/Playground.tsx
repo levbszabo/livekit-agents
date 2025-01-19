@@ -27,6 +27,7 @@ export interface PlaygroundProps {
   logo?: ReactNode;
   themeColors: string[];
   onConnect: (connect: boolean, opts?: { token: string; url: string }) => void;
+  agentType?: 'edit' | 'view';  // Add this line
 }
 
 // Update the header height constant at the top of the file
@@ -762,6 +763,7 @@ export default function Playground({
   logo,
   themeColors,
   onConnect,
+  agentType
 }: PlaygroundProps) {
   const { isMobile, isLandscape } = useIsMobile();
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
@@ -774,7 +776,8 @@ export default function Playground({
     brdgeId: null as string | null,
     apiBaseUrl: null as string | null,
     coreApiUrl: API_BASE_URL,
-    userId: null as string | null
+    userId: null as string | null,
+    agentType: 'edit' as 'edit' | 'view'  // Add this line with default
   });
 
   // Video URL state and fetching
@@ -840,7 +843,8 @@ export default function Playground({
         coreApiUrl: API_BASE_URL,
         userId: token ?
           jwtDecode<JWTPayload>(token).sub :
-          `anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+          `anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        agentType: (urlParams.get('agentType') as 'edit' | 'view') || 'edit'  // Add this line
       };
       setParams(newParams);
     }
@@ -1061,7 +1065,14 @@ export default function Playground({
   }, [agentConfig, updateAgentConfig]);
 
   // Add this inside the Playground component, with other state variables
-  const [activeTab, setActiveTab] = useState<ConfigTab>('ai-agent');
+  const [activeTab, setActiveTab] = useState<ConfigTab>(params.agentType === 'view' ? 'chat' : 'ai-agent');
+
+  // Add an effect to update activeTab when params.agentType changes
+  useEffect(() => {
+    if (params.agentType === 'view') {
+      setActiveTab('chat');
+    }
+  }, [params.agentType]);
 
   // Add these refs and states near the top of the component
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -1180,7 +1191,9 @@ export default function Playground({
   }, [savedVoices, params.brdgeId]);
 
   // Update tabs array
-  const tabs = [
+  const tabs = params.agentType === 'view' ? [
+    { id: 'chat', label: 'Chat' }
+  ] : [
     { id: 'ai-agent', label: 'AI Agent' },
     { id: 'voice-clone', label: 'Voice Clone' },
     { id: 'chat', label: 'Chat' }
@@ -1196,32 +1209,71 @@ export default function Playground({
     }
   });
 
-  // Compute transcript position for the agent
+  // Update the computeTranscriptPosition function to better handle the segments
   const computeTranscriptPosition = useCallback((time: number) => {
-    if (!transcript?.content?.segments) return { read: [], remaining: [] };
+    if (!transcript?.content?.segments) {
+      console.log('No transcript segments available');
+      return { read: [], remaining: [] };
+    }
 
-    const read = transcript.content.segments
-      .filter(seg => seg.end <= time)
-      .map(seg => seg.text);
+    try {
+      // Filter segments into read and remaining based on current time
+      const read = transcript.content.segments
+        .filter(seg => seg.end <= time)
+        .map(seg => seg.text.trim())
+        .filter(text => text.length > 0); // Filter out empty segments
 
-    const remaining = transcript.content.segments
-      .filter(seg => seg.start > time)
-      .map(seg => seg.text);
+      const remaining = transcript.content.segments
+        .filter(seg => seg.start > time)
+        .map(seg => seg.text.trim())
+        .filter(text => text.length > 0); // Filter out empty segments
 
-    return { read, remaining };
+      console.log('Computed transcript position:', {
+        currentTime: time,
+        readCount: read.length,
+        remainingCount: remaining.length,
+        read: read.slice(0, 3), // Log first 3 for debugging
+        remaining: remaining.slice(0, 3) // Log first 3 for debugging
+      });
+
+      return { read, remaining };
+    } catch (error) {
+      console.error('Error computing transcript position:', error);
+      return { read: [], remaining: [] };
+    }
   }, [transcript]);
 
-  // Send transcript position through data channel when time changes
+  // Update the effect that sends transcript position
   useEffect(() => {
-    if (roomState === ConnectionState.Connected) {
-      const position = computeTranscriptPosition(currentTime);
-      const payload: DataChannelPayload = {
-        transcript_position: position
-      };
+    if (roomState === ConnectionState.Connected && transcript?.content?.segments) {
+      try {
+        const position = computeTranscriptPosition(currentTime);
 
-      sendData(new TextEncoder().encode(JSON.stringify(payload)), { topic: "agent_data_channel" });
+        // Only send if we have actual segments
+        if (position.read.length > 0 || position.remaining.length > 0) {
+          const payload: DataChannelPayload = {
+            transcript_position: position
+          };
+
+          console.log('Sending transcript position:', payload);
+          sendData(new TextEncoder().encode(JSON.stringify(payload)), { topic: "agent_data_channel" });
+        }
+      } catch (error) {
+        console.error('Error sending transcript position:', error);
+      }
     }
-  }, [currentTime, roomState, sendData, computeTranscriptPosition]);
+  }, [currentTime, roomState, sendData, computeTranscriptPosition, transcript]);
+
+  // Add this effect to log when transcript changes
+  useEffect(() => {
+    if (transcript?.content?.segments) {
+      console.log('Transcript loaded:', {
+        segmentCount: transcript.content.segments.length,
+        firstSegment: transcript.content.segments[0],
+        lastSegment: transcript.content.segments[transcript.content.segments.length - 1]
+      });
+    }
+  }, [transcript]);
 
   // Update connect handler to use LiveKit connection
   const handleConnect = useCallback(async () => {
@@ -1395,6 +1447,26 @@ export default function Playground({
       ? 'bg-black flex flex-col items-center justify-center'
       : 'flex flex-row overflow-hidden'} h-[100dvh]`
     : '';
+
+  // Add this effect after other useEffects
+  useEffect(() => {
+    // Only send when we have both the connection and the config
+    if (roomState === ConnectionState.Connected && agentConfig) {
+      try {
+        const payload = {
+          agent_config: {
+            personality: agentConfig.personality,
+            knowledgeBase: agentConfig.knowledgeBase
+          }
+        };
+
+        console.log('Sending initial agent config:', payload);
+        sendData(new TextEncoder().encode(JSON.stringify(payload)), { topic: "agent_data_channel" });
+      } catch (error) {
+        console.error('Error sending initial agent config:', error);
+      }
+    }
+  }, [roomState, agentConfig, sendData]); // Dependencies ensure this runs when connection is ready and config is loaded
 
   return (
     <div className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
@@ -1752,8 +1824,14 @@ export default function Playground({
                   flex-1 
                   ${isMobile ? 'overflow-hidden p-1' : 'overflow-y-auto p-3'} 
                   space-y-4
+                  relative
                 `}>
-                  {(isMobile || activeTab === 'chat') && (
+                  {/* Chat component - Always mounted but conditionally hidden */}
+                  <div className={`
+                    absolute inset-0
+                    ${(isMobile || activeTab === 'chat') ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}
+                    transition-opacity duration-300
+                  `}>
                     <div className="h-full flex flex-col">
                       {/* Sticky header - Simplified for mobile */}
                       <div className="sticky top-0 z-10 bg-[#121212]/95 backdrop-blur-sm border-b border-gray-800">
@@ -1840,487 +1918,501 @@ export default function Playground({
                         </div>
                       </div>
                     </div>
-                  )}
-                  {!isMobile && activeTab === 'ai-agent' && (
+                  </div>
+
+                  {/* Only render AI Agent and Voice Clone tabs in edit mode */}
+                  {!isMobile && params.agentType !== 'view' && (
                     <>
-                      <div className="flex items-center justify-between mb-4">
-                        <h2 className={styles.section.title}>AI Agent Configuration</h2>
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={handleSaveConfig}
-                          disabled={isSaving}
-                          className={`
-                            group flex items-center gap-1.5
-                            px-3 py-1.5 rounded-lg
-                            bg-gradient-to-r 
-                            ${saveSuccess
-                              ? 'from-green-500/20 to-green-400/10 border-green-500/30'
-                              : 'from-cyan-500/10 to-transparent border-cyan-500/20'
-                            }
-                            ${isSaving ? 'opacity-70 cursor-wait' : ''}
-                            text-cyan-400 border
-                            transition-all duration-300
-                            hover:border-cyan-500/40
-                            hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]
-                            disabled:opacity-50 disabled:cursor-not-allowed
-                          `}
-                        >
-                          {isSaving ? (
-                            <>
-                              <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                              <span className="text-[11px]">Saving...</span>
-                            </>
-                          ) : saveSuccess ? (
-                            <>
-                              <motion.div
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                className="text-green-400"
-                              >
-                                <svg
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  className="w-3 h-3"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M5 13l4 4L19 7"
-                                  />
-                                </svg>
-                              </motion.div>
-                              <span className="text-[11px] text-green-400">Saved!</span>
-                            </>
-                          ) : (
-                            <>
-                              <Save size={12} className="group-hover:rotate-12 transition-transform duration-300" />
-                              <span className="text-[11px]">Save Changes</span>
-                            </>
-                          )}
-                        </motion.button>
-                      </div>
-
-                      {/* Agent Personality Section */}
-                      <section className={styles.section.wrapper}>
-                        <h2 className={styles.section.title}>Agent Personality</h2>
-                        <div className="
-                          relative group
-                          before:absolute before:inset-0
-                          before:bg-gradient-to-r before:from-cyan-500/[0.02] before:to-transparent
-                          before:opacity-0 before:transition-opacity before:duration-300
-                          hover:before:opacity-100
-                        ">
-                          <textarea
-                            value={agentConfig.personality}
-                            onChange={(e) => setAgentConfig({
-                              ...agentConfig,
-                              personality: e.target.value
-                            })}
-                            placeholder="Describe the agent's personality and behavior..."
-                            className={`${styles.input.base} ${styles.input.textarea}`}
-                          />
-                        </div>
-                      </section>
-
-                      {/* Knowledge Base Section */}
-                      <section className={styles.section.wrapper}>
-                        <div className="flex items-center justify-between mb-4">
-                          <h2 className={styles.section.title}>Knowledge Base</h2>
-                          <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => {
-                              const newEntry = {
-                                id: `kb_${Date.now()}`,
-                                type: "custom",
-                                name: "New Knowledge Entry",
-                                content: ""
-                              };
-                              setAgentConfig(prev => ({
-                                ...prev,
-                                knowledgeBase: [...prev.knowledgeBase, newEntry]
-                              }));
-                            }}
-                            className={`
-                              relative z-20
-                              group flex items-center gap-1.5
-                              px-3 py-1.5 rounded-lg text-[11px]
-                              bg-gradient-to-r from-cyan-500/10 to-transparent
-                              text-cyan-400/90 border border-cyan-500/20
-                              transition-all duration-300
-                              hover:border-cyan-500/40
-                              hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]
-                            `}
-                          >
-                            <Plus size={12} className="group-hover:rotate-90 transition-transform duration-300" />
-                            <span>Add Knowledge</span>
-                          </motion.button>
-                        </div>
-
-                        {/* Core Presentation */}
-                        <motion.div
-                          layout
-                          className="
-                            relative group
-                            bg-[#1E1E1E]/50 backdrop-blur-sm
-                            border border-gray-800/50 rounded-lg p-3
-                            transition-all duration-300
-                            hover:border-cyan-500/30
-                            hover:shadow-[0_0_20px_rgba(34,211,238,0.07)]
-                            z-10 // Ensure parent has lower z-index
-                          "
-                        >
-                          {/* Background gradient effect */}
-                          <div className="
-                            absolute inset-0 
-                            bg-gradient-to-r from-cyan-500/[0.02] to-transparent
-                            opacity-0 transition-opacity duration-300
-                            group-hover:opacity-100
-                            pointer-events-none
-                          "/>
-
-                          <div className="relative flex items-center justify-between pointer-events-auto">
-                            <div className="flex items-center gap-2">
-                              <FileText size={12} className="text-cyan-400 group-hover:animate-pulse" />
-                              <span className="text-[12px] text-gray-300 group-hover:text-cyan-400/90 transition-colors duration-300">
-                                {brdge?.presentation_filename ||
-                                  agentConfig.knowledgeBase.find(k => k.type === 'presentation')?.name ||
-                                  "No presentation file"}
-                              </span>
-                            </div>
-                            {!brdge?.presentation_filename &&
-                              !agentConfig.knowledgeBase.find(k => k.type === 'presentation')?.name ? (
-                              <motion.button
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
-                                onClick={() => fileInputRef.current?.click()}
-                                className={`
-                                  group flex items-center gap-2 px-3 py-1.5 rounded-lg
-                                  bg-gradient-to-r from-cyan-500/10 to-transparent
-                                  text-cyan-400 border border-cyan-500/20
-                                  transition-all duration-300
-                                  hover:border-cyan-500/40
-                                  hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]
-                                  ${isUploading ? 'opacity-50 cursor-wait' : ''}
-                                `}
-                                disabled={isUploading}
-                              >
-                                {isUploading ? (
-                                  <>
-                                    <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                    <span className="text-[11px]">Uploading...</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Plus size={12} className="text-cyan-400/70 group-hover:text-cyan-400 transition-colors duration-300" />
-                                    <span className="text-[11px] text-cyan-400/70 group-hover:text-cyan-400 transition-colors duration-300">
-                                      Upload PDF
-                                    </span>
-                                  </>
-                                )}
-                              </motion.button>
-                            ) : (
-                              <span className="
-                                text-[10px] text-gray-600/70 
-                                px-2 py-0.5 
-                                bg-black/20 rounded-md
-                                border border-gray-800/50
-                                group-hover:border-cyan-500/20
+                      {activeTab === 'ai-agent' && (
+                        <div className={`
+                          h-full
+                          ${activeTab === 'ai-agent' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}
+                          transition-opacity duration-300
+                        `}>
+                          <div className="flex items-center justify-between mb-4">
+                            <h2 className={styles.section.title}>AI Agent Configuration</h2>
+                            <motion.button
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={handleSaveConfig}
+                              disabled={isSaving}
+                              className={`
+                                group flex items-center gap-1.5
+                                px-3 py-1.5 rounded-lg
+                                bg-gradient-to-r 
+                                ${saveSuccess
+                                  ? 'from-green-500/20 to-green-400/10 border-green-500/30'
+                                  : 'from-cyan-500/10 to-transparent border-cyan-500/20'
+                                }
+                                ${isSaving ? 'opacity-70 cursor-wait' : ''}
+                                text-cyan-400 border
                                 transition-all duration-300
-                              ">
-                                PDF
-                              </span>
-                            )}
+                                hover:border-cyan-500/40
+                                hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]
+                                disabled:opacity-50 disabled:cursor-not-allowed
+                              `}
+                            >
+                              {isSaving ? (
+                                <>
+                                  <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                  <span className="text-[11px]">Saving...</span>
+                                </>
+                              ) : saveSuccess ? (
+                                <>
+                                  <motion.div
+                                    initial={{ scale: 0 }}
+                                    animate={{ scale: 1 }}
+                                    className="text-green-400"
+                                  >
+                                    <svg
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      className="w-3 h-3"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M5 13l4 4L19 7"
+                                      />
+                                    </svg>
+                                  </motion.div>
+                                  <span className="text-[11px] text-green-400">Saved!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Save size={12} className="group-hover:rotate-12 transition-transform duration-300" />
+                                  <span className="text-[11px]">Save Changes</span>
+                                </>
+                              )}
+                            </motion.button>
                           </div>
-                        </motion.div>
 
-                        {/* Supplementary Knowledge */}
-                        <div className="mt-4 space-y-3">
-                          <h3 className="
-                            font-satoshi text-[11px] text-gray-400/70
-                            flex items-center gap-2
-                            before:content-[''] before:w-1 before:h-1 before:rounded-full
-                            before:bg-cyan-400/30
-                          ">
-                            Supplementary Knowledge
-                          </h3>
-                          <motion.div layout className="grid grid-cols-1 gap-2">
-                            <AnimatePresence>
-                              {agentConfig.knowledgeBase
-                                .filter(entry => entry.type !== "presentation")
-                                .map((entry) => (
-                                  <KnowledgeBubble
-                                    key={entry.id}
-                                    entry={entry}
-                                    onEdit={handleKnowledgeEdit}
-                                    onRemove={handleKnowledgeRemove}
-                                  />
-                                ))}
-                            </AnimatePresence>
-                          </motion.div>
-                        </div>
-                      </section>
-                    </>
-                  )}
-                  {!isMobile && activeTab === 'voice-clone' && (
-                    <>
-                      <div className="flex items-center justify-between mb-4">
-                        <h2 className={styles.section.title}>Voice Clone Configuration</h2>
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => {
-                            setSelectedVoice(null);
-                            setIsCreatingVoice(true);
-                          }}
-                          className={`
-                            group flex items-center gap-1.5
-                            px-3 py-1.5 rounded-lg
-                            bg-gradient-to-r from-cyan-500/10 to-transparent
-                            text-cyan-400 border border-cyan-500/20
-                              transition-all duration-300
-                            hover:border-cyan-500/40
-                            hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]
-                          `}
-                        >
-                          <Plus size={12} className="group-hover:rotate-90 transition-transform duration-300" />
-                          <span className="text-[11px]">Create New Voice</span>
-                        </motion.button>
-                      </div>
-
-                      {(!savedVoices.length || isCreatingVoice) ? (
-                        // Voice Creation Section
-                        <div className="space-y-4">
-                          {/* Voice Setup Section */}
+                          {/* Agent Personality Section */}
                           <section className={styles.section.wrapper}>
-                            <h2 className={styles.section.title}>Voice Setup</h2>
+                            <h2 className={styles.section.title}>Agent Personality</h2>
                             <div className="
-                              relative group space-y-4
+                              relative group
                               before:absolute before:inset-0
                               before:bg-gradient-to-r before:from-cyan-500/[0.02] before:to-transparent
                               before:opacity-0 before:transition-opacity before:duration-300
                               hover:before:opacity-100
                             ">
-                              {/* Recording Instructions */}
-                              <div className="space-y-3">
-                                <h3 className="font-satoshi text-[12px] text-gray-300/90">
-                                  Create an AI voice clone with a short voice sample:
-                                </h3>
-                                <ul className="space-y-2">
-                                  {[
-                                    'Record 10-20 seconds of clear speech',
-                                    'Speak naturally at your normal pace',
-                                    'Avoid background noise and echoes'
-                                  ].map((text, i) => (
-                                    <li key={i} className="flex items-start gap-2">
-                                      <span className="text-cyan-400/80 mt-1.5 text-[10px]">•</span>
-                                      <span className="font-satoshi text-[13px] text-gray-400/80">{text}</span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
+                              <textarea
+                                value={agentConfig.personality}
+                                onChange={(e) => setAgentConfig({
+                                  ...agentConfig,
+                                  personality: e.target.value
+                                })}
+                                placeholder="Describe the agent's personality and behavior..."
+                                className={`${styles.input.base} ${styles.input.textarea}`}
+                              />
+                            </div>
+                          </section>
 
-                              {/* Sample Text Section */}
-                              <div className="space-y-2">
-                                <h3 className="font-satoshi text-[12px] text-gray-300/90">
-                                  Sample Text to Read:
-                                </h3>
-                                <div className={`
-                                  ${styles.knowledgeBase.content}
-                                  min-h-0
-                                  text-[11px]
-                                  bg-black/20
-                                  border border-gray-800/50
-                                  group-hover:border-cyan-500/20
-                            transition-all duration-300
-                                `}>
-                                  "In just a few quick steps my voice based AI assistant will be integrated into my content. This way you can speak to others without being there... how cool is that?"
-                                </div>
-                              </div>
-
-                              {/* Voice Recording Controls */}
-                              <div className="space-y-3 pt-2 relative z-[60]">
-                                <input
-                                  type="text"
-                                  value={voiceName}
-                                  onChange={(e) => setVoiceName(e.target.value)}
-                                  placeholder="Enter voice name"
-                                  className="w-full bg-gray-800/50 border border-gray-700 rounded-lg
-                                px-3 py-2 text-xs text-gray-300
-                                    transition-all duration-300
-                                focus:ring-2 focus:ring-cyan-500 focus:border-transparent
-                                hover:border-cyan-500/50
-                                    hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]
-                                    relative z-[60]"
-                                />
-
-                                <button
-                                  onClick={isRecording ? stopRecording : startRecording}
-                                  className={`
-                                    relative z-[60]
-                                    w-full px-4 py-2 rounded-lg text-xs font-medium
-                                    transition-all duration-300
-                                    flex items-center justify-center gap-2
-                                    ${isRecording
-                                      ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                                      : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
-                                    }
-                                    shadow-[0_0_15px_rgba(0,255,255,0.1)]
-                                    hover:shadow-[0_0_20px_rgba(0,255,255,0.15)]
-                                    transform hover:-translate-y-0.5
-                                  `}
-                                >
-                                  <span className={`
-                                    w-1.5 h-1.5 rounded-full 
-                                    ${isRecording
-                                      ? 'bg-red-500 animate-[pulse_1s_ease-in-out_infinite]'
-                                      : 'bg-cyan-500'
-                                    }
-                                  `} />
-                                  {isRecording ? (
-                                    <>Recording... {formatTime(recordingTime)}</>
-                                  ) : (
-                                    'Start Recording'
-                                  )}
-                                </button>
-                              </div>
-
-                              {/* Recording Preview */}
-                              {currentRecording && (
-                                <div className="space-y-2 relative z-[60]">
-                                  <div className="bg-gray-800/30 rounded-lg p-2">
-                                    <audio
-                                      src={URL.createObjectURL(currentRecording)}
-                                      controls
-                                      className="w-full h-7"
-                                    />
-                                  </div>
-                                  <button
-                                    onClick={handleCloneVoice}
-                                    disabled={!voiceName || isCloning}
-                                    className={`
-                                      relative z-[60]
-                                      w-full px-4 py-2 rounded-lg text-xs font-medium
+                          {/* Knowledge Base Section */}
+                          <section className={styles.section.wrapper}>
+                            <div className="flex items-center justify-between mb-4">
+                              <h2 className={styles.section.title}>Knowledge Base</h2>
+                              <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={() => {
+                                  const newEntry = {
+                                    id: `kb_${Date.now()}`,
+                                    type: "custom",
+                                    name: "New Knowledge Entry",
+                                    content: ""
+                                  };
+                                  setAgentConfig(prev => ({
+                                    ...prev,
+                                    knowledgeBase: [...prev.knowledgeBase, newEntry]
+                                  }));
+                                }}
+                                className={`
+                                  relative z-20
+                                  group flex items-center gap-1.5
+                                  px-3 py-1.5 rounded-lg text-[11px]
+                                  bg-gradient-to-r from-cyan-500/10 to-transparent
+                                  text-cyan-400/90 border border-cyan-500/20
                                   transition-all duration-300
-                                      transform hover:-translate-y-0.5
-                                      bg-cyan-500/20 text-cyan-400 
-                                  hover:bg-cyan-500/30 
-                                      shadow-[0_0_15px_rgba(0,255,255,0.1)]
-                                      hover:shadow-[0_0_20px_rgba(0,255,255,0.15)]
-                                      disabled:opacity-50 disabled:cursor-not-allowed
-                                      disabled:hover:transform-none
-                                    `}
-                                  >
-                                    {isCloning ? (
-                                      <div className="flex items-center justify-center gap-2">
-                                        <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                        Creating Voice Clone...
-                                      </div>
-                                    ) : (
-                                      'Create Voice Clone'
-                                    )}
-                                  </button>
+                                  hover:border-cyan-500/40
+                                  hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]
+                                `}
+                              >
+                                <Plus size={12} className="group-hover:rotate-90 transition-transform duration-300" />
+                                <span>Add Knowledge</span>
+                              </motion.button>
+                            </div>
+
+                            {/* Core Presentation */}
+                            <motion.div
+                              layout
+                              className="
+                                relative group
+                                bg-[#1E1E1E]/50 backdrop-blur-sm
+                                border border-gray-800/50 rounded-lg p-3
+                                transition-all duration-300
+                                hover:border-cyan-500/30
+                                hover:shadow-[0_0_20px_rgba(34,211,238,0.07)]
+                                z-10 // Ensure parent has lower z-index
+                              "
+                            >
+                              {/* Background gradient effect */}
+                              <div className="
+                                absolute inset-0 
+                                bg-gradient-to-r from-cyan-500/[0.02] to-transparent
+                                opacity-0 transition-opacity duration-300
+                                group-hover:opacity-100
+                                pointer-events-none
+                              "/>
+
+                              <div className="relative flex items-center justify-between pointer-events-auto">
+                                <div className="flex items-center gap-2">
+                                  <FileText size={12} className="text-cyan-400 group-hover:animate-pulse" />
+                                  <span className="text-[12px] text-gray-300 group-hover:text-cyan-400/90 transition-colors duration-300">
+                                    {brdge?.presentation_filename ||
+                                      agentConfig.knowledgeBase.find(k => k.type === 'presentation')?.name ||
+                                      "No presentation file"}
+                                  </span>
                                 </div>
-                              )}
+                                {!brdge?.presentation_filename &&
+                                  !agentConfig.knowledgeBase.find(k => k.type === 'presentation')?.name ? (
+                                  <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className={`
+                                      group flex items-center gap-2 px-3 py-1.5 rounded-lg
+                                      bg-gradient-to-r from-cyan-500/10 to-transparent
+                                      text-cyan-400 border border-cyan-500/20
+                                      transition-all duration-300
+                                      hover:border-cyan-500/40
+                                      hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]
+                                      ${isUploading ? 'opacity-50 cursor-wait' : ''}
+                                    `}
+                                    disabled={isUploading}
+                                  >
+                                    {isUploading ? (
+                                      <>
+                                        <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                        <span className="text-[11px]">Uploading...</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Plus size={12} className="text-cyan-400/70 group-hover:text-cyan-400 transition-colors duration-300" />
+                                        <span className="text-[11px] text-cyan-400/70 group-hover:text-cyan-400 transition-colors duration-300">
+                                          Upload PDF
+                                        </span>
+                                      </>
+                                    )}
+                                  </motion.button>
+                                ) : (
+                                  <span className="
+                                    text-[10px] text-gray-600/70 
+                                    px-2 py-0.5 
+                                    bg-black/20 rounded-md
+                                    border border-gray-800/50
+                                    group-hover:border-cyan-500/20
+                                    transition-all duration-300
+                                  ">
+                                    PDF
+                                  </span>
+                                )}
+                              </div>
+                            </motion.div>
+
+                            {/* Supplementary Knowledge */}
+                            <div className="mt-4 space-y-3">
+                              <h3 className="
+                                font-satoshi text-[11px] text-gray-400/70
+                                flex items-center gap-2
+                                before:content-[''] before:w-1 before:h-1 before:rounded-full
+                                before:bg-cyan-400/30
+                              ">
+                                Supplementary Knowledge
+                              </h3>
+                              <motion.div layout className="grid grid-cols-1 gap-2">
+                                <AnimatePresence>
+                                  {agentConfig.knowledgeBase
+                                    .filter(entry => entry.type !== "presentation")
+                                    .map((entry) => (
+                                      <KnowledgeBubble
+                                        key={entry.id}
+                                        entry={entry}
+                                        onEdit={handleKnowledgeEdit}
+                                        onRemove={handleKnowledgeRemove}
+                                      />
+                                    ))}
+                                </AnimatePresence>
+                              </motion.div>
                             </div>
                           </section>
                         </div>
-                      ) : (
-                        // Voice List Section
-                        <div className="space-y-4">
-                          <section className={styles.section.wrapper}>
-                            <h2 className={styles.section.title}>Voice Selection</h2>
-                            <div className="space-y-3 relative z-[100]">
-                              {savedVoices.map((voice) => (
-                                <motion.div
-                                  key={voice.id}
-                                  layout
-                                  className={`
-                                    relative group z-[100]
-                                    bg-[#1E1E1E]/50 backdrop-blur-sm
-                                    border border-gray-800/50 rounded-lg p-3
-                                    transition-all duration-300
-                                    hover:border-cyan-500/30
-                                    hover:shadow-[0_0_20px_rgba(34,211,238,0.07)]
-                                    cursor-pointer
-                                    ${voice.status === 'active' ? 'border-cyan-500/30 bg-cyan-500/5' : ''}
-                                  `}
-                                  onClick={async () => {
-                                    try {
-                                      if (voice.status !== 'active') {
-                                        // Activate this voice
-                                        const response = await api.post(`/brdges/${params.brdgeId}/voice/activate`, {
-                                          voice_id: voice.id
-                                        });
-                                        if (response.data?.voice) {
-                                          setSavedVoices(prev => prev.map(v => ({
-                                            ...v,
-                                            status: v.id === voice.id ? 'active' : 'inactive'
-                                          })));
-                                        }
-                                      } else {
-                                        // Deactivate this voice
-                                        const response = await api.post(`/brdges/${params.brdgeId}/voice/deactivate`, {
-                                          voice_id: voice.id
-                                        });
-                                        if (response.data?.voice) {
-                                          setSavedVoices(prev => prev.map(v => ({
-                                            ...v,
-                                            status: v.id === voice.id ? 'inactive' : v.status
-                                          })));
-                                        }
-                                      }
-                                    } catch (error) {
-                                      console.error('Error toggling voice:', error);
-                                    }
-                                  }}
-                                >
-                                  <div className="flex items-center justify-between relative z-[100]">
-                                    <div className="flex items-center gap-2">
-                                      <div className={`
-                                        w-2.5 h-2.5 rounded-full
-                                        ${voice.status === 'active' ? 'bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)]' : 'bg-gray-600'}
-                                        transition-all duration-300
-                                        group-hover:scale-110
-                                      `} />
-                                      <span className="text-[13px] text-gray-300 group-hover:text-cyan-400/90 transition-colors duration-300">
-                                        {voice.name}
-                                      </span>
+                      )}
+                      {activeTab === 'voice-clone' && (
+                        <div className={`
+                          h-full
+                          ${activeTab === 'voice-clone' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}
+                          transition-opacity duration-300
+                        `}>
+                          <div className="flex items-center justify-between mb-4">
+                            <h2 className={styles.section.title}>Voice Clone Configuration</h2>
+                            <motion.button
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() => {
+                                setSelectedVoice(null);
+                                setIsCreatingVoice(true);
+                              }}
+                              className={`
+                                group flex items-center gap-1.5
+                                px-3 py-1.5 rounded-lg
+                                bg-gradient-to-r from-cyan-500/10 to-transparent
+                                text-cyan-400 border border-cyan-500/20
+                                  transition-all duration-300
+                                hover:border-cyan-500/40
+                                hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]
+                              `}
+                            >
+                              <Plus size={12} className="group-hover:rotate-90 transition-transform duration-300" />
+                              <span className="text-[11px]">Create New Voice</span>
+                            </motion.button>
+                          </div>
+
+                          {(!savedVoices.length || isCreatingVoice) ? (
+                            // Voice Creation Section
+                            <div className="space-y-4">
+                              {/* Voice Setup Section */}
+                              <section className={styles.section.wrapper}>
+                                <h2 className={styles.section.title}>Voice Setup</h2>
+                                <div className="
+                                  relative group space-y-4
+                                  before:absolute before:inset-0
+                                  before:bg-gradient-to-r before:from-cyan-500/[0.02] before:to-transparent
+                                  before:opacity-0 before:transition-opacity before:duration-300
+                                  hover:before:opacity-100
+                                ">
+                                  {/* Recording Instructions */}
+                                  <div className="space-y-3">
+                                    <h3 className="font-satoshi text-[12px] text-gray-300/90">
+                                      Create an AI voice clone with a short voice sample:
+                                    </h3>
+                                    <ul className="space-y-2">
+                                      {[
+                                        'Record 10-20 seconds of clear speech',
+                                        'Speak naturally at your normal pace',
+                                        'Avoid background noise and echoes'
+                                      ].map((text, i) => (
+                                        <li key={i} className="flex items-start gap-2">
+                                          <span className="text-cyan-400/80 mt-1.5 text-[10px]">•</span>
+                                          <span className="font-satoshi text-[13px] text-gray-400/80">{text}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+
+                                  {/* Sample Text Section */}
+                                  <div className="space-y-2">
+                                    <h3 className="font-satoshi text-[12px] text-gray-300/90">
+                                      Sample Text to Read:
+                                    </h3>
+                                    <div className={`
+                                      ${styles.knowledgeBase.content}
+                                      min-h-0
+                                      text-[11px]
+                                      bg-black/20
+                                      border border-gray-800/50
+                                      group-hover:border-cyan-500/20
+                            transition-all duration-300
+                                        `}>
+                                      "In just a few quick steps my voice based AI assistant will be integrated into my content. This way you can speak to others without being there... how cool is that?"
                                     </div>
-                                    <div className="flex items-center gap-2">
+                                  </div>
+
+                                  {/* Voice Recording Controls */}
+                                  <div className="space-y-3 pt-2 relative z-[60]">
+                                    <input
+                                      type="text"
+                                      value={voiceName}
+                                      onChange={(e) => setVoiceName(e.target.value)}
+                                      placeholder="Enter voice name"
+                                      className="w-full bg-gray-800/50 border border-gray-700 rounded-lg
+                                    px-3 py-2 text-xs text-gray-300
+                                        transition-all duration-300
+                                    focus:ring-2 focus:ring-cyan-500 focus:border-transparent
+                                    hover:border-cyan-500/50
+                                        hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]
+                                        relative z-[60]"
+                                    />
+
+                                    <button
+                                      onClick={isRecording ? stopRecording : startRecording}
+                                      className={`
+                                        relative z-[60]
+                                        w-full px-4 py-2 rounded-lg text-xs font-medium
+                                        transition-all duration-300
+                                        flex items-center justify-center gap-2
+                                        ${isRecording
+                                          ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                                          : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
+                                        }
+                                        shadow-[0_0_15px_rgba(0,255,255,0.1)]
+                                        hover:shadow-[0_0_20px_rgba(0,255,255,0.15)]
+                                        transform hover:-translate-y-0.5
+                                      `}
+                                    >
                                       <span className={`
-                                        text-[10px] px-2 py-0.5 rounded-md
-                                        transition-all duration-300
-                                        ${voice.status === 'active' ? `
-                                          text-cyan-400/70
-                                          bg-cyan-500/10
-                                          border border-cyan-500/20
-                                          shadow-[0_0_10px_rgba(34,211,238,0.1)]
-                                        ` : `
-                                          text-gray-500
-                                          bg-gray-800/50
-                                          border border-gray-700/30
-                                          opacity-0 group-hover:opacity-100
+                                        w-1.5 h-1.5 rounded-full 
+                                        ${isRecording
+                                          ? 'bg-red-500 animate-[pulse_1s_ease-in-out_infinite]'
+                                          : 'bg-cyan-500'
+                                        }
+                                      `} />
+                                      {isRecording ? (
+                                        <>Recording... {formatTime(recordingTime)}</>
+                                      ) : (
+                                        'Start Recording'
+                                      )}
+                                    </button>
+                                  </div>
+
+                                  {/* Recording Preview */}
+                                  {currentRecording && (
+                                    <div className="space-y-2 relative z-[60]">
+                                      <div className="bg-gray-800/30 rounded-lg p-2">
+                                        <audio
+                                          src={URL.createObjectURL(currentRecording)}
+                                          controls
+                                          className="w-full h-7"
+                                        />
+                                      </div>
+                                      <button
+                                        onClick={handleCloneVoice}
+                                        disabled={!voiceName || isCloning}
+                                        className={`
+                                          relative z-[60]
+                                          w-full px-4 py-2 rounded-lg text-xs font-medium
+                                      transition-all duration-300
+                                          transform hover:-translate-y-0.5
+                                          bg-cyan-500/20 text-cyan-400 
+                                      hover:bg-cyan-500/30 
+                                          shadow-[0_0_15px_rgba(0,255,255,0.1)]
+                                          hover:shadow-[0_0_20px_rgba(0,255,255,0.15)]
+                                          disabled:opacity-50 disabled:cursor-not-allowed
+                                          disabled:hover:transform-none
                                         `}
-                                      `}>
-                                        {voice.status === 'active' ? 'Active' : 'Click to Toggle'}
-                                      </span>
+                                      >
+                                        {isCloning ? (
+                                          <div className="flex items-center justify-center gap-2">
+                                            <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                            Creating Voice Clone...
+                                          </div>
+                                        ) : (
+                                          'Create Voice Clone'
+                                        )}
+                                      </button>
                                     </div>
-                                  </div>
-                                  <div className={`
-                                    mt-2 text-[11px] text-gray-500
-                                    transition-all duration-300
-                                    ${voice.status === 'active' ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}
-                                  `}>
-                                    Created {new Date(voice.created_at).toLocaleDateString()}
-                                  </div>
-                                </motion.div>
-                              ))}
+                                  )}
+                                </div>
+                              </section>
                             </div>
-                          </section>
+                          ) : (
+                            // Voice List Section
+                            <div className="space-y-4">
+                              <section className={styles.section.wrapper}>
+                                <h2 className={styles.section.title}>Voice Selection</h2>
+                                <div className="space-y-3 relative z-[100]">
+                                  {savedVoices.map((voice) => (
+                                    <motion.div
+                                      key={voice.id}
+                                      layout
+                                      className={`
+                                        relative group z-[100]
+                                        bg-[#1E1E1E]/50 backdrop-blur-sm
+                                        border border-gray-800/50 rounded-lg p-3
+                                        transition-all duration-300
+                                        hover:border-cyan-500/30
+                                        hover:shadow-[0_0_20px_rgba(34,211,238,0.07)]
+                                        cursor-pointer
+                                        ${voice.status === 'active' ? 'border-cyan-500/30 bg-cyan-500/5' : ''}
+                                      `}
+                                      onClick={async () => {
+                                        try {
+                                          if (voice.status !== 'active') {
+                                            // Activate this voice
+                                            const response = await api.post(`/brdges/${params.brdgeId}/voice/activate`, {
+                                              voice_id: voice.id
+                                            });
+                                            if (response.data?.voice) {
+                                              setSavedVoices(prev => prev.map(v => ({
+                                                ...v,
+                                                status: v.id === voice.id ? 'active' : 'inactive'
+                                              })));
+                                            }
+                                          } else {
+                                            // Deactivate this voice
+                                            const response = await api.post(`/brdges/${params.brdgeId}/voice/deactivate`, {
+                                              voice_id: voice.id
+                                            });
+                                            if (response.data?.voice) {
+                                              setSavedVoices(prev => prev.map(v => ({
+                                                ...v,
+                                                status: v.id === voice.id ? 'inactive' : v.status
+                                              })));
+                                            }
+                                          }
+                                        } catch (error) {
+                                          console.error('Error toggling voice:', error);
+                                        }
+                                      }}
+                                    >
+                                      <div className="flex items-center justify-between relative z-[100]">
+                                        <div className="flex items-center gap-2">
+                                          <div className={`
+                                            w-2.5 h-2.5 rounded-full
+                                            ${voice.status === 'active' ? 'bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)]' : 'bg-gray-600'}
+                                            transition-all duration-300
+                                            group-hover:scale-110
+                                          `} />
+                                          <span className="text-[13px] text-gray-300 group-hover:text-cyan-400/90 transition-colors duration-300">
+                                            {voice.name}
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <span className={`
+                                            text-[10px] px-2 py-0.5 rounded-md
+                                            transition-all duration-300
+                                            ${voice.status === 'active' ? `
+                                              text-cyan-400/70
+                                              bg-cyan-500/10
+                                              border border-cyan-500/20
+                                              shadow-[0_0_10px_rgba(34,211,238,0.1)]
+                                            ` : `
+                                              text-gray-500
+                                              bg-gray-800/50
+                                              border border-gray-700/30
+                                              opacity-0 group-hover:opacity-100
+                                            `}
+                                          `}>
+                                            {voice.status === 'active' ? 'Active' : 'Click to Toggle'}
+                                          </span>
+                                        </div>
+                                      </div>
+                                      <div className={`
+                                        mt-2 text-[11px] text-gray-500
+                                        transition-all duration-300
+                                        ${voice.status === 'active' ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}
+                                      `}>
+                                        Created {new Date(voice.created_at).toLocaleDateString()}
+                                      </div>
+                                    </motion.div>
+                                  ))}
+                                </div>
+                              </section>
+                            </div>
+                          )}
                         </div>
                       )}
                     </>
