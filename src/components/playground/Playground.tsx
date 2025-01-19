@@ -1275,6 +1275,25 @@ export default function Playground({
     }
   }, [transcript]);
 
+  // Add effect to send initial transcript position
+  useEffect(() => {
+    if (roomState === ConnectionState.Connected && transcript?.content?.segments) {
+      const entireTranscript = transcript.content.segments
+        .map(seg => seg.text.trim())
+        .filter(Boolean);
+
+      const payload: DataChannelPayload = {
+        transcript_position: {
+          read: [],
+          remaining: entireTranscript
+        }
+      };
+
+      console.log('Sending initial transcript position:', payload);
+      sendData(new TextEncoder().encode(JSON.stringify(payload)), { topic: "agent_data_channel" });
+    }
+  }, [roomState, transcript, sendData]);
+
   // Update connect handler to use LiveKit connection
   const handleConnect = useCallback(async () => {
     if (roomState === ConnectionState.Connected) {
