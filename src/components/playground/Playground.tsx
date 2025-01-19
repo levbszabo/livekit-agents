@@ -1279,6 +1279,60 @@ export default function Playground({
     }
   };
 
+  // Add this ref for the file input
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Add this state for upload status
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Update the handlePresentationUpload function
+  const handlePresentationUpload = async (file: File) => {
+    if (!params.brdgeId) return;
+
+    try {
+      setIsUploading(true);
+      // Validate file size (20MB limit)
+      if (file.size > 20 * 1024 * 1024) {
+        console.error('File size exceeds 20MB limit');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('presentation', file);
+
+      const response = await api.post(
+        `/brdges/${params.brdgeId}/presentation`,
+        formData
+      );
+
+      // Update both brdge and agentConfig states
+      setBrdge(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          presentation_filename: response.data.presentation_filename
+        };
+      });
+
+      // Update agentConfig knowledgeBase
+      setAgentConfig(prev => ({
+        ...prev,
+        knowledgeBase: prev.knowledgeBase.map(entry =>
+          entry.type === 'presentation'
+            ? { ...entry, name: response.data.presentation_filename }
+            : entry
+        )
+      }));
+
+      console.log('Presentation uploaded successfully:', response.data.presentation_filename);
+
+    } catch (error: any) {
+      console.error('Error uploading presentation:', error?.response?.data || error);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
       {/* Enhanced futuristic header */}
@@ -1744,7 +1798,6 @@ export default function Playground({
                             <div className="flex items-center gap-2">
                               <FileText size={12} className="text-cyan-400 group-hover:animate-pulse" />
                               <span className="text-[12px] text-gray-300 group-hover:text-cyan-400/90 transition-colors duration-300">
-                                {/* Check both brdge and agentConfig for presentation name */}
                                 {brdge?.presentation_filename ||
                                   agentConfig.knowledgeBase.find(k => k.type === 'presentation')?.name ||
                                   "No presentation file"}
@@ -1755,65 +1808,31 @@ export default function Playground({
                               <motion.button
                                 whileHover={{ scale: 1.02 }}
                                 whileTap={{ scale: 0.98 }}
-                                onClick={() => document.getElementById('pdf-upload')?.click()}
-                                className="
-                                  relative z-30 group flex items-center gap-1.5
-                                  px-2 py-1 rounded-md
-                                  bg-cyan-500/10
-                                  text-cyan-400/90 border border-cyan-500/20
+                                onClick={() => fileInputRef.current?.click()}
+                                className={`
+                                  group flex items-center gap-2 px-3 py-1.5 rounded-lg
+                                  bg-gradient-to-r from-cyan-500/10 to-transparent
+                                  text-cyan-400 border border-cyan-500/20
                                   transition-all duration-300
                                   hover:border-cyan-500/40
                                   hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]
-                                "
+                                  ${isUploading ? 'opacity-50 cursor-wait' : ''}
+                                `}
+                                disabled={isUploading}
                               >
-                                <input
-                                  id="pdf-upload"
-                                  type="file"
-                                  accept=".pdf"
-                                  className="hidden"
-                                  onChange={async (e) => {
-                                    const file = e.target.files?.[0];
-                                    if (!file) return;
-
-                                    // Validate file size (20MB limit)
-                                    if (file.size > 20 * 1024 * 1024) {
-                                      console.error('File size exceeds 20MB limit');
-                                      return;
-                                    }
-
-                                    try {
-                                      const formData = new FormData();
-                                      formData.append('presentation', file);
-
-                                      const response = await fetch(
-                                        `${params.apiBaseUrl}/brdges/${params.brdgeId}/presentation`,
-                                        {
-                                          method: 'POST',
-                                          body: formData,
-                                        }
-                                      );
-
-                                      if (!response.ok) {
-                                        throw new Error('Failed to upload presentation');
-                                      }
-
-                                      // Refresh brdge data
-                                      const brdgeResponse = await fetch(
-                                        `${params.apiBaseUrl}/brdges/${params.brdgeId}`
-                                      );
-                                      if (brdgeResponse.ok) {
-                                        const data = await brdgeResponse.json();
-                                        setBrdge(data);
-                                      }
-                                    } catch (error) {
-                                      console.error('Error uploading presentation:', error);
-                                    }
-                                  }}
-                                />
-                                <Plus size={12} className="text-cyan-400/70 group-hover:text-cyan-400 transition-colors duration-300" />
-                                <span className="text-[11px] text-cyan-400/70 group-hover:text-cyan-400 transition-colors duration-300">
-                                  Upload PDF
-                                </span>
+                                {isUploading ? (
+                                  <>
+                                    <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                    <span className="text-[11px]">Uploading...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Plus size={12} className="text-cyan-400/70 group-hover:text-cyan-400 transition-colors duration-300" />
+                                    <span className="text-[11px] text-cyan-400/70 group-hover:text-cyan-400 transition-colors duration-300">
+                                      Upload PDF
+                                    </span>
+                                  </>
+                                )}
                               </motion.button>
                             ) : (
                               <span className="
@@ -2191,6 +2210,22 @@ export default function Playground({
           </motion.div>
         )}
       </div>
+
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf"
+        className="hidden"
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            await handlePresentationUpload(file);
+            // Clear the input value to allow uploading the same file again
+            e.target.value = '';
+          }
+        }}
+      />
     </div>
   );
 }
