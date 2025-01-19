@@ -21,6 +21,7 @@ import {
 import { TimeAlignedTranscript } from '@/components/transcript/TimeAlignedTranscript';
 import { Plus, FileText, X, Edit2, Save, ChevronDown, ChevronUp, Play, Pause, Volume2, VolumeX, Maximize2, Mic, MicOff, Radio } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import styled, { keyframes } from 'styled-components';
 
 export interface PlaygroundProps {
   logo?: ReactNode;
@@ -736,6 +737,26 @@ const formatTimeWithDecimals = (time: number | null | undefined, totalDuration: 
 
   return `${minutes}:${paddedSeconds} / ${totalMinutes}:${paddedTotalSeconds}`;
 };
+
+// Add the glow animation keyframes
+const glowAnimation = keyframes`
+  0% {
+    filter: drop-shadow(0 0 2px #00f7ff);
+  }
+  50% {
+    filter: drop-shadow(0 0 4px #00f7ff);
+  }
+  100% {
+    filter: drop-shadow(0 0 2px #00f7ff);
+  }
+`;
+
+const BrdgeLogo = styled.img`
+  width: 24px;
+  height: 24px;
+  margin-right: 8px;
+  animation: ${glowAnimation} 2s ease-in-out infinite;
+`;
 
 export default function Playground({
   logo,
@@ -1739,18 +1760,7 @@ export default function Playground({
                         <div className={`flex items-center justify-between ${isMobile ? 'p-1' : 'p-2'}`}>
                           {/* Brand icon - Hide text on mobile */}
                           <div className="flex items-center gap-2">
-                            <div className={`
-                              ${isMobile ? 'w-4 h-4' : 'w-6 h-6'}
-                              rounded-full bg-cyan-500/20
-                              flex items-center justify-center
-                              text-cyan-400 transition-all
-                              ${(localParticipant?.isMicrophoneEnabled || voiceAssistant?.audioTrack)
-                                ? 'animate-pulse shadow-[0_0_10px_rgba(34,211,238,0.5)]'
-                                : ''
-                              }
-                            `}>
-                              <Radio size={isMobile ? 10 : 16} />
-                            </div>
+                            <BrdgeLogo src="/new-img.png" alt="Brdge AI Logo" />
                             {!isMobile && <span className="text-sm text-gray-200 font-medium">AI Chat</span>}
                           </div>
 
