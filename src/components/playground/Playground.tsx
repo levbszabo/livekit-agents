@@ -19,7 +19,7 @@ import {
   PanelResizeHandle
 } from 'react-resizable-panels';
 import { TimeAlignedTranscript } from '@/components/transcript/TimeAlignedTranscript';
-import { Plus, FileText, X, Edit2, Save, ChevronDown, ChevronUp, Play, Pause, Volume2, VolumeX, Maximize2 } from 'lucide-react';
+import { Plus, FileText, X, Edit2, Save, ChevronDown, ChevronUp, Play, Pause, Volume2, VolumeX, Maximize2, Mic, MicOff, Radio } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export interface PlaygroundProps {
@@ -1333,6 +1333,34 @@ export default function Playground({
     }
   };
 
+  // Add auto-connect effect after URL params are loaded
+  useEffect(() => {
+    const canAutoConnect = params.userId && params.brdgeId;
+    if (canAutoConnect && roomState === ConnectionState.Disconnected) {
+      onConnect(true);
+    }
+  }, [params, roomState, onConnect]);
+
+  // Add effect to default mic to off when connected
+  useEffect(() => {
+    if (roomState === ConnectionState.Connected && localParticipant) {
+      localParticipant.setMicrophoneEnabled(false);
+    }
+  }, [roomState, localParticipant]);
+
+  // Add effect to pause video when speaking or TTS is active
+  useEffect(() => {
+    if (!videoRef.current) return;
+
+    const isMicOn = localParticipant?.isMicrophoneEnabled;
+    const isTTSSpeaking = !!voiceAssistant?.audioTrack;
+
+    if (isMicOn || isTTSSpeaking) {
+      videoRef.current.pause();
+      setIsPlaying(false);
+    }
+  }, [localParticipant?.isMicrophoneEnabled, voiceAssistant?.audioTrack]);
+
   return (
     <div className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
       {/* Enhanced futuristic header */}
@@ -2141,32 +2169,47 @@ export default function Playground({
 
                   {activeTab === 'chat' && (
                     <div className="h-full flex flex-col">
-                      {/* Connection Controls */}
-                      <div className="flex items-center gap-2 p-2 border-b border-gray-800/50">
-                        {connectButton}
+                      {/* Top bar with brand icon and mic toggle */}
+                      <div className="flex items-center justify-between p-2 border-b border-gray-800">
+                        {/* Brand icon that pulses when mic/TTS active */}
+                        <div className="flex items-center gap-2">
+                          <div className={`
+                            w-6 h-6 rounded-full bg-cyan-500/20
+                            flex items-center justify-center
+                            text-cyan-400 transition-all
+                            ${(localParticipant?.isMicrophoneEnabled || voiceAssistant?.audioTrack)
+                              ? 'animate-pulse shadow-[0_0_10px_rgba(34,211,238,0.5)]'
+                              : ''
+                            }
+                          `}>
+                            <Radio size={16} />
+                          </div>
+                          <span className="text-sm text-gray-200 font-medium">AI Chat</span>
+                        </div>
+
+                        {/* Mic toggle button */}
                         <button
                           onClick={() => {
-                            if (roomState === ConnectionState.Connected) {
-                              localParticipant?.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
+                            if (roomState === ConnectionState.Connected && localParticipant) {
+                              localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
                             }
                           }}
                           disabled={roomState !== ConnectionState.Connected}
-                          className={`
-                            p-1.5 rounded-lg transition-colors
-                            ${localParticipant?.isMicrophoneEnabled
-                              ? 'bg-cyan-500/20 text-cyan-300'
-                              : 'bg-gray-800 text-gray-400'
-                            }
-                          `}
+                          className="
+                            p-1.5 rounded-lg transition-colors text-xs
+                            flex items-center gap-1
+                            bg-cyan-500/20 text-cyan-400
+                            hover:bg-cyan-500/30
+                          "
                         >
-                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
-                            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
-                          </svg>
+                          {localParticipant?.isMicrophoneEnabled ? <Mic size={14} /> : <MicOff size={14} />}
+                          <span className="text-[11px]">
+                            {localParticipant?.isMicrophoneEnabled ? 'Mic: On' : 'Mic: Off'}
+                          </span>
                         </button>
                       </div>
 
-                      {/* Voice Assistant Transcription */}
+                      {/* Rest of chat content */}
                       {voiceAssistant?.audioTrack && (
                         <div className="p-2">
                           <TranscriptionTile
@@ -2176,7 +2219,7 @@ export default function Playground({
                         </div>
                       )}
 
-                      {/* Chat Messages */}
+                      {/* Existing chat messages and input */}
                       <div className="flex-1 overflow-y-auto p-2 space-y-2">
                         {transcripts.map((message) => (
                           <div
