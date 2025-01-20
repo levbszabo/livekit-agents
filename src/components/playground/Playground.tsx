@@ -161,7 +161,7 @@ const styles = {
       bg-[#1E1E1E]/50 backdrop-blur-sm
       border border-gray-800/50 rounded-lg
       px-3 py-2.5 text-[14px] leading-relaxed
-      text-cyan-400/90
+      text-white
       transition-all duration-300
       focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30
       focus:shadow-[0_0_15px_rgba(34,211,238,0.1)]
