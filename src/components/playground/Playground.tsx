@@ -1512,86 +1512,83 @@ export default function Playground({
     }
   }, [localParticipant?.isMicrophoneEnabled, voiceAssistant?.audioTrack]);
 
-  // Add this CSS class for mobile landscape mode
-  const mobileLayoutClass = isMobile
-    ? `fixed inset-0 ${!isLandscape
-      ? 'bg-black flex flex-col items-center justify-center'
-      : 'flex flex-row overflow-hidden'} h-[100dvh]`
-    : '';
+  // First, update the mobile layout class to be simpler
+  const mobileLayoutClass = isMobile ? 'flex flex-col' : '';
 
-  // Add this effect after other useEffects
-  useEffect(() => {
-    // Only send when we have both the connection and the config
-    if (roomState === ConnectionState.Connected && agentConfig) {
-      try {
-        const payload = {
-          agent_config: {
-            personality: agentConfig.personality,
-            knowledgeBase: agentConfig.knowledgeBase
-          },
-          user_id: params.userId,
-          brdge_id: params.brdgeId
-        };
+  // Add mobile-specific video controls that overlay the video
+  const MobileVideoControls = () => {
+    return (
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              if (videoRef.current) {
+                if (isPlaying) {
+                  videoRef.current.pause();
+                } else {
+                  videoRef.current.play();
+                }
+                setIsPlaying(!isPlaying);
+              }
+            }}
+            className="text-white/90 hover:text-cyan-400 transition-colors"
+          >
+            {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+          </button>
 
-        console.log('Sending initial agent config:', payload);
-        sendData(new TextEncoder().encode(JSON.stringify(payload)), { topic: "agent_data_channel" });
-      } catch (error) {
-        console.error('Error sending initial agent config:', error);
-      }
-    }
-  }, [roomState, agentConfig, sendData, params.userId, params.brdgeId]); // Dependencies ensure this runs when connection is ready and config is loaded
+          <div className="flex-1 text-[10px] text-white/60 font-medium">
+            {formatTime(currentTime)} / {formatTime(videoRef.current?.duration || 0)}
+          </div>
 
-  // Add this effect to handle automatic activation of latest voice when tab changes
-  useEffect(() => {
-    const activateLatestVoice = async () => {
-      if (activeTab === 'voice-clone' && savedVoices.length > 0 && params.brdgeId) {
-        // Find the most recent voice
-        const mostRecent = savedVoices.reduce((prev, current) => {
-          return new Date(current.created_at) > new Date(prev.created_at) ? current : prev;
-        }, savedVoices[0]);
+          <button
+            onClick={() => {
+              if (videoRef.current) {
+                videoRef.current.muted = !isMuted;
+                setIsMuted(!isMuted);
+              }
+            }}
+            className="text-white/90 hover:text-cyan-400 transition-colors"
+          >
+            {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+          </button>
+        </div>
+      </div>
+    );
+  };
 
-        // Only activate if it's not already active
-        if (mostRecent.status !== 'active') {
-          try {
-            const response = await api.post(`/brdges/${params.brdgeId}/voice/activate`, {
-              voice_id: mostRecent.id
-            });
-
-            if (response.data?.voice) {
-              setSavedVoices(prev => prev.map(v => ({
-                ...v,
-                status: v.id === mostRecent.id ? 'active' : 'inactive'
-              })));
+  // Add a FAB component for quick mobile actions
+  const MobileFAB = () => {
+    return (
+      <div className="fixed bottom-4 right-4 z-50">
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={() => {
+            if (roomState === ConnectionState.Connected && localParticipant) {
+              localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
             }
-          } catch (error) {
-            console.error('Error activating most recent voice:', error);
-          }
-        }
-      }
-    };
+          }}
+          className={`
+            w-12 h-12 rounded-full
+            flex items-center justify-center
+            ${localParticipant?.isMicrophoneEnabled
+              ? 'bg-red-500/90 text-white'
+              : 'bg-cyan-500/90 text-white'}
+            shadow-lg backdrop-blur-sm
+            border border-white/10
+          `}
+        >
+          {localParticipant?.isMicrophoneEnabled
+            ? <MicOff size={18} />
+            : <Mic size={18} />}
+        </motion.button>
+      </div>
+    );
+  };
 
-    activateLatestVoice();
-  }, [activeTab, savedVoices, params.brdgeId]); // Run when tab changes or voices update
-
-  // Remove or modify the existing auto-activation effect to avoid conflicts
-  // Replace the existing useEffect for voice activation with:
-  useEffect(() => {
-    if (savedVoices.length === 1) {
-      // If there's only one voice, make it active
-      const voice = savedVoices[0];
-      if (voice.status !== 'active') {
-        api.post(`/brdges/${params.brdgeId}/voices/${voice.id}/activate`)
-          .then(() => {
-            setSavedVoices([{ ...voice, status: 'active' }]);
-          })
-          .catch(error => console.error('Error activating single voice:', error));
-      }
-    }
-  }, [savedVoices, params.brdgeId]); // Only handle the single voice case automatically
-
+  // Then update the main container and content area for mobile
   return (
     <div className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
-      {/* Enhanced futuristic header - Hide on mobile */}
+      {/* Hide header on mobile as before */}
       {!isMobile && (
         <div className="h-[20px] flex items-center px-4 relative">
           {logo}
@@ -1632,64 +1629,84 @@ export default function Playground({
         </div>
       )}
 
-      {/* Mobile rotation prompt */}
-      {isMobile && !isLandscape && (
-        <div className="fixed inset-0 bg-black z-50 flex flex-col items-center justify-center p-4 text-center h-[100dvh]">
-          <div className="animate-pulse mb-4">
-            <svg
-              className="w-12 h-12 text-cyan-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 4v7a2 2 0 002 2h12a2 2 0 002-2V4M4 4h16"
-              />
-            </svg>
-          </div>
-          <p className="text-cyan-400 font-medium mb-2">Please rotate your device</p>
-          <p className="text-gray-400 text-sm">For the best experience, use landscape mode</p>
-        </div>
-      )}
-
       {/* Main container */}
       <div className={`flex-1 relative ${mobileLayoutClass}`}>
         {/* Main Content */}
-        <div className={`
-          ${isMobile && isLandscape ? 'w-[90%] h-[100dvh] overflow-hidden' : 'absolute inset-0'}
-          ${!isMobile && !isRightPanelCollapsed ? 'right-[360px]' : 'right-0'}
-          transition-all duration-300
-          ${isMobile ? 'touch-none' : ''}
-        `}>
+        <div
+          className={`
+            ${!isMobile ? 'absolute inset-0' : 'w-full h-full flex flex-col'}
+            ${!isMobile && !isRightPanelCollapsed ? 'right-[360px]' : 'right-0'}
+            transition-all duration-300
+          `}
+        >
           <PanelGroup direction="vertical">
-            {/* Video Panel */}
-            <Panel defaultSize={isMobile ? 100 : 85} minSize={60}>
-              <div className="h-full w-full flex flex-col bg-black">
-                <div className="flex-1 relative">
-                  <div className="absolute inset-0">
-                    <VideoPlayer
-                      videoRef={videoRef}
-                      videoUrl={videoUrl}
-                      currentTime={currentTime}
-                      setCurrentTime={setCurrentTime}
-                      setDuration={setDuration}
-                      onTimeUpdate={() => {
-                        if (videoRef.current) {
-                          setCurrentTime(videoRef.current.currentTime);
-                        }
-                      }}
-                      isPlaying={isPlaying}
-                      setIsPlaying={setIsPlaying}
-                    />
-                  </div>
-                </div>
+            {/* Video Panel - Adjust size for mobile */}
+            <Panel
+              defaultSize={isMobile ? 40 : 85}
+              minSize={isMobile ? 30 : 60}
+            >
+              <div className="h-full w-full bg-black">
+                <VideoPlayer
+                  videoRef={videoRef}
+                  videoUrl={videoUrl}
+                  currentTime={currentTime}
+                  setCurrentTime={setCurrentTime}
+                  setDuration={setDuration}
+                  onTimeUpdate={() => {
+                    if (videoRef.current) {
+                      setCurrentTime(videoRef.current.currentTime);
+                    }
+                  }}
+                  isPlaying={isPlaying}
+                  setIsPlaying={setIsPlaying}
+                />
               </div>
             </Panel>
 
-            {/* Hide transcript panel on mobile */}
+            {/* Chat/Transcript Panel for Mobile */}
+            {isMobile && (
+              <Panel defaultSize={60} minSize={30}>
+                <div className="h-full flex flex-col bg-black/90">
+                  {/* Chat content */}
+                  <div className="flex-1 overflow-y-auto">
+                    {/* Voice Assistant Transcription */}
+                    {voiceAssistant?.audioTrack && (
+                      <div className="p-2">
+                        <TranscriptionTile
+                          agentAudioTrack={voiceAssistant.audioTrack}
+                          accentColor="cyan"
+                        />
+                      </div>
+                    )}
+
+                    {/* Chat Messages */}
+                    <div className="flex-1 p-2 space-y-1">
+                      {transcripts.map((message) => (
+                        <div
+                          key={message.timestamp}
+                          className={`
+                            ${message.isSelf ? 'ml-auto bg-cyan-950/30' : 'mr-auto bg-gray-800/30'} 
+                            max-w-[95%]
+                            rounded-lg p-1.5
+                            backdrop-blur-sm
+                            border border-gray-700/50
+                            transition-all duration-300
+                            hover:border-cyan-500/30
+                            group
+                          `}
+                        >
+                          <div className="text-[11px] leading-relaxed text-gray-300">
+                            {message.message}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </Panel>
+            )}
+
+            {/* Desktop Transcript Panel */}
             {!isMobile && (
               <>
                 <PanelResizeHandle className={resizeHandleStyles.horizontal}>
@@ -1871,8 +1888,8 @@ export default function Playground({
           </PanelGroup>
         </div>
 
-        {/* Right Panel - Modified for mobile */}
-        {(!isMobile || (isMobile && isLandscape)) && (
+        {/* Right Panel - Desktop only */}
+        {!isMobile && (
           <motion.div
             className={`
               ${isMobile && isLandscape
@@ -2584,6 +2601,7 @@ export default function Playground({
           }
         }}
       />
+      {isMobile && <MobileFAB />}
     </div>
   );
 }
