@@ -702,16 +702,25 @@ const VideoPlayer = ({
 
   // Toggle play/pause on click (if not loading)
   const handleClick = () => {
-    if (!videoRef.current || isLoading) return;
+    if (!videoRef.current) return; // Ensure the video ref exists
+    if (isLoading) {
+      console.log("Video is still loading, cannot play yet.");
+      return;
+    }
+
     if (isPlaying) {
       videoRef.current.pause();
       setIsPlaying(false);
     } else {
-      videoRef.current.play().catch(() => {
-        // In case the browser blocks auto-play
-        setIsPlaying(false);
-      });
-      setIsPlaying(true);
+      videoRef.current
+        .play()
+        .then(() => {
+          setIsPlaying(true);
+        })
+        .catch((err) => {
+          console.error("Video playback failed:", err); // Log any playback errors
+          setIsPlaying(false);
+        });
     }
   };
 
