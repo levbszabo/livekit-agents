@@ -640,14 +640,22 @@ const TranscriptTimeline = ({ transcript, currentTime, onTimeClick }: {
   );
 };
 
-// Update the VideoPlayer component
+// Replace the formatTimeWithDecimals function with this simpler version
+const formatTime = (time: number): string => {
+  if (!isFinite(time) || isNaN(time)) return '0:00';
+  const minutes = Math.floor(time / 60);
+  const seconds = Math.floor(time % 60);
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};
+
+// Update the VideoPlayer component to better handle duration updates
 const VideoPlayer = ({
   videoRef,
   videoUrl,
   currentTime,
   setCurrentTime,
-  onTimeUpdate,
   setDuration,
+  onTimeUpdate,
   isPlaying,
   setIsPlaying,
 }: {
@@ -655,88 +663,109 @@ const VideoPlayer = ({
   videoUrl: string | null;
   currentTime: number;
   setCurrentTime: (time: number) => void;
-  onTimeUpdate: () => void;
   setDuration: (duration: number) => void;
+  onTimeUpdate: () => void;
   isPlaying: boolean;
   setIsPlaying: (playing: boolean) => void;
 }) => {
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Enhanced metadata/duration handling
+  const updateDuration = useCallback(() => {
+    if (!videoRef.current) return;
+    const dur = videoRef.current.duration;
+    if (dur && !isNaN(dur) && isFinite(dur)) {
+      setDuration(dur);
+      setIsLoading(false);
+    }
+  }, [setDuration]);
+
+  // Handle initial load and duration updates
   const handleLoadedMetadata = () => {
-    if (videoRef.current) {
-      const videoDuration = videoRef.current.duration;
-      if (!isNaN(videoDuration) && isFinite(videoDuration)) {
-        setDuration(videoDuration);
-        setCurrentTime(videoRef.current.currentTime);
-      }
-    }
+    updateDuration();
   };
 
+  // Backup duration handler
+  const handleDurationChange = () => {
+    updateDuration();
+  };
+
+  // Update currentTime whenever the video time changes
   const handleTimeUpdate = () => {
-    if (videoRef.current) {
-      const newTime = videoRef.current.currentTime;
-      if (isFinite(newTime) && newTime >= 0) {
-        setCurrentTime(newTime);
-      }
+    if (!videoRef.current) return;
+    const t = videoRef.current.currentTime;
+    if (!isNaN(t) && isFinite(t)) {
+      setCurrentTime(t);
+      onTimeUpdate();
     }
-    onTimeUpdate();
   };
 
+  // Toggle play/pause on click (if not loading)
   const handleClick = () => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
+    if (!videoRef.current || isLoading) return;
+    if (isPlaying) {
+      videoRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      videoRef.current.play().catch(() => {
+        // In case the browser blocks auto-play
+        setIsPlaying(false);
+      });
+      setIsPlaying(true);
     }
   };
 
+  // If videoUrl changes, reset loading state and reload the video
   useEffect(() => {
-    if (videoRef.current && videoUrl) {
-      videoRef.current.load(); // Force reload when URL changes
+    if (videoUrl && videoRef.current) {
+      setIsLoading(true);
+      videoRef.current.load(); // Force the video element to reload
+      // Try to get duration after a short delay if needed
+      const timer = setTimeout(() => {
+        updateDuration();
+      }, 100);
+      return () => clearTimeout(timer);
     }
-  }, [videoUrl]);
+  }, [videoUrl, updateDuration]);
+
+  // If playing changes, play/pause
+  useEffect(() => {
+    if (!videoRef.current) return;
+    if (isPlaying) {
+      videoRef.current.play().catch(() => setIsPlaying(false));
+    } else {
+      videoRef.current.pause();
+    }
+  }, [isPlaying]);
 
   return (
-    <div className="relative w-full h-full bg-black cursor-pointer" onClick={handleClick}>
+    <div
+      className="relative w-full h-full bg-black cursor-pointer"
+      onClick={handleClick}
+    >
+      {/* Loading overlay */}
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10">
+          <div className="w-8 h-8 border-2 border-cyan-500/30 border-t-cyan-400 animate-spin rounded-full" />
+        </div>
+      )}
+
       <video
         ref={videoRef}
-        src={videoUrl || ''}
+        src={videoUrl || ""}
         className="absolute inset-0 w-full h-full object-cover"
-        onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
-        onDurationChange={handleLoadedMetadata}
-        onLoadedData={handleLoadedMetadata}
-        onCanPlay={handleLoadedMetadata}
+        onDurationChange={handleDurationChange}
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedData={updateDuration}
+        onCanPlay={() => setIsLoading(false)}
+        onWaiting={() => setIsLoading(true)}
+        onPlaying={() => setIsLoading(false)}
+        preload="auto"
         playsInline
       />
     </div>
   );
-};
-
-// Add this helper function at the top of the file
-const formatTimeWithDecimals = (time: number | null | undefined, totalDuration: number | null | undefined): string => {
-  // Handle invalid/initial states
-  if (time === null || time === undefined) return '0:00.00';
-  if (totalDuration === null || totalDuration === undefined || !isFinite(totalDuration)) {
-    totalDuration = 0;
-  }
-
-  // Format current time
-  const minutes = Math.floor(time / 60);
-  const seconds = time % 60;
-  const formattedSeconds = seconds.toFixed(2);
-
-  // Format total duration
-  const totalMinutes = Math.floor(totalDuration / 60);
-  const totalSeconds = totalDuration % 60;
-  const formattedTotalSeconds = totalSeconds.toFixed(2);
-
-  // Ensure proper padding for seconds less than 10
-  const paddedSeconds = formattedSeconds.padStart(5, '0');
-  const paddedTotalSeconds = formattedTotalSeconds.padStart(5, '0');
-
-  return `${minutes}:${paddedSeconds} / ${totalMinutes}:${paddedTotalSeconds}`;
 };
 
 // Add the glow animation keyframes
@@ -757,6 +786,12 @@ const BrdgeLogo = styled.img`
   height: 24px;
   margin-right: 8px;
   animation: ${glowAnimation} 2s ease-in-out infinite;
+`;
+
+// Add this keyframe animation to your existing keyframes
+const loadingAnimation = keyframes`
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 `;
 
 export default function Playground({
@@ -1092,8 +1127,9 @@ export default function Playground({
 
   // Add these helper functions before the return statement
   const formatTime = (seconds: number) => {
+    if (!isFinite(seconds) || isNaN(seconds)) return '0:00';
     const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+    const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
@@ -1340,24 +1376,40 @@ export default function Playground({
     }
   }, [videoUrl]);
 
-  // Update progress bar click handler
-  const handleProgressBarClick = useCallback((e: React.MouseEvent) => {
-    if (!progressBarRef.current || !videoRef.current || !duration) return;
+  // Replace the progress bar click handler with this enhanced version
+  const handleProgressBarInteraction = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    if (!progressBarRef.current || !videoRef.current || !videoRef.current.duration) return;
 
     const rect = progressBarRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const percentage = x / rect.width;
-    const newTime = percentage * duration;
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const x = clientX - rect.left;
+    const percentage = Math.max(0, Math.min(1, x / rect.width));
+    const newTime = percentage * videoRef.current.duration;
 
-    if (isFinite(newTime) && newTime >= 0) {
-      try {
-        videoRef.current.currentTime = newTime;
-        setCurrentTime(newTime);
-      } catch (error) {
-        console.error('Error setting video time:', error);
-      }
+    if (isFinite(newTime) && !isNaN(newTime)) {
+      videoRef.current.currentTime = newTime;
+      setCurrentTime(newTime);
     }
-  }, [duration]);
+  }, []);
+
+  // Add these state variables for progress bar dragging
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Add these handlers for progress bar dragging
+  const handleProgressBarMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    handleProgressBarInteraction(e);
+  };
+
+  const handleProgressBarMouseMove = (e: React.MouseEvent) => {
+    if (isDragging) {
+      handleProgressBarInteraction(e);
+    }
+  };
+
+  const handleProgressBarMouseUp = () => {
+    setIsDragging(false);
+  };
 
   // Add this state near other state declarations
   const [isSaving, setIsSaving] = useState(false);
@@ -1623,12 +1675,12 @@ export default function Playground({
                       videoUrl={videoUrl}
                       currentTime={currentTime}
                       setCurrentTime={setCurrentTime}
+                      setDuration={setDuration}
                       onTimeUpdate={() => {
                         if (videoRef.current) {
                           setCurrentTime(videoRef.current.currentTime);
                         }
                       }}
-                      setDuration={setDuration}
                       isPlaying={isPlaying}
                       setIsPlaying={setIsPlaying}
                     />
@@ -1692,25 +1744,49 @@ export default function Playground({
                           <div
                             ref={progressBarRef}
                             className="relative w-full h-1 bg-gray-800/50 rounded-full cursor-pointer group"
-                            onClick={handleProgressBarClick}
+                            onMouseDown={handleProgressBarMouseDown}
+                            onMouseMove={handleProgressBarMouseMove}
+                            onMouseUp={handleProgressBarMouseUp}
+                            onMouseLeave={handleProgressBarMouseUp}
+                            onClick={handleProgressBarInteraction}
                           >
+                            {/* Loading bar */}
+                            <div
+                              className={`absolute inset-0 rounded-full overflow-hidden ${!duration ? 'opacity-100' : 'opacity-0'}`}
+                            >
+                              <div
+                                className="h-full bg-cyan-500/30"
+                                style={{
+                                  backgroundImage: 'linear-gradient(90deg, transparent, rgba(34,211,238,0.3), transparent)',
+                                  backgroundSize: '200% 100%',
+                                  animation: 'loading 1.5s ease-in-out infinite',
+                                }}
+                              />
+                            </div>
+                            {/* Progress bar */}
                             <div
                               className="absolute top-0 left-0 h-full bg-cyan-500 rounded-full transition-all duration-150"
                               style={{ width: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }}
                             />
-                            <div className="
-                          absolute top-1/2 -translate-y-1/2
-                          w-2.5 h-2.5 bg-cyan-400 rounded-full
-                          opacity-0 group-hover:opacity-100
-                          transition-all duration-300
-                          shadow-[0_0_10px_rgba(34,211,238,0.5)]
-                        " style={{ left: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }} />
+                            {/* Progress indicator */}
+                            <div
+                              className={`
+                                absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-cyan-400 rounded-full
+                                ${!duration ? 'opacity-0' : 'opacity-0 group-hover:opacity-100'}
+                                transition-all duration-300
+                                shadow-[0_0_10px_rgba(34,211,238,0.5)]
+                              `}
+                              style={{
+                                left: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%',
+                                opacity: isDragging ? 1 : undefined
+                              }}
+                            />
                           </div>
                         </div>
 
                         {/* Time Display */}
                         <div className="flex items-center gap-2 text-[11px] text-gray-400 font-medium tracking-wider">
-                          {formatTimeWithDecimals(currentTime, videoRef.current?.duration)}
+                          {formatTime(currentTime)} / {formatTime(videoRef.current?.duration || 0)}
                         </div>
 
                         {/* Volume Control */}

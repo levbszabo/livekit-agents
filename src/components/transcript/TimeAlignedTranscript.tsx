@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 
 interface Word {
@@ -29,25 +29,50 @@ export const TimeAlignedTranscript: React.FC<TimeAlignedTranscriptProps> = ({
 }) => {
     const activeWordRef = useRef<HTMLSpanElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const [isUserScrolling, setIsUserScrolling] = useState(false);
+    const scrollTimeoutRef = useRef<NodeJS.Timeout>();
 
-    // Enhanced auto-scroll with smooth "through" effect
+    // Enhanced auto-scroll with user interaction detection
     useEffect(() => {
-        if (!activeWordRef.current || !containerRef.current) return;
+        if (!activeWordRef.current || !containerRef.current || isUserScrolling) return;
 
         const container = containerRef.current;
         const word = activeWordRef.current;
         const containerWidth = container.offsetWidth;
         const wordPosition = word.offsetLeft;
 
-        // Keep the active word at 40% of the screen width
-        const targetScroll = wordPosition - (containerWidth * 0.4);
+        // Position the active word at 40% of the container width
+        const targetScroll = Math.max(0, wordPosition - (containerWidth * 0.4));
 
-        // Add smooth scrolling with easing
         container.scrollTo({
             left: targetScroll,
             behavior: 'smooth'
         });
-    }, [currentTime]);
+    }, [currentTime, isUserScrolling]);
+
+    // Handle user scroll interaction
+    const handleScroll = () => {
+        setIsUserScrolling(true);
+
+        // Clear existing timeout
+        if (scrollTimeoutRef.current) {
+            clearTimeout(scrollTimeoutRef.current);
+        }
+
+        // Reset after 2 seconds of no scrolling
+        scrollTimeoutRef.current = setTimeout(() => {
+            setIsUserScrolling(false);
+        }, 2000);
+    };
+
+    // Cleanup timeout
+    useEffect(() => {
+        return () => {
+            if (scrollTimeoutRef.current) {
+                clearTimeout(scrollTimeoutRef.current);
+            }
+        };
+    }, []);
 
     // Find the currently active word across all segments
     const findActiveWord = () => {
@@ -69,6 +94,7 @@ export const TimeAlignedTranscript: React.FC<TimeAlignedTranscriptProps> = ({
         <div className="w-full h-full flex flex-col">
             <div
                 ref={containerRef}
+                onScroll={handleScroll}
                 className="
                     flex-1
                     w-full overflow-x-auto overflow-y-auto
