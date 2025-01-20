@@ -1476,7 +1476,9 @@ export default function Playground({
           agent_config: {
             personality: agentConfig.personality,
             knowledgeBase: agentConfig.knowledgeBase
-          }
+          },
+          user_id: params.userId,
+          brdge_id: params.brdgeId
         };
 
         console.log('Sending initial agent config:', payload);
@@ -1485,7 +1487,55 @@ export default function Playground({
         console.error('Error sending initial agent config:', error);
       }
     }
-  }, [roomState, agentConfig, sendData]); // Dependencies ensure this runs when connection is ready and config is loaded
+  }, [roomState, agentConfig, sendData, params.userId, params.brdgeId]); // Dependencies ensure this runs when connection is ready and config is loaded
+
+  // Add this effect to handle automatic activation of latest voice when tab changes
+  useEffect(() => {
+    const activateLatestVoice = async () => {
+      if (activeTab === 'voice-clone' && savedVoices.length > 0 && params.brdgeId) {
+        // Find the most recent voice
+        const mostRecent = savedVoices.reduce((prev, current) => {
+          return new Date(current.created_at) > new Date(prev.created_at) ? current : prev;
+        }, savedVoices[0]);
+
+        // Only activate if it's not already active
+        if (mostRecent.status !== 'active') {
+          try {
+            const response = await api.post(`/brdges/${params.brdgeId}/voice/activate`, {
+              voice_id: mostRecent.id
+            });
+
+            if (response.data?.voice) {
+              setSavedVoices(prev => prev.map(v => ({
+                ...v,
+                status: v.id === mostRecent.id ? 'active' : 'inactive'
+              })));
+            }
+          } catch (error) {
+            console.error('Error activating most recent voice:', error);
+          }
+        }
+      }
+    };
+
+    activateLatestVoice();
+  }, [activeTab, savedVoices, params.brdgeId]); // Run when tab changes or voices update
+
+  // Remove or modify the existing auto-activation effect to avoid conflicts
+  // Replace the existing useEffect for voice activation with:
+  useEffect(() => {
+    if (savedVoices.length === 1) {
+      // If there's only one voice, make it active
+      const voice = savedVoices[0];
+      if (voice.status !== 'active') {
+        api.post(`/brdges/${params.brdgeId}/voices/${voice.id}/activate`)
+          .then(() => {
+            setSavedVoices([{ ...voice, status: 'active' }]);
+          })
+          .catch(error => console.error('Error activating single voice:', error));
+      }
+    }
+  }, [savedVoices, params.brdgeId]); // Only handle the single voice case automatically
 
   return (
     <div className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
