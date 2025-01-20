@@ -1390,7 +1390,7 @@ export default function Playground({
       videoRef.current.currentTime = newTime;
       setCurrentTime(newTime);
     }
-  }, []);
+  }, [setCurrentTime]); // Add setCurrentTime as a dependency
 
   // Add these state variables for progress bar dragging
   const [isDragging, setIsDragging] = useState(false);
@@ -2372,7 +2372,7 @@ export default function Playground({
                                       group-hover:border-cyan-500/20
                             transition-all duration-300
                                         `}>
-                                      "In just a few quick steps my voice based AI assistant will be integrated into my content. This way you can speak to others without being there... how cool is that?"
+                                      &ldquo;In just a few quick steps my voice based AI assistant will be integrated into my content. This way you can speak to others without being there... how cool is that?&rdquo;
                                     </div>
                                   </div>
 
