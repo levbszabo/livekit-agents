@@ -803,7 +803,6 @@ const VideoPlayer = ({
           playsInline
           webkit-playsinline="true"
           x-webkit-airplay="allow"
-          controlsList="nodownload"
           preload="metadata"
           muted={isMobile && !hasInteracted}
           controls={false}
