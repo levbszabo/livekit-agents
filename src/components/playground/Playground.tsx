@@ -648,7 +648,7 @@ const formatTime = (time: number): string => {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 };
 
-// Update the VideoPlayer component to better handle duration updates
+// Update the VideoPlayer component to better handle mobile playback
 const VideoPlayer = ({
   videoRef,
   videoUrl,
@@ -676,17 +676,11 @@ const VideoPlayer = ({
     const dur = videoRef.current.duration;
     if (dur && !isNaN(dur) && isFinite(dur)) {
       setDuration(dur);
-      setIsLoading(false);
     }
   }, [setDuration]);
 
   // Handle initial load and duration updates
   const handleLoadedMetadata = () => {
-    updateDuration();
-  };
-
-  // Backup duration handler
-  const handleDurationChange = () => {
     updateDuration();
   };
 
@@ -700,60 +694,50 @@ const VideoPlayer = ({
     }
   };
 
-  // Toggle play/pause on click (if not loading)
+  // Toggle play/pause on click - Modified for mobile support
   const handleClick = () => {
-    if (!videoRef.current) return; // Ensure the video ref exists
-    if (isLoading) {
-      console.log("Video is still loading, cannot play yet.");
-      return;
-    }
+    if (!videoRef.current) return;
+
+    // Optimistically set loading to false on user interaction
+    setIsLoading(false);
 
     if (isPlaying) {
       videoRef.current.pause();
       setIsPlaying(false);
     } else {
+      // Attempt playback without checking loading state
       videoRef.current
         .play()
         .then(() => {
           setIsPlaying(true);
+          setIsLoading(false);
         })
         .catch((err) => {
-          console.error("Video playback failed:", err); // Log any playback errors
+          console.error("Video playback failed:", err);
           setIsPlaying(false);
+          // Only set loading if there's an actual error
+          setIsLoading(true);
         });
     }
   };
 
-  // If videoUrl changes, reset loading state and reload the video
+  // If videoUrl changes, reset loading state
   useEffect(() => {
-    if (videoUrl && videoRef.current) {
+    if (videoUrl) {
       setIsLoading(true);
-      videoRef.current.load(); // Force the video element to reload
-      // Try to get duration after a short delay if needed
-      const timer = setTimeout(() => {
-        updateDuration();
-      }, 100);
-      return () => clearTimeout(timer);
+      if (videoRef.current) {
+        videoRef.current.load();
+      }
     }
-  }, [videoUrl, updateDuration]);
-
-  // If playing changes, play/pause
-  useEffect(() => {
-    if (!videoRef.current) return;
-    if (isPlaying) {
-      videoRef.current.play().catch(() => setIsPlaying(false));
-    } else {
-      videoRef.current.pause();
-    }
-  }, [isPlaying]);
+  }, [videoUrl]);
 
   return (
     <div
       className="relative w-full h-full bg-black cursor-pointer"
       onClick={handleClick}
     >
-      {/* Loading overlay */}
-      {isLoading && (
+      {/* Loading overlay - Only show if actually loading and not playing */}
+      {isLoading && !isPlaying && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10">
           <div className="w-8 h-8 border-2 border-cyan-500/30 border-t-cyan-400 animate-spin rounded-full" />
         </div>
@@ -764,11 +748,9 @@ const VideoPlayer = ({
         src={videoUrl || ""}
         className="absolute inset-0 w-full h-full object-cover"
         onLoadedMetadata={handleLoadedMetadata}
-        onDurationChange={handleDurationChange}
         onTimeUpdate={handleTimeUpdate}
         onLoadedData={updateDuration}
         onCanPlay={() => setIsLoading(false)}
-        onWaiting={() => setIsLoading(true)}
         onPlaying={() => setIsLoading(false)}
         preload="auto"
         playsInline
