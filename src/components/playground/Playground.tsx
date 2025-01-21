@@ -648,7 +648,7 @@ const formatTime = (time: number): string => {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 };
 
-// Update the VideoPlayer component to better handle mobile playback
+// Update the VideoPlayer component with better mobile support
 const VideoPlayer = ({
   videoRef,
   videoUrl,
@@ -669,62 +669,91 @@ const VideoPlayer = ({
   setIsPlaying: (playing: boolean) => void;
 }) => {
   const [isLoading, setIsLoading] = useState(true);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
+  const [hasInteracted, setHasInteracted] = useState(false);
+  const [isVideoReady, setIsVideoReady] = useState(false);
+  const { isMobile } = useIsMobile();
 
-  // Enhanced metadata/duration handling
-  const updateDuration = useCallback(() => {
+  // Handle initial load and duration updates
+  const handleLoadedMetadata = () => {
     if (!videoRef.current) return;
     const dur = videoRef.current.duration;
     if (dur && !isNaN(dur) && isFinite(dur)) {
       setDuration(dur);
-    }
-  }, [setDuration]);
-
-  // Handle initial load and duration updates
-  const handleLoadedMetadata = () => {
-    updateDuration();
-  };
-
-  // Update currentTime whenever the video time changes
-  const handleTimeUpdate = () => {
-    if (!videoRef.current) return;
-    const t = videoRef.current.currentTime;
-    if (!isNaN(t) && isFinite(t)) {
-      setCurrentTime(t);
-      onTimeUpdate();
+      // Don't set loading false here, wait for canplay
+      if (isMobile) {
+        videoRef.current.muted = true;
+      }
     }
   };
 
-  // Toggle play/pause on click - Modified for mobile support
-  const handleClick = () => {
-    if (!videoRef.current) return;
+  // Handle when video can actually play
+  const handleCanPlay = () => {
+    setIsVideoReady(true);
+    setIsLoading(false); // Move loading state here
 
-    // Optimistically set loading to false on user interaction
+    // Auto-play on mobile if muted
+    if (isMobile && videoRef.current?.muted && !hasInteracted) {
+      attemptPlay();
+    }
+  };
+
+  // Enhanced error handling
+  const handlePlaybackError = (error: any) => {
+    console.error('Video playback error:', error);
+    if (isVideoReady) {
+      setPlaybackError('Unable to play video. Please try again.');
+    }
+    setIsPlaying(false);
     setIsLoading(false);
+  };
+
+  // Handle play attempt with mobile considerations
+  const attemptPlay = async () => {
+    if (!videoRef.current || !isVideoReady) return;
+
+    try {
+      setPlaybackError(null);
+
+      // Don't set loading true here anymore
+      // setIsLoading(true);
+
+      // For mobile, ensure video is muted for first play
+      if (isMobile && !hasInteracted) {
+        videoRef.current.muted = true;
+      }
+
+      await videoRef.current.play();
+      setIsPlaying(true);
+      setHasInteracted(true);
+    } catch (error) {
+      handlePlaybackError(error);
+    }
+  };
+
+  // Handle click/tap with mobile considerations
+  const handleVideoClick = async () => {
+    if (!videoRef.current || !isVideoReady) return;
 
     if (isPlaying) {
       videoRef.current.pause();
       setIsPlaying(false);
     } else {
-      // Attempt playback without checking loading state
-      videoRef.current
-        .play()
-        .then(() => {
-          setIsPlaying(true);
-          setIsLoading(false);
-        })
-        .catch((err) => {
-          console.error("Video playback failed:", err);
-          setIsPlaying(false);
-          // Only set loading if there's an actual error
-          setIsLoading(true);
-        });
+      // If on mobile and first interaction, unmute
+      if (isMobile && hasInteracted && videoRef.current.muted) {
+        videoRef.current.muted = false;
+      }
+      attemptPlay();
     }
   };
 
-  // If videoUrl changes, reset loading state
+  // Reset states when video URL changes
   useEffect(() => {
     if (videoUrl) {
+      setIsVideoReady(false);
       setIsLoading(true);
+      setPlaybackError(null);
+      setHasInteracted(false);
       if (videoRef.current) {
         videoRef.current.load();
       }
@@ -734,12 +763,49 @@ const VideoPlayer = ({
   return (
     <div
       className="relative w-full h-full bg-black cursor-pointer"
-      onClick={handleClick}
+      onClick={handleVideoClick}
     >
-      {/* Loading overlay - Only show if actually loading and not playing */}
-      {isLoading && !isPlaying && (
+      {/* Play Button Overlay */}
+      {isVideoReady && !isPlaying && !isLoading && !playbackError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-transparent z-20">
+          <motion.div
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            className="p-4 rounded-full bg-black/30 border border-cyan-500/50
+              backdrop-blur-sm
+              shadow-[0_0_15px_rgba(34,211,238,0.2)]"
+          >
+            <Play
+              size={isMobile ? 24 : 32}
+              className="text-cyan-400"
+            />
+          </motion.div>
+        </div>
+      )}
+
+      {/* Loading Overlay */}
+      {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10">
           <div className="w-8 h-8 border-2 border-cyan-500/30 border-t-cyan-400 animate-spin rounded-full" />
+        </div>
+      )}
+
+      {/* Error Overlay */}
+      {playbackError && isVideoReady && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10">
+          <div className="text-red-400 text-sm text-center px-4">
+            {playbackError}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                attemptPlay();
+              }}
+              className="mt-2 px-3 py-1 bg-cyan-500/20 text-cyan-400 rounded-md text-xs
+                hover:bg-cyan-500/30 transition-all duration-300"
+            >
+              Try Again
+            </button>
+          </div>
         </div>
       )}
 
@@ -748,14 +814,69 @@ const VideoPlayer = ({
         src={videoUrl || ""}
         className="absolute inset-0 w-full h-full object-cover"
         onLoadedMetadata={handleLoadedMetadata}
-        onTimeUpdate={handleTimeUpdate}
-        onLoadedData={updateDuration}
-        onCanPlay={() => setIsLoading(false)}
-        onPlaying={() => setIsLoading(false)}
-        preload="auto"
+        onTimeUpdate={onTimeUpdate}
+        onError={(e) => handlePlaybackError(e)}
+        onPlaying={() => {
+          setIsLoading(false);
+          setPlaybackError(null);
+        }}
+        onCanPlay={handleCanPlay}
+        onWaiting={() => setIsLoading(true)}
+        onStalled={() => setIsLoading(true)}
         playsInline
+        webkit-playsinline="true"
+        preload="metadata"
+        muted={isMobile && !hasInteracted}
       />
     </div>
+  );
+};
+
+// Add this new component for mobile video controls with better UX
+const MobileVideoControls = ({
+  isPlaying,
+  currentTime,
+  duration,
+  isMuted,
+  onPlayPause,
+  onMuteToggle,
+}: {
+  isPlaying: boolean;
+  currentTime: number;
+  duration: number;
+  isMuted: boolean;
+  onPlayPause: () => void;
+  onMuteToggle: () => void;
+}) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 20 }}
+      className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-3 z-30"
+    >
+      <div className="flex items-center gap-4">
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={onPlayPause}
+          className="text-white/90 hover:text-cyan-400 transition-colors"
+        >
+          {isPlaying ? <Pause size={20} /> : <Play size={20} />}
+        </motion.button>
+
+        <div className="flex-1 text-[11px] text-white/70 font-medium">
+          {formatTime(currentTime)} / {formatTime(duration)}
+        </div>
+
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={onMuteToggle}
+          className="text-white/90 hover:text-cyan-400 transition-colors"
+        >
+          {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+        </motion.button>
+      </div>
+    </motion.div>
   );
 };
 
