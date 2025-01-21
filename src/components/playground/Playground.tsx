@@ -1576,6 +1576,24 @@ export default function Playground({
     );
   };
 
+  // Add this effect to send agent config when connected
+  useEffect(() => {
+    if (roomState === ConnectionState.Connected && agentConfig) {
+      try {
+        const configPayload = {
+          agent_config: agentConfig,
+          user_id: params.userId,
+          brdge_id: params.brdgeId
+        };
+
+        console.log('Sending agent config:', configPayload);
+        sendData(new TextEncoder().encode(JSON.stringify(configPayload)), { topic: "agent_data_channel" });
+      } catch (error) {
+        console.error('Error sending agent config:', error);
+      }
+    }
+  }, [roomState, agentConfig, params.userId, params.brdgeId, sendData]);
+
   // Then update the main container and content area for mobile
   return (
     <div className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
