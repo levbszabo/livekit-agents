@@ -790,6 +790,7 @@ const VideoPlayer = ({
           ref={videoRef}
           src={videoUrl}
           className="absolute inset-0 w-full h-full object-cover"
+          crossOrigin="anonymous"
           onLoadedMetadata={handleLoadedMetadata}
           onTimeUpdate={onTimeUpdate}
           onError={(e) => handlePlaybackError(e)}
