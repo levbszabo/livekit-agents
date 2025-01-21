@@ -651,7 +651,7 @@ const formatTime = (time: number): string => {
 // Update the VideoPlayer component with better mobile support
 const VideoPlayer = ({
   videoRef,
-  videoUrl,
+  videoUrl,  // This is the key - we need to handle this properly
   currentTime,
   setCurrentTime,
   setDuration,
@@ -660,7 +660,7 @@ const VideoPlayer = ({
   setIsPlaying,
 }: {
   videoRef: React.RefObject<HTMLVideoElement>;
-  videoUrl: string | null;
+  videoUrl: string | null;  // Note it can be null
   currentTime: number;
   setCurrentTime: (time: number) => void;
   setDuration: (duration: number) => void;
@@ -760,11 +760,62 @@ const VideoPlayer = ({
     }
   }, [videoUrl]);
 
+  // Add this effect to handle video URL changes and loading
+  useEffect(() => {
+    if (!videoUrl) {
+      setIsLoading(true);
+      setIsVideoReady(false);
+      return;
+    }
+
+    // Pre-load the video to check if it's valid
+    const preloadVideo = new Image();
+    preloadVideo.src = videoUrl;
+    preloadVideo.onload = () => {
+      if (videoRef.current) {
+        videoRef.current.src = videoUrl;
+        videoRef.current.load();  // Force reload with new URL
+      }
+    };
+  }, [videoUrl]);
+
   return (
     <div
       className="relative w-full h-full bg-black cursor-pointer"
       onClick={handleVideoClick}
     >
+      {/* Only render video if we have a URL */}
+      {videoUrl ? (
+        <video
+          ref={videoRef}
+          src={videoUrl}
+          className="absolute inset-0 w-full h-full object-cover"
+          onLoadedMetadata={handleLoadedMetadata}
+          onTimeUpdate={onTimeUpdate}
+          onError={(e) => handlePlaybackError(e)}
+          onPlaying={() => {
+            setIsLoading(false);
+            setPlaybackError(null);
+          }}
+          onCanPlay={handleCanPlay}
+          onWaiting={() => setIsLoading(true)}
+          onStalled={() => setIsLoading(true)}
+          playsInline
+          webkit-playsinline="true"
+          x-webkit-airplay="allow"
+          controlsList="nodownload"
+          preload="metadata"
+          muted={isMobile && !hasInteracted}
+          controls={false}
+          autoPlay={false}
+        />
+      ) : (
+        // Show loading state if no video URL yet
+        <div className="absolute inset-0 flex items-center justify-center bg-black">
+          <div className="w-8 h-8 border-2 border-cyan-500/30 border-t-cyan-400 animate-spin rounded-full" />
+        </div>
+      )}
+
       {/* Play Button Overlay */}
       {isVideoReady && !isPlaying && !isLoading && !playbackError && (
         <div className="absolute inset-0 flex items-center justify-center bg-transparent z-20">
@@ -808,26 +859,6 @@ const VideoPlayer = ({
           </div>
         </div>
       )}
-
-      <video
-        ref={videoRef}
-        src={videoUrl || ""}
-        className="absolute inset-0 w-full h-full object-cover"
-        onLoadedMetadata={handleLoadedMetadata}
-        onTimeUpdate={onTimeUpdate}
-        onError={(e) => handlePlaybackError(e)}
-        onPlaying={() => {
-          setIsLoading(false);
-          setPlaybackError(null);
-        }}
-        onCanPlay={handleCanPlay}
-        onWaiting={() => setIsLoading(true)}
-        onStalled={() => setIsLoading(true)}
-        playsInline
-        webkit-playsinline="true"
-        preload="metadata"
-        muted={isMobile && !hasInteracted}
-      />
     </div>
   );
 };
@@ -1778,7 +1809,7 @@ export default function Playground({
               <div className="h-full w-full bg-black">
                 <VideoPlayer
                   videoRef={videoRef}
-                  videoUrl={videoUrl}
+                  videoUrl={videoUrl}  // This is the key - we need to handle this properly
                   currentTime={currentTime}
                   setCurrentTime={setCurrentTime}
                   setDuration={setDuration}
