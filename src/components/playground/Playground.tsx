@@ -788,8 +788,6 @@ const VideoPlayer = ({
       {videoUrl ? (
         <video
           ref={videoRef}
-          src={videoUrl}
-          type="video/*"  // Generic video type
           className="absolute inset-0 w-full h-full object-cover"
           crossOrigin="anonymous"
           onLoadedMetadata={handleLoadedMetadata}
@@ -809,7 +807,9 @@ const VideoPlayer = ({
           muted={isMobile && !hasInteracted}
           controls={false}
           autoPlay={false}
-        />
+        >
+          <source src={videoUrl} type="video/*" />
+        </video>
       ) : (
         // Show loading state if no video URL yet
         <div className="absolute inset-0 flex items-center justify-center bg-black">
