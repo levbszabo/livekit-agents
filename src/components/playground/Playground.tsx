@@ -803,7 +803,10 @@ const VideoPlayer = ({
           controls={false}
           autoPlay={false}
         >
-          <source src={videoUrl} type="video/*" />
+          <source
+            src={videoUrl}
+            type={videoUrl?.endsWith('.webm') ? 'video/webm' : 'video/mp4'}
+          />
         </video>
       ) : (
         // Show loading state if no video URL yet
