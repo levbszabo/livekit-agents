@@ -768,15 +768,10 @@ const VideoPlayer = ({
       return;
     }
 
-    // Pre-load the video to check if it's valid
-    const preloadVideo = new Image();
-    preloadVideo.src = videoUrl;
-    preloadVideo.onload = () => {
-      if (videoRef.current) {
-        videoRef.current.src = videoUrl;
-        videoRef.current.load();  // Force reload with new URL
-      }
-    };
+    if (videoRef.current) {
+      videoRef.current.src = videoUrl;
+      videoRef.current.load(); // Force reload with new URL
+    }
   }, [videoUrl]);
 
   return (
