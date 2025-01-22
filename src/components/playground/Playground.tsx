@@ -789,6 +789,7 @@ const VideoPlayer = ({
         <video
           ref={videoRef}
           src={videoUrl}
+          type="video/*"  // Generic video type
           className="absolute inset-0 w-full h-full object-cover"
           crossOrigin="anonymous"
           onLoadedMetadata={handleLoadedMetadata}
