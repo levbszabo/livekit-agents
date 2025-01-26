@@ -6,7 +6,7 @@ import {
 import { AnimatePresence, motion } from "framer-motion";
 import { Inter } from "next/font/google";
 import Head from "next/head";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 
 import { PlaygroundConnect } from "@/components/PlaygroundConnect";
 import Playground from "@/components/playground/Playground";
@@ -47,12 +47,30 @@ export function HomeInner() {
 
   const { config } = useConfig();
   const { toastMessage, setToastMessage } = useToast();
+  const [brdgeId, setBrdgeId] = useState<string | null>(null);
+
+  // Get brdge_id from URL params
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      setBrdgeId(urlParams.get('brdgeId'));
+    }
+  }, []);
 
   const handleConnect = useCallback(
     async (c: boolean, mode: ConnectionMode) => {
-      c ? connect(mode) : disconnect();
+      if (c) {
+        // Only pass brdgeId if it's a string
+        if (typeof brdgeId === 'string') {
+          connect(mode, brdgeId);
+        } else {
+          connect(mode);
+        }
+      } else {
+        disconnect();
+      }
     },
-    [connect, disconnect]
+    [connect, disconnect, brdgeId]
   );
 
   const showPG = useMemo(() => {

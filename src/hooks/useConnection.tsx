@@ -14,7 +14,7 @@ type TokenGeneratorData = {
   token: string;
   mode: ConnectionMode;
   disconnect: () => Promise<void>;
-  connect: (mode: ConnectionMode) => Promise<void>;
+  connect: (mode: ConnectionMode, brdgeId?: string) => Promise<void>;
 };
 
 const ConnectionContext = createContext<TokenGeneratorData | undefined>(undefined);
@@ -35,7 +35,7 @@ export const ConnectionProvider = ({
   }>({ wsUrl: "", token: "", shouldConnect: false, mode: "manual" });
 
   const connect = useCallback(
-    async (mode: ConnectionMode) => {
+    async (mode: ConnectionMode, brdgeId?: string) => {
       let token = "";
       let url = "";
       if (mode === "cloud") {
@@ -55,7 +55,8 @@ export const ConnectionProvider = ({
         }
         const path = process.env.NODE_ENV === "development" ? "/api/token" : "/playground/api/token";
         url = process.env.NEXT_PUBLIC_LIVEKIT_URL;
-        const { accessToken } = await fetch(path).then((res) =>
+        const params = brdgeId ? `?brdge_id=${brdgeId}` : '';
+        const { accessToken } = await fetch(`${path}${params}`).then((res) =>
           res.json()
         );
         token = accessToken;
