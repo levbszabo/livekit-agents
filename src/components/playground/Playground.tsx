@@ -18,7 +18,6 @@ import {
   PanelGroup,
   PanelResizeHandle
 } from 'react-resizable-panels';
-import { TimeAlignedTranscript } from '@/components/transcript/TimeAlignedTranscript';
 import { Plus, FileText, X, Edit2, Save, ChevronDown, ChevronUp, Play, Pause, Volume2, VolumeX, Maximize2, Mic, MicOff, Radio } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import styled, { keyframes } from 'styled-components';
@@ -1871,18 +1870,16 @@ export default function Playground({
               <>
                 <PanelResizeHandle className={resizeHandleStyles.horizontal}>
                   <div className="relative w-full h-2 group">
-                    {/* Main resize line with glow */}
                     <div className="absolute left-1/2 -translate-x-1/2 w-8 h-0.5 
-                  bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent 
-                  group-hover:via-cyan-400
-                  shadow-[0_0_8px_rgba(34,211,238,0.3)]
-                  transition-all duration-300"
+                      bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent 
+                      group-hover:via-cyan-400
+                      shadow-[0_0_8px_rgba(34,211,238,0.3)]
+                      transition-all duration-300"
                     />
-                    {/* Animated accent lines */}
                     <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-[1px] overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                       <div className="absolute inset-0 w-1/3
-                    bg-gradient-to-r from-transparent via-cyan-300/40 to-transparent
-                    animate-[scan_3s_ease-in-out_infinite]"
+                        bg-gradient-to-r from-transparent via-cyan-300/40 to-transparent
+                        animate-[scan_3s_ease-in-out_infinite]"
                       />
                     </div>
                   </div>
@@ -1890,16 +1887,10 @@ export default function Playground({
 
                 <Panel defaultSize={15} minSize={15} maxSize={40}>
                   <div className="h-full flex flex-col bg-black/90">
-                    {/* Unified Control Bar */}
+                    {/* Unified Control Bar with improved controls */}
                     <div className="border-b border-gray-800 bg-black/90 p-2 relative">
-                      <div className="absolute bottom-0 left-0 right-0">
-                        <div className="absolute bottom-0 left-0 right-0 h-[1px]
-                      bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent
-                      shadow-[0_0_8px_rgba(34,211,238,0.2)]"
-                        />
-                      </div>
                       <div className="flex items-center gap-4">
-                        {/* Play/Pause */}
+                        {/* Play/Pause Button */}
                         <button
                           onClick={() => {
                             if (videoRef.current) {
@@ -1916,54 +1907,56 @@ export default function Playground({
                           {isPlaying ? <Pause size={18} /> : <Play size={18} />}
                         </button>
 
-                        {/* Progress Bar */}
-                        <div className="flex-1">
+                        {/* Progress Bar Container */}
+                        <div className="flex-1 relative">
+                          {/* Outer bar (full width) */}
                           <div
                             ref={progressBarRef}
-                            className="relative w-full h-1 bg-gray-800/50 rounded-full cursor-pointer group"
-                            onMouseDown={handleProgressBarMouseDown}
-                            onMouseMove={handleProgressBarMouseMove}
-                            onMouseUp={handleProgressBarMouseUp}
-                            onMouseLeave={handleProgressBarMouseUp}
-                            onClick={handleProgressBarInteraction}
+                            className="h-3 bg-gray-800/50 rounded-full cursor-pointer 
+                              transition-colors duration-300
+                              hover:bg-gray-700/60"
+                            onMouseDown={(e) => {
+                              setIsDragging(true);
+                              handleProgressBarInteraction(e);
+                            }}
+                            onMouseMove={(e) => {
+                              if (isDragging) handleProgressBarInteraction(e);
+                            }}
+                            onMouseUp={() => setIsDragging(false)}
+                            onMouseLeave={() => setIsDragging(false)}
                           >
-                            {/* Loading bar */}
+                            {/* Filled progress */}
                             <div
-                              className={`absolute inset-0 rounded-full overflow-hidden ${!duration ? 'opacity-100' : 'opacity-0'}`}
-                            >
-                              <div
-                                className="h-full bg-cyan-500/30"
-                                style={{
-                                  backgroundImage: 'linear-gradient(90deg, transparent, rgba(34,211,238,0.3), transparent)',
-                                  backgroundSize: '200% 100%',
-                                  animation: 'loading 1.5s ease-in-out infinite',
-                                }}
-                              />
-                            </div>
-                            {/* Progress bar */}
-                            <div
-                              className="absolute top-0 left-0 h-full bg-cyan-500 rounded-full transition-all duration-150"
-                              style={{ width: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }}
-                            />
-                            {/* Progress indicator */}
-                            <div
-                              className={`
-                                absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-cyan-400 rounded-full
-                                ${!duration ? 'opacity-0' : 'opacity-0 group-hover:opacity-100'}
-                                transition-all duration-300
-                                shadow-[0_0_10px_rgba(34,211,238,0.5)]
-                              `}
+                              className="h-full bg-cyan-500 rounded-full transition-all duration-150"
                               style={{
-                                left: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%',
-                                opacity: isDragging ? 1 : undefined
+                                width: duration > 0
+                                  ? `${(currentTime / duration) * 100}%`
+                                  : '0%',
                               }}
                             />
+                            {/* Draggable Thumb - Modified for better hover behavior */}
+                            {duration > 0 && (
+                              <div
+                                className="absolute top-1/2 -translate-y-1/2 
+                                  w-3 h-3 bg-cyan-400 rounded-full
+                                  shadow-[0_0_5px_rgba(34,211,238,0.6)]
+                                  border-2 border-white/20
+                                  transition-all duration-200
+                                  opacity-0 hover:opacity-100
+                                  hover:scale-125"
+                                style={{
+                                  left: `${(currentTime / duration) * 100}%`,
+                                  opacity: isDragging ? 1 : undefined,
+                                  transform: isDragging ? 'translate(-50%, -50%) scale(1.25)' : 'translate(-50%, -50%)',
+                                }}
+                              />
+                            )}
                           </div>
                         </div>
 
                         {/* Time Display */}
                         <div className="flex items-center gap-2 text-[11px] text-gray-400 font-medium tracking-wider">
-                          {formatTime(currentTime)} / {formatTime(videoRef.current?.duration || 0)}
+                          {formatTime(currentTime)} / {formatTime(duration)}
                         </div>
 
                         {/* Volume Control */}
@@ -1996,7 +1989,7 @@ export default function Playground({
                           />
                         </div>
 
-                        {/* Fullscreen Toggle */}
+                        {/* Fullscreen Button */}
                         <button
                           onClick={() => {
                             if (videoRef.current) {
@@ -2010,37 +2003,8 @@ export default function Playground({
                       </div>
                     </div>
 
-                    {/* Updated transcript container */}
-                    <div className="flex-1 bg-black/90">
-                      {transcript?.content?.words && (
-                        <TimeAlignedTranscript
-                          segments={[
-                            {
-                              text: transcript.content.transcript || '',
-                              start: 0,
-                              end: transcript.content.words[transcript.content.words.length - 1]?.end || 0,
-                              words: transcript.content.words.map((word: TranscriptWord) => ({
-                                word: word.punctuated_word || word.word,
-                                start: word.start,
-                                end: word.end,
-                                confidence: word.confidence || 1.0
-                              }))
-                            }
-                          ]}
-                          currentTime={currentTime}
-                          onTimeClick={(time) => {
-                            if (videoRef.current && isFinite(time) && time >= 0) {
-                              try {
-                                videoRef.current.currentTime = time;
-                                setCurrentTime(time);
-                              } catch (error) {
-                                console.error('Error setting video time:', error);
-                              }
-                            }
-                          }}
-                        />
-                      )}
-                    </div>
+                    {/* Empty space where transcript used to be */}
+                    <div className="flex-1 bg-black/90" />
                   </div>
                 </Panel>
               </>
