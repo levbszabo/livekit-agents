@@ -39,7 +39,7 @@ import {
     ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import styled, { keyframes } from 'styled-components';
+import styled, { keyframes, css } from 'styled-components';
 
 export interface PlaygroundProps {
     logo?: ReactNode;
@@ -749,8 +749,10 @@ const VideoPlayer = ({
         }
     };
 
-    const handleVideoClick = async () => {
+    const handleVideoClick = async (e: React.MouseEvent | React.TouchEvent) => {
+        e.stopPropagation(); // Prevent event bubbling
         if (!videoRef.current || !isVideoReady) return;
+
         if (isPlaying) {
             videoRef.current.pause();
             setIsPlaying(false);
@@ -777,12 +779,25 @@ const VideoPlayer = ({
     return (
         <div
             className="relative w-full h-full bg-black cursor-pointer"
+            style={{
+                maxHeight: '100vh',
+                aspectRatio: '16/9',
+                maxWidth: '100vw'
+            }}
             onClick={handleVideoClick}
+            onTouchEnd={handleVideoClick}
         >
+            {/* Transparent click overlay */}
+            <div
+                className="absolute inset-0 z-30"
+                onClick={handleVideoClick}
+                onTouchEnd={handleVideoClick}
+            />
+
             {videoUrl ? (
                 <video
                     ref={videoRef}
-                    className="absolute inset-0 w-full h-full object-cover"
+                    className="absolute inset-0 w-full h-full object-cover z-10"
                     crossOrigin="anonymous"
                     onLoadedMetadata={handleLoadedMetadata}
                     onTimeUpdate={onTimeUpdate}
@@ -808,42 +823,32 @@ const VideoPlayer = ({
                     />
                 </video>
             ) : (
-                <div className="absolute inset-0 flex items-center justify-center bg-black">
+                <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
                     <div className="w-8 h-8 border-2 border-cyan-500/30 border-t-cyan-400 animate-spin rounded-full" />
                 </div>
             )}
 
+            {/* Play button overlay */}
             {isVideoReady && !isPlaying && !isLoading && !playbackError && (
-                <div className="absolute inset-0 flex items-center justify-center bg-transparent z-20">
-                    <motion.div
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        className="p-4 rounded-full bg-black/30 border border-cyan-500/50 backdrop-blur-sm shadow-[0_0_15px_rgba(34,211,238,0.2)]"
-                    >
+                <div className="absolute inset-0 flex items-center justify-center bg-transparent z-20 pointer-events-none">
+                    <div className="p-4 rounded-full bg-black/30 border border-cyan-500/50 backdrop-blur-sm shadow-[0_0_15px_rgba(34,211,238,0.2)]">
                         <Play size={isMobile ? 24 : 32} className="text-cyan-400" />
-                    </motion.div>
+                    </div>
                 </div>
             )}
 
+            {/* Loading overlay */}
             {isLoading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10">
+                <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-20 pointer-events-none">
                     <div className="w-8 h-8 border-2 border-cyan-500/30 border-t-cyan-400 animate-spin rounded-full" />
                 </div>
             )}
 
-            {playbackError && isVideoReady && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10">
+            {/* Error overlay */}
+            {playbackError && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-20 pointer-events-none">
                     <div className="text-red-400 text-sm text-center px-4">
                         {playbackError}
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                attemptPlay();
-                            }}
-                            className="mt-2 px-3 py-1 bg-cyan-500/20 text-cyan-400 rounded-md text-xs hover:bg-cyan-500/30 transition-all duration-300"
-                        >
-                            Try Again
-                        </button>
                     </div>
                 </div>
             )}
@@ -874,7 +879,13 @@ const MobileVideoControls = ({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-3 z-30"
+            className="absolute left-0 right-0 bg-gradient-to-t from-black/90 to-transparent z-30"
+            style={{
+                bottom: 'env(safe-area-inset-bottom)',
+                paddingLeft: 'max(0.75rem, env(safe-area-inset-left))',
+                paddingRight: 'max(0.75rem, env(safe-area-inset-right))',
+                paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))'
+            }}
         >
             <div className="flex items-center gap-4">
                 <motion.button
@@ -905,39 +916,69 @@ const MobileVideoControls = ({
 // Floating Action Button for mobile quick actions (e.g. mic toggle)
 // ----------------------------------------------------------------------------
 const MobileFAB = () => {
-    const { isMobile } = useIsMobile();
     const { localParticipant } = useLocalParticipant();
     const roomState = useConnectionState();
+    const isMuted = !localParticipant?.isMicrophoneEnabled;
+
+    const pulseAnimation = keyframes`
+        0% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.4); }
+        70% { box-shadow: 0 0 0 10px rgba(34, 211, 238, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }
+    `;
+
+    const PulsingButton = styled.button<{ $isMuted: boolean }>`
+        width: 3.5rem;
+        height: 3.5rem;
+        border-radius: 9999px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(8px);
+        transition: all 0.3s ease;
+        touch-action: manipulation;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        
+        ${({ $isMuted }) => $isMuted ? css`
+            background: linear-gradient(45deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.2));
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            
+            &:hover {
+                background: linear-gradient(45deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.3));
+            }
+        ` : css`
+            background: linear-gradient(45deg, rgba(34, 211, 238, 0.1), rgba(34, 211, 238, 0.2));
+            border: 1px solid rgba(34, 211, 238, 0.3);
+            animation: ${pulseAnimation} 2s infinite;
+            
+            &:hover {
+                background: linear-gradient(45deg, rgba(34, 211, 238, 0.2), rgba(34, 211, 238, 0.3));
+            }
+        `}
+    `;
 
     return (
-        <div className="fixed bottom-4 right-4 z-50">
-            <motion.button
-                whileTap={{ scale: 0.95 }}
-                onClick={() => {
+        <div
+            className="fixed right-4 z-[9999]"
+            style={{
+                bottom: 'max(1rem, calc(1rem + env(safe-area-inset-bottom)))',
+                right: 'max(1rem, calc(1rem + env(safe-area-inset-right)))'
+            }}
+        >
+            <PulsingButton
+                $isMuted={isMuted}
+                onClick={(e) => {
+                    e.stopPropagation();
                     if (roomState === ConnectionState.Connected && localParticipant) {
                         localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
                     }
                 }}
-                className={`
-                    flex items-center gap-2 px-4 py-2 rounded-lg
-                    bg-black/60 backdrop-blur-sm
-                    border border-gray-700/50
-                    transition-all duration-300
-                    hover:border-cyan-500/30 hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]
-                `}
             >
-                {localParticipant?.isMicrophoneEnabled ? (
-                    <>
-                        <Mic size={16} className="text-cyan-400" />
-                        <span className="text-cyan-400 text-sm">Mic: On</span>
-                    </>
+                {isMuted ? (
+                    <MicOff size={20} className="text-red-400" />
                 ) : (
-                    <>
-                        <MicOff size={16} className="text-cyan-400" />
-                        <span className="text-cyan-400 text-sm">Mic: Off</span>
-                    </>
+                    <Mic size={20} className="text-cyan-400" />
                 )}
-            </motion.button>
+            </PulsingButton>
         </div>
     );
 };
@@ -1009,6 +1050,38 @@ export default function MobilePlayground({
     onConnect,
     agentType
 }: PlaygroundProps) {
+    // Add viewport meta handling
+    useEffect(() => {
+        // Set viewport meta for consistent mobile rendering
+        const viewport = document.querySelector('meta[name=viewport]');
+        if (viewport) {
+            viewport.setAttribute('content',
+                'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover'
+            );
+        }
+
+        // Handle iOS Safari viewport height issues
+        const setVH = () => {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        };
+
+        setVH();
+        window.addEventListener('resize', setVH);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(setVH, 100);
+        });
+
+        return () => {
+            window.removeEventListener('resize', setVH);
+            window.removeEventListener('orientationchange', setVH);
+            // Reset viewport meta on cleanup
+            if (viewport) {
+                viewport.setAttribute('content', 'width=device-width, initial-scale=1.0');
+            }
+        };
+    }, []);
+
     const { isMobile, isLandscape } = useIsMobile();
     const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
     const [selectedVoice, setSelectedVoice] = useState<string | null>(null);
@@ -1544,7 +1617,10 @@ export default function MobilePlayground({
     // Mobile layout rendering: if in portrait, video on top, chat below; if in landscape, show video enlarged with a toggleable side panel.
     // ----------------------------------------------------------------------------
     return (
-        <div className="fixed inset-0 flex flex-col bg-[#121212] overflow-hidden">
+        <div
+            className="fixed inset-0 flex flex-col bg-[#121212] overflow-hidden"
+            style={{ height: 'calc(var(--vh, 1vh) * 100)' }}
+        >
             {isLandscape ? (
                 // Landscape mode
                 <div className="flex h-full">
@@ -1575,21 +1651,25 @@ export default function MobilePlayground({
                         </div>
 
                         {/* Video Controls - Now underneath */}
-                        <div className="bg-gray-900/95 border-t border-gray-800/50">
+                        <div className="bg-gray-900/95 border-t border-gray-800/50 touch-manipulation">
                             <div className="px-4 py-3">
                                 {/* Progress Bar */}
-                                <div className="relative group">
+                                <div className="relative group touch-manipulation">
                                     <div
                                         ref={progressBarRef}
-                                        className="h-1 bg-gray-800/50 rounded-full cursor-pointer 
-                                            group-hover:h-1.5
-                                            transition-all duration-150"
-                                        onMouseDown={handleProgressBarMouseDown}
-                                        onMouseMove={handleProgressBarMouseMove}
-                                        onMouseUp={handleProgressBarMouseUp}
-                                        onMouseLeave={handleProgressBarMouseUp}
-                                        onTouchStart={(e) => handleProgressBarInteraction(e)}
-                                        onTouchMove={(e) => handleProgressBarInteraction(e)}
+                                        className="h-2 bg-gray-800/50 rounded-full cursor-pointer touch-manipulation"
+                                        onTouchStart={(e) => {
+                                            e.stopPropagation();
+                                            handleProgressBarInteraction(e);
+                                        }}
+                                        onTouchMove={(e) => {
+                                            e.stopPropagation();
+                                            handleProgressBarInteraction(e);
+                                        }}
+                                        onMouseDown={(e) => {
+                                            e.stopPropagation();
+                                            handleProgressBarMouseDown(e);
+                                        }}
                                     >
                                         <div
                                             className="absolute top-0 left-0 h-full bg-cyan-500 rounded-full 
@@ -1602,64 +1682,51 @@ export default function MobilePlayground({
                                 </div>
 
                                 {/* Controls Row */}
-                                <div className="flex items-center gap-4 mt-2">
+                                <div className="flex items-center gap-4 mt-3">
                                     <button
-                                        onClick={() => setIsPlaying(!isPlaying)}
-                                        className="text-white/90 hover:text-cyan-400 transition-colors"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setIsPlaying(!isPlaying);
+                                        }}
+                                        className="p-2 text-white/90 hover:text-cyan-400 transition-colors touch-manipulation"
                                     >
                                         {isPlaying ? (
-                                            <Pause size={20} />
+                                            <Pause size={24} />
                                         ) : (
-                                            <Play size={20} />
+                                            <Play size={24} />
                                         )}
                                     </button>
 
-                                    <div className="flex-1 text-[11px] text-white/70 font-medium">
+                                    <div className="flex-1 text-[13px] text-white/70 font-medium">
                                         {formatTime(currentTime)} / {formatTime(duration)}
                                     </div>
 
-                                    <div className="flex items-center gap-2 group">
+                                    <div className="flex items-center gap-3">
                                         <button
-                                            onClick={() => {
+                                            onClick={(e) => {
+                                                e.stopPropagation();
                                                 if (videoRef.current) {
                                                     videoRef.current.muted = !isMuted;
                                                     setIsMuted(!isMuted);
                                                 }
                                             }}
-                                            className="text-white/90 hover:text-cyan-400 transition-colors"
+                                            className="p-2 text-white/90 hover:text-cyan-400 transition-colors touch-manipulation"
                                         >
-                                            {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                                            {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
                                         </button>
-                                        <div className="w-0 group-hover:w-20 overflow-hidden transition-all duration-300">
-                                            <input
-                                                type="range"
-                                                min="0"
-                                                max="1"
-                                                step="0.1"
-                                                value={isMuted ? 0 : volume}
-                                                onChange={(e) => {
-                                                    const newVolume = parseFloat(e.target.value);
-                                                    setVolume(newVolume);
-                                                    if (videoRef.current) {
-                                                        videoRef.current.volume = newVolume;
-                                                        setIsMuted(newVolume === 0);
-                                                    }
-                                                }}
-                                                className="w-full accent-cyan-500"
-                                            />
-                                        </div>
-                                    </div>
 
-                                    <button
-                                        onClick={() => {
-                                            if (videoRef.current) {
-                                                videoRef.current.requestFullscreen();
-                                            }
-                                        }}
-                                        className="text-white/90 hover:text-cyan-400 transition-colors"
-                                    >
-                                        <Maximize2 size={20} />
-                                    </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (videoRef.current) {
+                                                    videoRef.current.requestFullscreen();
+                                                }
+                                            }}
+                                            className="p-2 text-white/90 hover:text-cyan-400 transition-colors touch-manipulation"
+                                        >
+                                            <Maximize2 size={24} />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1745,102 +1812,93 @@ export default function MobilePlayground({
                     </div>
                 </div>
             ) : (
-                // Portrait mode
-                <div className="flex flex-col h-full">
-                    {/* Video section with controls */}
-                    <div className="w-full flex flex-col bg-black">
-                        {/* Video container - fixed 16:9 ratio */}
-                        <div className="relative w-full" style={{ aspectRatio: "16/9" }}>
-                            <div className="absolute inset-0">
-                                <VideoPlayer
-                                    videoRef={videoRef}
-                                    videoUrl={videoUrl}
-                                    currentTime={currentTime}
-                                    setCurrentTime={setCurrentTime}
-                                    setDuration={setDuration}
-                                    onTimeUpdate={() => {
-                                        if (videoRef.current) {
-                                            setCurrentTime(videoRef.current.currentTime);
-                                        }
-                                    }}
-                                    isPlaying={isPlaying}
-                                    setIsPlaying={setIsPlaying}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Video Controls - Now underneath */}
-                        <div className="bg-gray-900/95 border-t border-gray-800/50">
-                            <div className="px-3 py-2">
-                                {/* Progress Bar */}
-                                <div
-                                    ref={progressBarRef}
-                                    className="h-1 bg-gray-800/50 rounded-full cursor-pointer"
-                                    onTouchStart={(e) => handleProgressBarInteraction(e)}
-                                    onTouchMove={(e) => handleProgressBarInteraction(e)}
-                                >
-                                    <div
-                                        className="h-full bg-cyan-500 rounded-full transition-all duration-150"
-                                        style={{
-                                            width: `${(currentTime / duration) * 100}%`
+                // Portrait mode with sticky video section and scrollable chat
+                <div
+                    className="flex flex-col h-full overflow-hidden"
+                    style={{
+                        paddingTop: 'env(safe-area-inset-top)',
+                        paddingBottom: 'env(safe-area-inset-bottom)',
+                        paddingLeft: 'env(safe-area-inset-left)',
+                        paddingRight: 'env(safe-area-inset-right)'
+                    }}
+                >
+                    {/* Sticky Video Section */}
+                    <div className="sticky top-0 z-20">
+                        <div className="w-full flex flex-col bg-black">
+                            {/* Video container - fixed 16:9 ratio */}
+                            <div className="relative w-full" style={{ aspectRatio: "16/9" }}>
+                                <div className="absolute inset-0">
+                                    <VideoPlayer
+                                        videoRef={videoRef}
+                                        videoUrl={videoUrl}
+                                        currentTime={currentTime}
+                                        setCurrentTime={setCurrentTime}
+                                        setDuration={setDuration}
+                                        onTimeUpdate={() => {
+                                            if (videoRef.current) {
+                                                setCurrentTime(videoRef.current.currentTime);
+                                            }
                                         }}
+                                        isPlaying={isPlaying}
+                                        setIsPlaying={setIsPlaying}
                                     />
                                 </div>
+                            </div>
 
-                                {/* Controls Row */}
-                                <div className="flex items-center gap-3 mt-2">
-                                    <button
-                                        onClick={() => setIsPlaying(!isPlaying)}
-                                        className="text-white/90 hover:text-cyan-400 transition-colors"
+                            {/* Video Controls - Portrait mode */}
+                            <div className="bg-gray-900/95 border-t border-gray-800/50 touch-manipulation">
+                                <div className="px-3 py-2">
+                                    <div
+                                        ref={progressBarRef}
+                                        className="h-2 bg-gray-800/50 rounded-full cursor-pointer touch-manipulation"
+                                        onTouchStart={(e) => { e.stopPropagation(); handleProgressBarInteraction(e); }}
+                                        onTouchMove={(e) => { e.stopPropagation(); handleProgressBarInteraction(e); }}
                                     >
-                                        {isPlaying ? (
-                                            <Pause size={16} />
-                                        ) : (
-                                            <Play size={16} />
-                                        )}
-                                    </button>
-
-                                    <div className="flex-1 text-[11px] text-white/70 font-medium">
-                                        {formatTime(currentTime)} / {formatTime(duration)}
+                                        <div
+                                            className="h-full bg-cyan-500 rounded-full transition-all duration-150"
+                                            style={{ width: `${(currentTime / duration) * 100}%` }}
+                                        />
                                     </div>
-
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-3 mt-2">
                                         <button
-                                            onClick={() => {
-                                                if (videoRef.current) {
-                                                    videoRef.current.muted = !isMuted;
-                                                    setIsMuted(!isMuted);
-                                                }
-                                            }}
-                                            className="text-white/90 hover:text-cyan-400 transition-colors"
+                                            onClick={(e) => { e.stopPropagation(); setIsPlaying(!isPlaying); }}
+                                            className="p-2 text-white/90 hover:text-cyan-400 transition-colors touch-manipulation"
                                         >
-                                            {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                                            {isPlaying ? (<Pause size={20} />) : (<Play size={20} />)}
                                         </button>
 
-                                        <button
-                                            onClick={() => {
-                                                if (videoRef.current) {
-                                                    videoRef.current.requestFullscreen();
-                                                }
-                                            }}
-                                            className="text-white/90 hover:text-cyan-400 transition-colors"
-                                        >
-                                            <Maximize2 size={16} />
-                                        </button>
+                                        <div className="flex-1 text-[12px] text-white/70 font-medium">
+                                            {formatTime(currentTime)} / {formatTime(duration)}
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); if (videoRef.current) { videoRef.current.muted = !isMuted; setIsMuted(!isMuted); } }}
+                                                className="p-2 text-white/90 hover:text-cyan-400 transition-colors touch-manipulation"
+                                            >
+                                                {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                                            </button>
+
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); if (videoRef.current) { videoRef.current.requestFullscreen(); } }}
+                                                className="p-2 text-white/90 hover:text-cyan-400 transition-colors touch-manipulation"
+                                            >
+                                                <Maximize2 size={20} />
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-
-                    {/* Chat panel - takes remaining height */}
-                    <div className="flex-1 flex flex-col min-h-0 bg-gray-900">
+                    {/* Scrollable Chat Panel */}
+                    <div className="flex-1 overflow-y-auto bg-gray-900">
                         {voiceAssistant?.audioTrack && (
                             <div className="p-3 border-b border-gray-800/50">
                                 <TranscriptionTile agentAudioTrack={voiceAssistant.audioTrack} accentColor="cyan" />
                             </div>
                         )}
-                        <div className="flex-1 overflow-y-auto p-3">
+                        <div className="p-3">
                             <AnimatePresence>
                                 {transcripts.map((msg) => (
                                     <motion.div

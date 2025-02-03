@@ -10,6 +10,7 @@ import { useCallback, useState, useEffect } from "react";
 
 import { PlaygroundConnect } from "@/components/PlaygroundConnect";
 import Playground from "@/components/playground/Playground";
+import MobilePlayground from "@/components/playground/mobile/MobilePlayground";
 import { PlaygroundToast, ToastType } from "@/components/toast/PlaygroundToast";
 import { ConfigProvider, useConfig } from "@/hooks/useConfig";
 import { ConnectionMode, ConnectionProvider, useConnection } from "@/hooks/useConnection";
@@ -48,19 +49,39 @@ export function HomeInner() {
   const { config } = useConfig();
   const { toastMessage, setToastMessage } = useToast();
   const [brdgeId, setBrdgeId] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
-  // Get brdge_id from URL params
+  // Get URL params including brdgeId and detect mobile devices
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
       setBrdgeId(urlParams.get('brdgeId'));
+
+      // Function to check if device is mobile
+      const checkMobile = () => {
+        const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const isSmallScreen = window.innerWidth <= 768;
+        setIsMobile(isMobileDevice || isSmallScreen || urlParams.get('mobile') === '1');
+      };
+
+      // Initial check
+      checkMobile();
+
+      // Add resize listener
+      window.addEventListener('resize', checkMobile);
+      window.addEventListener('orientationchange', checkMobile);
+
+      // Cleanup
+      return () => {
+        window.removeEventListener('resize', checkMobile);
+        window.removeEventListener('orientationchange', checkMobile);
+      };
     }
   }, []);
 
   const handleConnect = useCallback(
     async (c: boolean, mode: ConnectionMode) => {
       if (c) {
-        // Only pass brdgeId if it's a string
         if (typeof brdgeId === 'string') {
           connect(mode, brdgeId);
         } else {
@@ -82,6 +103,9 @@ export function HomeInner() {
     }
     return false;
   }, [wsUrl])
+
+  // Determine which Playground component to render
+  const PlaygroundComponent = isMobile ? MobilePlayground : Playground;
 
   return (
     <>
@@ -126,7 +150,7 @@ export function HomeInner() {
               console.error(e);
             }}
           >
-            <Playground
+            <PlaygroundComponent
               themeColors={themeColors}
               onConnect={(c) => {
                 const m = process.env.NEXT_PUBLIC_LIVEKIT_URL ? "env" : mode;
