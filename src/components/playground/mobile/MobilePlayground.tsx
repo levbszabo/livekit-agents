@@ -958,10 +958,16 @@ const MobileFAB = () => {
 
     return (
         <div
-            className="fixed right-4 z-[9999]"
+            className="fixed z-[9999]"
             style={{
-                bottom: 'max(1rem, calc(1rem + env(safe-area-inset-bottom)))',
-                right: 'max(1rem, calc(1rem + env(safe-area-inset-right)))'
+                bottom: 'env(safe-area-inset-bottom)',
+                right: 'env(safe-area-inset-right)',
+                padding: '1rem',
+                background: 'linear-gradient(to top, rgba(17, 17, 17, 1) 0%, rgba(17, 17, 17, 0.8) 50%, transparent 100%)',
+                width: '100%',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                pointerEvents: 'none' // This makes the gradient background non-interactive
             }}
         >
             <PulsingButton
@@ -972,6 +978,7 @@ const MobileFAB = () => {
                         localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
                     }
                 }}
+                style={{ pointerEvents: 'auto' }} // This makes the button interactive
             >
                 {isMuted ? (
                     <MicOff size={20} className="text-red-400" />
@@ -1060,6 +1067,12 @@ export default function MobilePlayground({
             );
         }
 
+        // Add meta tag to prevent input zoom
+        let metaFormat = document.createElement('meta');
+        metaFormat.setAttribute('name', 'format-detection');
+        metaFormat.setAttribute('content', 'telephone=no');
+        document.head.appendChild(metaFormat);
+
         // Handle iOS Safari viewport height issues
         const setVH = () => {
             const vh = window.innerHeight * 0.01;
@@ -1079,6 +1092,7 @@ export default function MobilePlayground({
             if (viewport) {
                 viewport.setAttribute('content', 'width=device-width, initial-scale=1.0');
             }
+            document.head.removeChild(metaFormat);
         };
     }, []);
 
@@ -1618,8 +1632,15 @@ export default function MobilePlayground({
     // ----------------------------------------------------------------------------
     return (
         <div
-            className="fixed inset-0 flex flex-col bg-[#121212] overflow-hidden"
-            style={{ height: 'calc(var(--vh, 1vh) * 100)' }}
+            className="fixed inset-0 flex flex-col bg-[#121212]"
+            style={{
+                height: '100dvh',
+                width: '100%',
+                maxWidth: '100%',
+                overflow: 'hidden',
+                position: 'fixed',
+                touchAction: 'none'
+            }}
         >
             {isLandscape ? (
                 // Landscape mode
@@ -1701,30 +1722,37 @@ export default function MobilePlayground({
                                         {formatTime(currentTime)} / {formatTime(duration)}
                                     </div>
 
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-2">
+                                        {/* Mic button */}
+                                        {localParticipant && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (roomState === ConnectionState.Connected) {
+                                                        localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
+                                                    }
+                                                }}
+                                                className="p-2 transition-colors touch-manipulation"
+                                            >
+                                                {!localParticipant.isMicrophoneEnabled ? (
+                                                    <MicOff size={20} className="text-red-400" />
+                                                ) : (
+                                                    <Mic size={20} className="text-cyan-400" />
+                                                )}
+                                            </button>
+                                        )}
                                         <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (videoRef.current) {
-                                                    videoRef.current.muted = !isMuted;
-                                                    setIsMuted(!isMuted);
-                                                }
-                                            }}
+                                            onClick={(e) => { e.stopPropagation(); if (videoRef.current) { videoRef.current.muted = !isMuted; setIsMuted(!isMuted); } }}
                                             className="p-2 text-white/90 hover:text-cyan-400 transition-colors touch-manipulation"
                                         >
-                                            {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+                                            {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
                                         </button>
 
                                         <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (videoRef.current) {
-                                                    videoRef.current.requestFullscreen();
-                                                }
-                                            }}
+                                            onClick={(e) => { e.stopPropagation(); if (videoRef.current) { videoRef.current.requestFullscreen(); } }}
                                             className="p-2 text-white/90 hover:text-cyan-400 transition-colors touch-manipulation"
                                         >
-                                            <Maximize2 size={24} />
+                                            <Maximize2 size={20} />
                                         </button>
                                     </div>
                                 </div>
@@ -1814,8 +1842,11 @@ export default function MobilePlayground({
             ) : (
                 // Portrait mode with sticky video section and scrollable chat
                 <div
-                    className="flex flex-col h-full overflow-hidden"
+                    className="flex flex-col h-full"
                     style={{
+                        height: '100%',
+                        overflow: 'hidden',
+                        touchAction: 'none',
                         paddingTop: 'env(safe-area-inset-top)',
                         paddingBottom: 'env(safe-area-inset-bottom)',
                         paddingLeft: 'env(safe-area-inset-left)',
@@ -1872,6 +1903,24 @@ export default function MobilePlayground({
                                         </div>
 
                                         <div className="flex items-center gap-2">
+                                            {/* Mic button */}
+                                            {localParticipant && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (roomState === ConnectionState.Connected) {
+                                                            localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
+                                                        }
+                                                    }}
+                                                    className="p-2 transition-colors touch-manipulation"
+                                                >
+                                                    {!localParticipant.isMicrophoneEnabled ? (
+                                                        <MicOff size={20} className="text-red-400" />
+                                                    ) : (
+                                                        <Mic size={20} className="text-cyan-400" />
+                                                    )}
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); if (videoRef.current) { videoRef.current.muted = !isMuted; setIsMuted(!isMuted); } }}
                                                 className="p-2 text-white/90 hover:text-cyan-400 transition-colors touch-manipulation"
@@ -1892,32 +1941,33 @@ export default function MobilePlayground({
                         </div>
                     </div>
                     {/* Scrollable Chat Panel */}
-                    <div className="flex-1 overflow-y-auto bg-gray-900">
-                        {voiceAssistant?.audioTrack && (
-                            <div className="p-3 border-b border-gray-800/50">
-                                <TranscriptionTile agentAudioTrack={voiceAssistant.audioTrack} accentColor="cyan" />
+                    <div className="flex-1 bg-gray-900 relative" style={{ overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch' }}>
+                        <div className="h-full">
+                            {voiceAssistant?.audioTrack && (
+                                <div className="p-3 border-b border-gray-800/50">
+                                    <TranscriptionTile agentAudioTrack={voiceAssistant.audioTrack} accentColor="cyan" />
+                                </div>
+                            )}
+                            <div className="p-3">
+                                <AnimatePresence>
+                                    {transcripts.map((msg) => (
+                                        <motion.div
+                                            key={msg.timestamp}
+                                            initial={{ opacity: 0, y: 5 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: -5 }}
+                                            className={`${msg.isSelf ? 'ml-auto bg-cyan-950/30' : 'mr-auto bg-gray-800/30'} rounded-lg p-2.5 max-w-[90%] mb-2`}
+                                        >
+                                            <span className="text-[11px] text-gray-400">{msg.name}: </span>
+                                            <span className="text-[12px] text-gray-200">{msg.message}</span>
+                                        </motion.div>
+                                    ))}
+                                </AnimatePresence>
                             </div>
-                        )}
-                        <div className="p-3">
-                            <AnimatePresence>
-                                {transcripts.map((msg) => (
-                                    <motion.div
-                                        key={msg.timestamp}
-                                        initial={{ opacity: 0, y: 5 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: -5 }}
-                                        className={`${msg.isSelf ? 'ml-auto bg-cyan-950/30' : 'mr-auto bg-gray-800/30'} rounded-lg p-2.5 max-w-[90%] mb-2`}
-                                    >
-                                        <span className="text-[11px] text-gray-400">{msg.name}: </span>
-                                        <span className="text-[12px] text-gray-200">{msg.message}</span>
-                                    </motion.div>
-                                ))}
-                            </AnimatePresence>
                         </div>
                     </div>
                 </div>
             )}
-            {<MobileFAB />}
         </div>
     );
 }

@@ -107,6 +107,33 @@ export function HomeInner() {
   // Determine which Playground component to render
   const PlaygroundComponent = isMobile ? MobilePlayground : Playground;
 
+  // Add global styles to prevent scrolling and bouncing effects
+  useEffect(() => {
+    // Prevent scrolling on the body
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+    document.body.style.height = '100%';
+
+    // Prevent iOS overscroll/bounce effect
+    document.documentElement.style.overflow = 'hidden';
+    document.documentElement.style.position = 'fixed';
+    document.documentElement.style.width = '100%';
+    document.documentElement.style.height = '100%';
+
+    // Cleanup
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.height = '';
+      document.documentElement.style.overflow = '';
+      document.documentElement.style.position = '';
+      document.documentElement.style.width = '';
+      document.documentElement.style.height = '';
+    };
+  }, []);
+
   return (
     <>
       <Head>
@@ -114,10 +141,11 @@ export function HomeInner() {
         <meta name="description" content={config.description} />
         <meta
           name="viewport"
-          content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+          content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
         />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="format-detection" content="telephone=no" />
         <meta
           property="og:image"
           content="https://livekit.io/images/og/agents-playground.png"
@@ -126,7 +154,21 @@ export function HomeInner() {
         <meta property="og:image:height" content="630" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <main className="relative flex flex-col justify-center items-center h-full w-full bg-black repeating-square-background">
+      <main
+        className="relative flex flex-col justify-center items-center bg-black repeating-square-background"
+        style={{
+          height: '100dvh',
+          width: '100%',
+          maxWidth: '100%',
+          overflow: 'hidden',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          touchAction: 'none'
+        }}
+      >
         <AnimatePresence>
           {toastMessage && (
             <motion.div
@@ -141,7 +183,12 @@ export function HomeInner() {
         </AnimatePresence>
         {showPG ? (
           <LiveKitRoom
-            className="flex flex-col h-full w-full"
+            className="flex flex-col"
+            style={{
+              height: '100%',
+              width: '100%',
+              overflow: 'hidden'
+            }}
             serverUrl={wsUrl}
             token={token}
             connect={shouldConnect}
