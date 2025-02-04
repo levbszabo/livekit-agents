@@ -750,7 +750,8 @@ const VideoPlayer = ({
     };
 
     const handleVideoClick = async (e: React.MouseEvent | React.TouchEvent) => {
-        e.stopPropagation(); // Prevent event bubbling
+        e.preventDefault();
+        e.stopPropagation();
         if (!videoRef.current || !isVideoReady) return;
 
         if (isPlaying) {
@@ -782,16 +783,18 @@ const VideoPlayer = ({
             style={{
                 maxHeight: '100vh',
                 aspectRatio: '16/9',
-                maxWidth: '100vw'
+                maxWidth: '100vw',
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
             }}
             onClick={handleVideoClick}
             onTouchEnd={handleVideoClick}
         >
-            {/* Video element - increase z-index */}
+            {/* Video element */}
             {videoUrl ? (
                 <video
                     ref={videoRef}
-                    className="absolute inset-0 w-full h-full object-cover z-20"
+                    className="absolute inset-0 w-full h-full object-cover z-10"
                     crossOrigin="anonymous"
                     onLoadedMetadata={handleLoadedMetadata}
                     onTimeUpdate={onTimeUpdate}
@@ -810,6 +813,7 @@ const VideoPlayer = ({
                     muted={isMobile && !hasInteracted}
                     controls={false}
                     autoPlay={false}
+                    style={{ pointerEvents: 'none' }}
                 >
                     <source
                         src={videoUrl}
@@ -817,37 +821,38 @@ const VideoPlayer = ({
                     />
                 </video>
             ) : (
-                <div className="absolute inset-0 flex items-center justify-center bg-black z-20">
+                <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
                     <div className="w-8 h-8 border-2 border-cyan-500/30 border-t-cyan-400 animate-spin rounded-full" />
                 </div>
             )}
 
-            {/* Transparent click overlay - make it higher z-index than video */}
-            <div
-                className="absolute inset-0 z-30"
-                onClick={handleVideoClick}
-                onTouchEnd={handleVideoClick}
-            />
-
-            {/* Play button overlay - above the click overlay */}
+            {/* Play button overlay */}
             {isVideoReady && !isPlaying && !isLoading && !playbackError && (
-                <div className="absolute inset-0 flex items-center justify-center bg-transparent z-40 pointer-events-none">
+                <div
+                    className="absolute inset-0 flex items-center justify-center bg-transparent z-30"
+                    style={{ pointerEvents: 'none' }}
+                >
                     <div className="p-4 rounded-full bg-black/30 border border-cyan-500/50 backdrop-blur-sm shadow-[0_0_15px_rgba(34,211,238,0.2)]">
                         <Play size={isMobile ? 24 : 32} className="text-cyan-400" />
                     </div>
                 </div>
             )}
 
-            {/* Loading overlay - above everything else */}
+            {/* Loading and Error overlays */}
             {isLoading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-50 pointer-events-none">
+                <div
+                    className="absolute inset-0 flex items-center justify-center bg-black/60 z-50"
+                    style={{ pointerEvents: 'none' }}
+                >
                     <div className="w-8 h-8 border-2 border-cyan-500/30 border-t-cyan-400 animate-spin rounded-full" />
                 </div>
             )}
 
-            {/* Error overlay - above everything else */}
             {playbackError && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-50 pointer-events-none">
+                <div
+                    className="absolute inset-0 flex items-center justify-center bg-black/60 z-50"
+                    style={{ pointerEvents: 'none' }}
+                >
                     <div className="text-red-400 text-sm text-center px-4">
                         {playbackError}
                     </div>
@@ -1742,18 +1747,19 @@ export default function MobilePlayground({
                                                 )}
                                             </button>
                                         )}
+
+                                        {/* Volume button */}
                                         <button
-                                            onClick={(e) => { e.stopPropagation(); if (videoRef.current) { videoRef.current.muted = !isMuted; setIsMuted(!isMuted); } }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (videoRef.current) {
+                                                    videoRef.current.muted = !isMuted;
+                                                    setIsMuted(!isMuted);
+                                                }
+                                            }}
                                             className="p-2 text-white/90 hover:text-cyan-400 transition-colors touch-manipulation"
                                         >
                                             {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-                                        </button>
-
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); if (videoRef.current) { videoRef.current.requestFullscreen(); } }}
-                                            className="p-2 text-white/90 hover:text-cyan-400 transition-colors touch-manipulation"
-                                        >
-                                            <Maximize2 size={20} />
                                         </button>
                                     </div>
                                 </div>
@@ -1922,18 +1928,19 @@ export default function MobilePlayground({
                                                     )}
                                                 </button>
                                             )}
+
+                                            {/* Volume button */}
                                             <button
-                                                onClick={(e) => { e.stopPropagation(); if (videoRef.current) { videoRef.current.muted = !isMuted; setIsMuted(!isMuted); } }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (videoRef.current) {
+                                                        videoRef.current.muted = !isMuted;
+                                                        setIsMuted(!isMuted);
+                                                    }
+                                                }}
                                                 className="p-2 text-white/90 hover:text-cyan-400 transition-colors touch-manipulation"
                                             >
                                                 {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-                                            </button>
-
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); if (videoRef.current) { videoRef.current.requestFullscreen(); } }}
-                                                className="p-2 text-white/90 hover:text-cyan-400 transition-colors touch-manipulation"
-                                            >
-                                                <Maximize2 size={20} />
                                             </button>
                                         </div>
                                     </div>
