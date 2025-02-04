@@ -787,17 +787,11 @@ const VideoPlayer = ({
             onClick={handleVideoClick}
             onTouchEnd={handleVideoClick}
         >
-            {/* Transparent click overlay */}
-            <div
-                className="absolute inset-0 z-30"
-                onClick={handleVideoClick}
-                onTouchEnd={handleVideoClick}
-            />
-
+            {/* Video element - increase z-index */}
             {videoUrl ? (
                 <video
                     ref={videoRef}
-                    className="absolute inset-0 w-full h-full object-cover z-10"
+                    className="absolute inset-0 w-full h-full object-cover z-20"
                     crossOrigin="anonymous"
                     onLoadedMetadata={handleLoadedMetadata}
                     onTimeUpdate={onTimeUpdate}
@@ -823,30 +817,37 @@ const VideoPlayer = ({
                     />
                 </video>
             ) : (
-                <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
+                <div className="absolute inset-0 flex items-center justify-center bg-black z-20">
                     <div className="w-8 h-8 border-2 border-cyan-500/30 border-t-cyan-400 animate-spin rounded-full" />
                 </div>
             )}
 
-            {/* Play button overlay */}
+            {/* Transparent click overlay - make it higher z-index than video */}
+            <div
+                className="absolute inset-0 z-30"
+                onClick={handleVideoClick}
+                onTouchEnd={handleVideoClick}
+            />
+
+            {/* Play button overlay - above the click overlay */}
             {isVideoReady && !isPlaying && !isLoading && !playbackError && (
-                <div className="absolute inset-0 flex items-center justify-center bg-transparent z-20 pointer-events-none">
+                <div className="absolute inset-0 flex items-center justify-center bg-transparent z-40 pointer-events-none">
                     <div className="p-4 rounded-full bg-black/30 border border-cyan-500/50 backdrop-blur-sm shadow-[0_0_15px_rgba(34,211,238,0.2)]">
                         <Play size={isMobile ? 24 : 32} className="text-cyan-400" />
                     </div>
                 </div>
             )}
 
-            {/* Loading overlay */}
+            {/* Loading overlay - above everything else */}
             {isLoading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-20 pointer-events-none">
+                <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-50 pointer-events-none">
                     <div className="w-8 h-8 border-2 border-cyan-500/30 border-t-cyan-400 animate-spin rounded-full" />
                 </div>
             )}
 
-            {/* Error overlay */}
+            {/* Error overlay - above everything else */}
             {playbackError && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-20 pointer-events-none">
+                <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-50 pointer-events-none">
                     <div className="text-red-400 text-sm text-center px-4">
                         {playbackError}
                     </div>
