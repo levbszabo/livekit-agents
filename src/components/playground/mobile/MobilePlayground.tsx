@@ -778,48 +778,42 @@ const VideoPlayer = ({
     }, [videoUrl]);
 
     return (
-        <div
-            className="relative w-full h-full bg-black cursor-pointer"
-            style={{
-                maxHeight: '100vh',
-                aspectRatio: '16/9',
-                maxWidth: '100vw',
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent',
-            }}
+        <div className="relative w-full h-full bg-black flex items-center justify-center"
             onClick={handleVideoClick}
             onTouchEnd={handleVideoClick}
         >
             {/* Video element */}
             {videoUrl ? (
-                <video
-                    ref={videoRef}
-                    className="absolute inset-0 w-full h-full object-cover z-10"
-                    crossOrigin="anonymous"
-                    onLoadedMetadata={handleLoadedMetadata}
-                    onTimeUpdate={onTimeUpdate}
-                    onError={(e) => handlePlaybackError(e)}
-                    onPlaying={() => {
-                        setIsLoading(false);
-                        setPlaybackError(null);
-                    }}
-                    onCanPlay={handleCanPlay}
-                    onWaiting={() => setIsLoading(true)}
-                    onStalled={() => setIsLoading(true)}
-                    playsInline
-                    webkit-playsinline="true"
-                    x-webkit-airplay="allow"
-                    preload="metadata"
-                    muted={isMobile && !hasInteracted}
-                    controls={false}
-                    autoPlay={false}
-                    style={{ pointerEvents: 'none' }}
-                >
-                    <source
-                        src={videoUrl}
-                        type={videoUrl?.endsWith('.webm') ? 'video/webm' : 'video/mp4'}
-                    />
-                </video>
+                <div className="relative w-full h-full flex items-center justify-center bg-black">
+                    <video
+                        ref={videoRef}
+                        className="max-h-full max-w-full w-auto h-auto object-contain"
+                        crossOrigin="anonymous"
+                        onLoadedMetadata={handleLoadedMetadata}
+                        onTimeUpdate={onTimeUpdate}
+                        onError={(e) => handlePlaybackError(e)}
+                        onPlaying={() => {
+                            setIsLoading(false);
+                            setPlaybackError(null);
+                        }}
+                        onCanPlay={handleCanPlay}
+                        onWaiting={() => setIsLoading(true)}
+                        onStalled={() => setIsLoading(true)}
+                        playsInline
+                        webkit-playsinline="true"
+                        x-webkit-airplay="allow"
+                        preload="metadata"
+                        muted={isMobile && !hasInteracted}
+                        controls={false}
+                        autoPlay={false}
+                        style={{ pointerEvents: 'none' }}
+                    >
+                        <source
+                            src={videoUrl}
+                            type={videoUrl?.endsWith('.webm') ? 'video/webm' : 'video/mp4'}
+                        />
+                    </video>
+                </div>
             ) : (
                 <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
                     <div className="w-8 h-8 border-2 border-cyan-500/30 border-t-cyan-400 animate-spin rounded-full" />
@@ -1658,23 +1652,21 @@ export default function MobilePlayground({
                         ${!isRightPanelCollapsed ? 'mr-[300px]' : ''}
                     `}>
                         {/* Video */}
-                        <div className="relative flex-1">
-                            <div className="absolute inset-0">
-                                <VideoPlayer
-                                    videoRef={videoRef}
-                                    videoUrl={videoUrl}
-                                    currentTime={currentTime}
-                                    setCurrentTime={setCurrentTime}
-                                    setDuration={setDuration}
-                                    onTimeUpdate={() => {
-                                        if (videoRef.current) {
-                                            setCurrentTime(videoRef.current.currentTime);
-                                        }
-                                    }}
-                                    isPlaying={isPlaying}
-                                    setIsPlaying={setIsPlaying}
-                                />
-                            </div>
+                        <div className="relative flex-1 bg-black">
+                            <VideoPlayer
+                                videoRef={videoRef}
+                                videoUrl={videoUrl}
+                                currentTime={currentTime}
+                                setCurrentTime={setCurrentTime}
+                                setDuration={setDuration}
+                                onTimeUpdate={() => {
+                                    if (videoRef.current) {
+                                        setCurrentTime(videoRef.current.currentTime);
+                                    }
+                                }}
+                                isPlaying={isPlaying}
+                                setIsPlaying={setIsPlaying}
+                            />
                         </div>
 
                         {/* Video Controls - Now underneath */}
@@ -1847,11 +1839,11 @@ export default function MobilePlayground({
                     </div>
                 </div>
             ) : (
-                // Portrait mode with sticky video section and scrollable chat
+                // Portrait mode with sticky video and scrollable chat
                 <div
                     className="flex flex-col h-full"
                     style={{
-                        height: '100%',
+                        height: '100dvh',
                         overflow: 'hidden',
                         touchAction: 'none',
                         paddingTop: 'env(safe-area-inset-top)',
@@ -1860,35 +1852,34 @@ export default function MobilePlayground({
                         paddingRight: 'env(safe-area-inset-right)'
                     }}
                 >
-                    {/* Sticky Video Section */}
-                    <div className="sticky top-0 z-20">
-                        <div className="w-full flex flex-col bg-black">
-                            {/* Video container - fixed 16:9 ratio */}
-                            <div className="relative w-full" style={{ aspectRatio: "16/9" }}>
-                                <div className="absolute inset-0">
-                                    <VideoPlayer
-                                        videoRef={videoRef}
-                                        videoUrl={videoUrl}
-                                        currentTime={currentTime}
-                                        setCurrentTime={setCurrentTime}
-                                        setDuration={setDuration}
-                                        onTimeUpdate={() => {
-                                            if (videoRef.current) {
-                                                setCurrentTime(videoRef.current.currentTime);
-                                            }
-                                        }}
-                                        isPlaying={isPlaying}
-                                        setIsPlaying={setIsPlaying}
-                                    />
-                                </div>
+                    {/* Video Section - Fixed at top */}
+                    <div className="flex-shrink-0 bg-black">
+                        <div className="w-full">
+                            {/* Video container - increased height */}
+                            <div className="relative w-full" style={{ height: '55vh' }}>
+                                <VideoPlayer
+                                    videoRef={videoRef}
+                                    videoUrl={videoUrl}
+                                    currentTime={currentTime}
+                                    setCurrentTime={setCurrentTime}
+                                    setDuration={setDuration}
+                                    onTimeUpdate={() => {
+                                        if (videoRef.current) {
+                                            setCurrentTime(videoRef.current.currentTime);
+                                        }
+                                    }}
+                                    isPlaying={isPlaying}
+                                    setIsPlaying={setIsPlaying}
+                                />
                             </div>
 
-                            {/* Video Controls - Portrait mode */}
-                            <div className="bg-gray-900/95 border-t border-gray-800/50 touch-manipulation">
-                                <div className="px-3 py-2">
+                            {/* Video Controls - Adjusted padding */}
+                            <div className="bg-gray-900/95 border-t border-gray-800/50">
+                                <div className="px-4 py-3">
+                                    {/* Progress bar - Made slightly taller */}
                                     <div
                                         ref={progressBarRef}
-                                        className="h-2 bg-gray-800/50 rounded-full cursor-pointer touch-manipulation"
+                                        className="h-2.5 bg-gray-800/50 rounded-full cursor-pointer touch-manipulation"
                                         onTouchStart={(e) => { e.stopPropagation(); handleProgressBarInteraction(e); }}
                                         onTouchMove={(e) => { e.stopPropagation(); handleProgressBarInteraction(e); }}
                                     >
@@ -1897,20 +1888,21 @@ export default function MobilePlayground({
                                             style={{ width: `${(currentTime / duration) * 100}%` }}
                                         />
                                     </div>
-                                    <div className="flex items-center gap-3 mt-2">
+
+                                    {/* Playback controls - Adjusted spacing */}
+                                    <div className="flex items-center gap-4 mt-3">
                                         <button
                                             onClick={(e) => { e.stopPropagation(); setIsPlaying(!isPlaying); }}
-                                            className="p-2 text-white/90 hover:text-cyan-400 transition-colors touch-manipulation"
+                                            className="p-2 text-white/90 hover:text-cyan-400 transition-colors"
                                         >
-                                            {isPlaying ? (<Pause size={20} />) : (<Play size={20} />)}
+                                            {isPlaying ? <Pause size={22} /> : <Play size={22} />}
                                         </button>
 
-                                        <div className="flex-1 text-[12px] text-white/70 font-medium">
+                                        <div className="flex-1 text-[13px] text-white/70 font-medium">
                                             {formatTime(currentTime)} / {formatTime(duration)}
                                         </div>
 
-                                        <div className="flex items-center gap-2">
-                                            {/* Mic button */}
+                                        <div className="flex items-center gap-3">
                                             {localParticipant && (
                                                 <button
                                                     onClick={(e) => {
@@ -1919,17 +1911,15 @@ export default function MobilePlayground({
                                                             localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
                                                         }
                                                     }}
-                                                    className="p-2 transition-colors touch-manipulation"
+                                                    className="p-2 transition-colors"
                                                 >
                                                     {!localParticipant.isMicrophoneEnabled ? (
-                                                        <MicOff size={20} className="text-red-400" />
+                                                        <MicOff size={22} className="text-red-400" />
                                                     ) : (
-                                                        <Mic size={20} className="text-cyan-400" />
+                                                        <Mic size={22} className="text-cyan-400" />
                                                     )}
                                                 </button>
                                             )}
-
-                                            {/* Volume button */}
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -1938,9 +1928,9 @@ export default function MobilePlayground({
                                                         setIsMuted(!isMuted);
                                                     }
                                                 }}
-                                                className="p-2 text-white/90 hover:text-cyan-400 transition-colors touch-manipulation"
+                                                className="p-2 text-white/90 hover:text-cyan-400 transition-colors"
                                             >
-                                                {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                                                {isMuted ? <VolumeX size={22} /> : <Volume2 size={22} />}
                                             </button>
                                         </div>
                                     </div>
@@ -1948,15 +1938,22 @@ export default function MobilePlayground({
                             </div>
                         </div>
                     </div>
-                    {/* Scrollable Chat Panel */}
-                    <div className="flex-1 bg-gray-900 relative" style={{ overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch' }}>
-                        <div className="h-full">
+
+                    {/* Chat Section - Adjusted spacing */}
+                    <div className="flex-1 overflow-hidden bg-gray-900/95">
+                        <div className="h-full overflow-y-auto overscroll-y-contain">
+                            {/* Voice Assistant Transcription */}
                             {voiceAssistant?.audioTrack && (
-                                <div className="p-3 border-b border-gray-800/50">
-                                    <TranscriptionTile agentAudioTrack={voiceAssistant.audioTrack} accentColor="cyan" />
+                                <div className="px-4 py-3 border-b border-gray-800/50">
+                                    <TranscriptionTile
+                                        agentAudioTrack={voiceAssistant.audioTrack}
+                                        accentColor="cyan"
+                                    />
                                 </div>
                             )}
-                            <div className="p-3">
+
+                            {/* Chat Messages */}
+                            <div className="p-4 space-y-3">
                                 <AnimatePresence>
                                     {transcripts.map((msg) => (
                                         <motion.div
@@ -1964,10 +1961,18 @@ export default function MobilePlayground({
                                             initial={{ opacity: 0, y: 5 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             exit={{ opacity: 0, y: -5 }}
-                                            className={`${msg.isSelf ? 'ml-auto bg-cyan-950/30' : 'mr-auto bg-gray-800/30'} rounded-lg p-2.5 max-w-[90%] mb-2`}
+                                            className={`
+                                                ${msg.isSelf ? 'ml-auto bg-cyan-950/30' : 'mr-auto bg-gray-800/30'}
+                                                rounded-lg p-3 max-w-[85%]
+                                                backdrop-blur-sm
+                                                border border-gray-700/50
+                                                transition-all duration-300
+                                                hover:border-cyan-500/30
+                                                shadow-sm
+                                            `}
                                         >
-                                            <span className="text-[11px] text-gray-400">{msg.name}: </span>
-                                            <span className="text-[12px] text-gray-200">{msg.message}</span>
+                                            <span className="text-[12px] text-gray-400">{msg.name}: </span>
+                                            <span className="text-[13px] text-gray-200">{msg.message}</span>
                                         </motion.div>
                                     ))}
                                 </AnimatePresence>
