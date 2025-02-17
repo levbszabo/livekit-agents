@@ -650,7 +650,7 @@ const formatTime = (time: number): string => {
 // Update the VideoPlayer component with better mobile support
 const VideoPlayer = ({
   videoRef,
-  videoUrl,  // This is the key - we need to handle this properly
+  videoUrl,
   currentTime,
   setCurrentTime,
   setDuration,
@@ -659,7 +659,7 @@ const VideoPlayer = ({
   setIsPlaying,
 }: {
   videoRef: React.RefObject<HTMLVideoElement>;
-  videoUrl: string | null;  // Note it can be null
+  videoUrl: string | null;
   currentTime: number;
   setCurrentTime: (time: number) => void;
   setDuration: (duration: number) => void;
@@ -774,39 +774,43 @@ const VideoPlayer = ({
   }, [videoUrl]);
 
   return (
-    <div
-      className="relative w-full h-full bg-black cursor-pointer"
-      onClick={handleVideoClick}
-    >
+    <div className="relative w-full h-full bg-black" onClick={handleVideoClick}>
       {/* Only render video if we have a URL */}
       {videoUrl ? (
-        <video
-          ref={videoRef}
-          className="absolute inset-0 w-full h-full object-cover"
-          crossOrigin="anonymous"
-          onLoadedMetadata={handleLoadedMetadata}
-          onTimeUpdate={onTimeUpdate}
-          onError={(e) => handlePlaybackError(e)}
-          onPlaying={() => {
-            setIsLoading(false);
-            setPlaybackError(null);
-          }}
-          onCanPlay={handleCanPlay}
-          onWaiting={() => setIsLoading(true)}
-          onStalled={() => setIsLoading(true)}
-          playsInline
-          webkit-playsinline="true"
-          x-webkit-airplay="allow"
-          preload="metadata"
-          muted={isMobile && !hasInteracted}
-          controls={false}
-          autoPlay={false}
-        >
-          <source
-            src={videoUrl}
-            type={videoUrl?.endsWith('.webm') ? 'video/webm' : 'video/mp4'}
-          />
-        </video>
+        <div className="w-full h-full flex items-center justify-center bg-black">
+          <div className="h-full relative flex items-center justify-center">
+            <video
+              ref={videoRef}
+              className="h-full w-auto max-w-none"
+              style={{
+                objectFit: 'contain'
+              }}
+              crossOrigin="anonymous"
+              onLoadedMetadata={handleLoadedMetadata}
+              onTimeUpdate={onTimeUpdate}
+              onError={(e) => handlePlaybackError(e)}
+              onPlaying={() => {
+                setIsLoading(false);
+                setPlaybackError(null);
+              }}
+              onCanPlay={handleCanPlay}
+              onWaiting={() => setIsLoading(true)}
+              onStalled={() => setIsLoading(true)}
+              playsInline
+              webkit-playsinline="true"
+              x-webkit-airplay="allow"
+              preload="metadata"
+              muted={isMobile && !hasInteracted}
+              controls={false}
+              autoPlay={false}
+            >
+              <source
+                src={videoUrl}
+                type={videoUrl?.endsWith('.webm') ? 'video/webm' : 'video/mp4'}
+              />
+            </video>
+          </div>
+        </div>
       ) : (
         // Show loading state if no video URL yet
         <div className="absolute inset-0 flex items-center justify-center bg-black">
@@ -1807,7 +1811,7 @@ export default function Playground({
               <div className="h-full w-full bg-black">
                 <VideoPlayer
                   videoRef={videoRef}
-                  videoUrl={videoUrl}  // This is the key - we need to handle this properly
+                  videoUrl={videoUrl}
                   currentTime={currentTime}
                   setCurrentTime={setCurrentTime}
                   setDuration={setDuration}
