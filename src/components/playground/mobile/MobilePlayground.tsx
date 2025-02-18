@@ -36,7 +36,8 @@ import {
     MicOff,
     Radio,
     RotateCcw,
-    ChevronRight
+    ChevronRight,
+    Settings
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import styled, { keyframes, css } from 'styled-components';
@@ -185,63 +186,63 @@ const styles = {
     label: `font-satoshi text-[11px] font-normal tracking-wide text-gray-400/70`,
     input: {
         base: `
-      font-satoshi w-full
-      bg-[#1E1E1E]/50 backdrop-blur-sm
-      border border-gray-800/50 rounded-lg
-      px-3 py-2.5 text-[14px] leading-relaxed
-      text-white
-      transition-all duration-300
-      focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30
-      focus:shadow-[0_0_15px_rgba(34,211,238,0.1)]
-      hover:border-cyan-500/20
-      placeholder:text-gray-600/50
-    `,
+            font-satoshi w-full
+            bg-[#1E1E1E]/50 backdrop-blur-sm
+            border border-gray-800/50 rounded-lg
+            px-3 py-2.5 text-[14px] leading-relaxed
+            text-white
+            transition-all duration-300
+            focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30
+            focus:shadow-[0_0_15px_rgba(34,211,238,0.1)]
+            hover:border-cyan-500/20
+            placeholder:text-gray-600/50
+        `,
         textarea: `
-      min-h-[120px] resize-none
-      bg-transparent
-      border border-gray-800/50 rounded-lg
-      transition-all duration-300
-      focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30
-      focus:shadow-[0_0_15px_rgba(34,211,238,0.1)]
-      hover:border-cyan-500/20
-      scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-700/30
-      hover:scrollbar-thumb-cyan-500/20
-      text-shadow-[0_0_10px_rgba(34,211,238,0.3)]
-    `
+            min-h-[120px] resize-none
+            bg-transparent
+            border border-gray-800/50 rounded-lg
+            transition-all duration-300
+            focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30
+            focus:shadow-[0_0_15px_rgba(34,211,238,0.1)]
+            hover:border-cyan-500/20
+            scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-700/30
+            hover:scrollbar-thumb-cyan-500/20
+            text-shadow-[0_0_10px_rgba(34,211,238,0.3)]
+        `
     },
     button: {
         primary: `
-      group
-      flex items-center gap-2
-      px-4 py-2 rounded-lg text-[13px]
-      bg-gradient-to-r from-cyan-500/10 to-cyan-400/5
-      text-cyan-400
-      border border-cyan-500/20
-      transition-all duration-300
-      hover:border-cyan-400/40
-      hover:shadow-[0_0_15px_rgba(34,211,238,0.15)]
-      hover:bg-gradient-to-r hover:from-cyan-500/20 hover:to-cyan-400/10
-    `,
+            group
+            flex items-center gap-2
+            px-4 py-2 rounded-lg text-[13px]
+            bg-gradient-to-r from-cyan-500/10 to-cyan-400/5
+            text-cyan-400
+            border border-cyan-500/20
+            transition-all duration-300
+            hover:border-cyan-400/40
+            hover:shadow-[0_0_15px_rgba(34,211,238,0.15)]
+            hover:bg-gradient-to-r hover:from-cyan-500/20 hover:to-cyan-400/10
+        `,
         icon: `
-      p-1.5 rounded-md
-      transition-all duration-300
-      hover:bg-cyan-500/10
-      hover:shadow-[0_0_10px_rgba(34,211,238,0.15)]
-      group-hover:text-cyan-400
-    `
+            p-1.5 rounded-md
+            transition-all duration-300
+            hover:bg-cyan-500/10
+            hover:shadow-[0_0_10px_rgba(34,211,238,0.15)]
+            group-hover:text-cyan-400
+        `
     },
     tab: {
         base: `
-      relative px-4 py-2 
-      font-satoshi text-[13px] font-medium tracking-[-0.01em]
-      transition-all duration-300
-    `,
+            relative px-4 py-2 
+            font-satoshi text-[13px] font-medium tracking-[-0.01em]
+            transition-all duration-300
+        `,
         active: `
-      text-cyan-400
-      after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px]
-      after:bg-gradient-to-r after:from-cyan-500/80 after:to-cyan-400/20
-      after:shadow-[0_0_8px_rgba(34,211,238,0.3)]
-    `,
+            text-cyan-400
+            after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px]
+            after:bg-gradient-to-r after:from-cyan-500/80 after:to-cyan-400/20
+            after:shadow-[0_0_8px_rgba(34,211,238,0.3)]
+        `,
         inactive: `text-gray-400/70 hover:text-gray-300`
     },
     voiceClone: {
@@ -249,91 +250,91 @@ const styles = {
         subtitle: `font-satoshi text-[12px] font-medium tracking-[-0.01em] text-gray-300/90 mb-3`,
         instruction: `font-satoshi text-[12px] leading-relaxed tracking-wide text-gray-400/80`,
         sampleText: `
-      font-satoshi text-[12px] leading-relaxed tracking-wide
-      bg-black/20 rounded-lg p-3
-      border border-gray-800
-      text-gray-300/80
-    `
+            font-satoshi text-[12px] leading-relaxed tracking-wide
+            bg-black/20 rounded-lg p-3
+            border border-gray-800
+            text-gray-300/80
+        `
     },
     knowledgeBase: {
         bubble: `
-      relative z-10
-      bg-[#1E1E1E]/50 backdrop-blur-sm
-      border border-gray-800/50 rounded-lg p-2.5
-      transition-all duration-300
-      hover:border-cyan-500/30
-      hover:shadow-[0_0_15px_rgba(34,211,238,0.07)]
-      before:absolute before:inset-0 before:z-[-1]
-      before:bg-gradient-to-r before:from-cyan-500/[0.02] before:to-transparent
-      before:opacity-0 before:transition-opacity before:duration-300
-      hover:before:opacity-100
-      cursor-pointer
-    `,
+            relative z-10
+            bg-[#1E1E1E]/50 backdrop-blur-sm
+            border border-gray-800/50 rounded-lg p-2.5
+            transition-all duration-300
+            hover:border-cyan-500/30
+            hover:shadow-[0_0_15px_rgba(34,211,238,0.07)]
+            before:absolute before:inset-0 before:z-[-1]
+            before:bg-gradient-to-r before:from-cyan-500/[0.02] before:to-transparent
+            before:opacity-0 before:transition-opacity before:duration-300
+            hover:before:opacity-100
+            cursor-pointer
+        `,
         input: `
-      flex-1 bg-transparent z-20
-      font-satoshi text-[13px] text-gray-300
-      border border-gray-700/50 rounded-md px-2 py-1
-      focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30
-      hover:border-cyan-500/20
-      transition-all duration-300
-    `,
+            flex-1 bg-transparent z-20
+            font-satoshi text-[13px] text-gray-300
+            border border-gray-700/50 rounded-md px-2 py-1
+            focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30
+            hover:border-cyan-500/20
+            transition-all duration-300
+        `,
         content: `
-      w-full bg-black/20 z-20
-      font-satoshi text-[13px] text-gray-300
-      border border-gray-800/50 rounded-lg
-      p-2 min-h-[45px]
-      focus:ring-1 focus:ring-cyan-500/50
-      focus:border-cyan-500/30
-      hover:border-cyan-500/20
-      resize-none
-      transition-all duration-300
-    `
+            w-full bg-black/20 z-20
+            font-satoshi text-[13px] text-gray-300
+            border border-gray-800/50 rounded-lg
+            p-2 min-h-[45px]
+            focus:ring-1 focus:ring-cyan-500/50
+            focus:border-cyan-500/30
+            hover:border-cyan-500/20
+            resize-none
+            transition-all duration-300
+        `
     },
     card: {
         base: `
-      bg-[#1E1E1E] 
-      border border-gray-800
-      rounded-lg p-2.5
-      transition-all duration-300
-      hover:border-cyan-500/30
-      hover:shadow-[0_0_20px_rgba(34,211,238,0.1)]
-      backdrop-blur-sm
-    `,
+            bg-[#1E1E1E] 
+            border border-gray-800
+            rounded-lg p-2.5
+            transition-all duration-300
+            hover:border-cyan-500/30
+            hover:shadow-[0_0_20px_rgba(34,211,238,0.1)]
+            backdrop-blur-sm
+        `,
         active: `
-      border-cyan-500/30
-      shadow-[0_0_20px_rgba(34,211,238,0.1)]
-      bg-gradient-to-b from-cyan-500/10 to-transparent
-    `
+            border-cyan-500/30
+            shadow-[0_0_20px_rgba(34,211,238,0.1)]
+            bg-gradient-to-b from-cyan-500/10 to-transparent
+        `
     },
     section: {
         wrapper: `
-      relative p-2
-      before:absolute before:inset-0
-      before:border before:border-gray-800/50 before:rounded-lg
-      before:transition-all before:duration-300
-      hover:before:border-cyan-500/20
-      hover:before:shadow-[0_0_20px_rgba(34,211,238,0.05)]
-      after:absolute after:inset-0
-      after:bg-gradient-to-b after:from-cyan-500/[0.02] after:to-transparent
-      after:opacity-0 after:transition-opacity after:duration-300
-      hover:after:opacity-100
-      rounded-lg
-      mb-2
-    `,
+            relative p-2
+            before:absolute before:inset-0
+            before:border before:border-gray-800/50 before:rounded-lg
+            before:transition-all before:duration-300
+            hover:before:border-cyan-500/20
+            hover:before:shadow-[0_0_20px_rgba(34,211,238,0.05)]
+            after:absolute after:inset-0
+            after:bg-gradient-to-b after:from-cyan-500/[0.02] after:to-transparent
+            after:opacity-0 after:transition-opacity after:duration-300
+            hover:after:opacity-100
+            rounded-lg
+            mb-2
+        `,
         title: `
-      font-satoshi text-[14px] font-medium tracking-[-0.01em] 
-      text-white/90 mb-2
-      flex items-center gap-2
-      before:content-[''] before:w-1 before:h-1 before:rounded-full
-      before:bg-cyan-400/50 before:shadow-[0_0_5px_rgba(34,211,238,0.5)]
-    `
+            font-satoshi text-[14px] font-medium tracking-[-0.01em] 
+            text-white/90 mb-2
+            flex items-center gap-2
+            before:content-[''] before:w-1 before:h-1 before:rounded-full
+            before:bg-cyan-400/50 before:shadow-[0_0_5px_rgba(34,211,238,0.5)]
+        `
     },
     divider: `
-    h-px w-full
-    bg-gradient-to-r from-transparent via-gray-800/50 to-transparent
-    my-6
-  `
-};
+        h-px w-full
+        bg-gradient-to-r from-transparent via-gray-800/50 to-transparent
+        my-6
+    `
+} as const;
 
 const resizeHandleStyles = {
     vertical: `
@@ -1049,6 +1050,445 @@ const RotateIndicator = ({ show }: RotateIndicatorProps) => (
 );
 
 // ----------------------------------------------------------------------------
+// Settings Drawer Component
+// ----------------------------------------------------------------------------
+const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
+    isOpen,
+    onClose,
+    agentConfig,
+    onUpdateAgentConfig,
+    savedVoices,
+    onVoiceCreate,
+    isCreatingVoice,
+    setIsCreatingVoice,
+    params
+}) => {
+    const [activeTab, setActiveTab] = useState<'agent' | 'voice'>('agent');
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState(false);
+
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            await onUpdateAgentConfig(agentConfig);
+            setSaveSuccess(true);
+            setTimeout(() => setSaveSuccess(false), 2000);
+        } catch (error) {
+            console.error('Error saving config:', error);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <motion.div
+            initial={{ x: '100%' }}
+            animate={{ x: isOpen ? 0 : '100%' }}
+            transition={{ type: "spring", damping: 20, stiffness: 300 }}
+            className="fixed inset-0 z-50 bg-gray-900/95 backdrop-blur-md"
+            style={{
+                paddingTop: 'env(safe-area-inset-top)',
+                paddingBottom: 'env(safe-area-inset-bottom)',
+                paddingLeft: 'env(safe-area-inset-left)',
+                paddingRight: 'env(safe-area-inset-right)'
+            }}
+        >
+            {/* Header with Save Button */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-800">
+                <h2 className="text-[16px] font-medium text-cyan-400">Settings</h2>
+                <div className="flex items-center gap-2">
+                    <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className={`
+                            group flex items-center gap-1.5
+                            px-3 py-1.5 rounded-lg
+                            ${saveSuccess
+                                ? 'bg-green-500/20 text-green-400 border-green-500/30'
+                                : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
+                            }
+                            border
+                            transition-all duration-300
+                            disabled:opacity-50 disabled:cursor-not-allowed
+                        `}
+                    >
+                        {isSaving ? (
+                            <>
+                                <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                <span className="text-[11px]">Saving...</span>
+                            </>
+                        ) : saveSuccess ? (
+                            <>
+                                <motion.div
+                                    initial={{ scale: 0 }}
+                                    animate={{ scale: 1 }}
+                                    className="text-green-400"
+                                >
+                                    <svg
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        className="w-3 h-3"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M5 13l4 4L19 7"
+                                        />
+                                    </svg>
+                                </motion.div>
+                                <span className="text-[11px]">Saved!</span>
+                            </>
+                        ) : (
+                            <>
+                                <Save size={12} className="group-hover:rotate-12 transition-transform duration-300" />
+                                <span className="text-[11px]">Save Changes</span>
+                            </>
+                        )}
+                    </motion.button>
+                    <button
+                        onClick={onClose}
+                        className="p-2 rounded-lg hover:bg-cyan-500/10 text-gray-400 hover:text-cyan-400"
+                    >
+                        <X size={20} />
+                    </button>
+                </div>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex border-b border-gray-800">
+                <button
+                    onClick={() => setActiveTab('agent')}
+                    className={`flex-1 px-4 py-3 text-[14px] font-medium relative ${activeTab === 'agent' ? 'text-cyan-400' : 'text-gray-400'
+                        }`}
+                >
+                    AI Agent
+                    {activeTab === 'agent' && (
+                        <motion.div
+                            layoutId="activeSettingsTab"
+                            className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400"
+                        />
+                    )}
+                </button>
+                <button
+                    onClick={() => setActiveTab('voice')}
+                    className={`flex-1 px-4 py-3 text-[14px] font-medium relative ${activeTab === 'voice' ? 'text-cyan-400' : 'text-gray-400'
+                        }`}
+                >
+                    Voice Clone
+                    {activeTab === 'voice' && (
+                        <motion.div
+                            layoutId="activeSettingsTab"
+                            className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400"
+                        />
+                    )}
+                </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-4">
+                <AnimatePresence mode="wait">
+                    {activeTab === 'agent' ? (
+                        <motion.div
+                            key="agent"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="space-y-6"
+                        >
+                            {/* Agent Personality */}
+                            <section>
+                                <h3 className="text-[14px] font-medium text-gray-300 mb-2">Agent Personality</h3>
+                                <p className="text-[12px] text-gray-400 mb-3">
+                                    Describe how you want your AI agent to behave and interact.
+                                </p>
+                                <textarea
+                                    value={agentConfig.personality}
+                                    onChange={(e) => onUpdateAgentConfig({
+                                        ...agentConfig,
+                                        personality: e.target.value
+                                    })}
+                                    placeholder="Example: A friendly and knowledgeable AI assistant that explains concepts clearly and engages in natural conversation..."
+                                    className="w-full h-32 bg-black/20 rounded-lg border border-gray-800 p-3 text-[14px] text-gray-300"
+                                />
+                            </section>
+
+                            {/* Knowledge Base */}
+                            <section>
+                                <div className="flex items-center justify-between mb-4">
+                                    <div>
+                                        <h3 className="text-[14px] font-medium text-gray-300 mb-1">Knowledge Base</h3>
+                                        <p className="text-[12px] text-gray-400">
+                                            Add custom knowledge to enhance your AI agent's responses.
+                                        </p>
+                                    </div>
+                                    <motion.button
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => {
+                                            const newEntry = {
+                                                id: `kb_${Date.now()}`,
+                                                type: "custom",
+                                                name: "New Knowledge Entry",
+                                                content: ""
+                                            };
+                                            onUpdateAgentConfig({
+                                                ...agentConfig,
+                                                knowledgeBase: [...agentConfig.knowledgeBase, newEntry]
+                                            });
+                                        }}
+                                        className="px-3 py-2 rounded-lg bg-cyan-500/20 text-cyan-400 text-[13px] flex items-center gap-1.5"
+                                    >
+                                        <Plus size={14} />
+                                        Add Knowledge
+                                    </motion.button>
+                                </div>
+
+                                <div className="space-y-4">
+                                    {agentConfig.knowledgeBase.map((entry) => (
+                                        <KnowledgeBubble
+                                            key={entry.id}
+                                            entry={entry}
+                                            onEdit={(id, content, name) => {
+                                                onUpdateAgentConfig({
+                                                    ...agentConfig,
+                                                    knowledgeBase: agentConfig.knowledgeBase.map(e =>
+                                                        e.id === id ? { ...e, content, ...(name && { name }) } : e
+                                                    )
+                                                });
+                                            }}
+                                            onRemove={(id) => {
+                                                onUpdateAgentConfig({
+                                                    ...agentConfig,
+                                                    knowledgeBase: agentConfig.knowledgeBase.filter(e => e.id !== id)
+                                                });
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            </section>
+                        </motion.div>
+                    ) : (
+                        <motion.div
+                            key="voice"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="space-y-6"
+                        >
+                            {/* Voice Clone Content */}
+                            {isCreatingVoice ? (
+                                <VoiceCreation
+                                    onVoiceCreate={onVoiceCreate}
+                                    onCancel={() => setIsCreatingVoice(false)}
+                                />
+                            ) : (
+                                <VoiceList
+                                    voices={savedVoices}
+                                    onCreateNew={() => setIsCreatingVoice(true)}
+                                    brdgeId={params.brdgeId}
+                                />
+                            )}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
+        </motion.div>
+    );
+};
+
+// ----------------------------------------------------------------------------
+// Voice Creation Component
+// ----------------------------------------------------------------------------
+const VoiceCreation: React.FC<{
+    onVoiceCreate: (name: string, recording: Blob) => Promise<void>;
+    onCancel: () => void;
+}> = ({ onVoiceCreate, onCancel }) => {
+    const [isRecording, setIsRecording] = useState(false);
+    const [recordingTime, setRecordingTime] = useState(0);
+    const [voiceName, setVoiceName] = useState('');
+    const [currentRecording, setCurrentRecording] = useState<Blob | null>(null);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = mediaRecorder;
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) {
+                    setCurrentRecording(new Blob([e.data], { type: 'audio/wav' }));
+                }
+            };
+
+            mediaRecorder.start();
+            setIsRecording(true);
+            timerRef.current = setInterval(() => {
+                setRecordingTime(prev => prev + 1);
+            }, 1000);
+        } catch (err) {
+            console.error('Error accessing microphone:', err);
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop();
+            mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+            setIsRecording(false);
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+                setRecordingTime(0);
+            }
+        }
+    };
+
+    useEffect(() => {
+        return () => {
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+            }
+            if (mediaRecorderRef.current && isRecording) {
+                mediaRecorderRef.current.stop();
+                mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+            }
+        };
+    }, [isRecording]);
+
+    return (
+        <div className="space-y-4">
+            <div className="flex items-center justify-between">
+                <h3 className="text-[14px] font-medium text-gray-300">Create New Voice</h3>
+                <button
+                    onClick={onCancel}
+                    className="text-gray-400 hover:text-cyan-400"
+                >
+                    <X size={20} />
+                </button>
+            </div>
+
+            <div className="space-y-4">
+                <input
+                    type="text"
+                    value={voiceName}
+                    onChange={(e) => setVoiceName(e.target.value)}
+                    placeholder="Voice name"
+                    className="w-full bg-black/20 rounded-lg border border-gray-800 p-3 text-[14px] text-gray-300"
+                />
+
+                <button
+                    onClick={isRecording ? stopRecording : startRecording}
+                    className={`
+                        w-full py-3 rounded-lg text-[14px] font-medium
+                        flex items-center justify-center gap-2
+                        ${isRecording ? 'bg-red-500/20 text-red-400' : 'bg-cyan-500/20 text-cyan-400'}
+                    `}
+                >
+                    <span className={`
+                        w-2 h-2 rounded-full 
+                        ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-cyan-500'}
+                    `} />
+                    {isRecording ? (
+                        <>Recording... {formatTime(recordingTime)}</>
+                    ) : (
+                        'Start Recording'
+                    )}
+                </button>
+
+                {currentRecording && (
+                    <div className="space-y-2">
+                        <audio
+                            src={URL.createObjectURL(currentRecording)}
+                            controls
+                            className="w-full"
+                        />
+                        <button
+                            onClick={() => onVoiceCreate(voiceName, currentRecording)}
+                            disabled={!voiceName}
+                            className={`
+                                w-full py-3 rounded-lg text-[14px] font-medium
+                                bg-cyan-500/20 text-cyan-400
+                                disabled:opacity-50 disabled:cursor-not-allowed
+                            `}
+                        >
+                            Create Voice Clone
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// ----------------------------------------------------------------------------
+// Voice List Component
+// ----------------------------------------------------------------------------
+const VoiceList: React.FC<{
+    voices: SavedVoice[];
+    onCreateNew: () => void;
+    brdgeId: string | null;
+}> = ({ voices, onCreateNew, brdgeId }) => {
+    const activateVoice = async (voiceId: string) => {
+        try {
+            await api.post(`/brdges/${brdgeId}/voices/${voiceId}/activate`);
+            // Voice list will be updated by parent component
+        } catch (error) {
+            console.error('Error activating voice:', error);
+        }
+    };
+
+    return (
+        <div className="space-y-4">
+            <div className="flex items-center justify-between">
+                <h3 className="text-[14px] font-medium text-gray-300">Saved Voices</h3>
+                <button
+                    onClick={onCreateNew}
+                    className="px-3 py-2 rounded-lg bg-cyan-500/20 text-cyan-400 text-[13px]"
+                >
+                    Create New
+                </button>
+            </div>
+
+            <div className="space-y-2">
+                {voices.map((voice) => (
+                    <motion.div
+                        key={voice.id}
+                        onClick={() => activateVoice(voice.id)}
+                        className={`
+                            p-3 rounded-lg border cursor-pointer
+                            ${voice.status === 'active'
+                                ? 'border-cyan-500/30 bg-cyan-500/5'
+                                : 'border-gray-800 bg-black/20'
+                            }
+                            transition-all duration-300
+                            hover:border-cyan-500/30
+                        `}
+                    >
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <div className={`
+                                    w-2 h-2 rounded-full
+                                    ${voice.status === 'active' ? 'bg-cyan-400' : 'bg-gray-600'}
+                                `} />
+                                <span className="text-[14px] text-gray-300">{voice.name}</span>
+                            </div>
+                            <span className="text-[12px] text-cyan-400/70">
+                                {voice.status === 'active' ? 'Active' : 'Click to Activate'}
+                            </span>
+                        </div>
+                    </motion.div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+// ----------------------------------------------------------------------------
 // Main MobilePlayground Component – all functionality included
 // ----------------------------------------------------------------------------
 export default function MobilePlayground({
@@ -1243,7 +1683,7 @@ export default function MobilePlayground({
         fetchAgentConfig();
     }, [params.brdgeId, params.apiBaseUrl]);
 
-    const updateAgentConfig = async (newConfig: typeof agentConfig) => {
+    const updateAgentConfig = async (newConfig: AgentConfig) => {
         try {
             const response = await fetch(
                 `${params.apiBaseUrl}/brdges/${params.brdgeId}/agent-config`,
@@ -1386,11 +1826,13 @@ export default function MobilePlayground({
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             const mediaRecorder = new MediaRecorder(stream);
             mediaRecorderRef.current = mediaRecorder;
+
             mediaRecorder.ondataavailable = (e) => {
                 if (e.data.size > 0) {
                     setCurrentRecording(new Blob([e.data], { type: 'audio/wav' }));
                 }
             };
+
             mediaRecorder.start();
             setIsRecording(true);
             timerRef.current = setInterval(() => {
@@ -1441,6 +1883,7 @@ export default function MobilePlayground({
     // Automatic voice activation effect
     useEffect(() => {
         if (savedVoices.length === 1) {
+            // If there's only one voice, make it active
             const voice = savedVoices[0];
             if (voice.status !== 'active') {
                 api.post(`/brdges/${params.brdgeId}/voices/${voice.id}/activate`)
@@ -1450,9 +1893,11 @@ export default function MobilePlayground({
                     .catch(error => console.error('Error activating single voice:', error));
             }
         } else if (savedVoices.length > 1 && !savedVoices.some(v => v.status === 'active')) {
+            // If there are multiple voices and none are active, activate the most recent one
             const mostRecent = savedVoices.reduce((prev, current) => {
                 return new Date(current.created_at) > new Date(prev.created_at) ? current : prev;
             }, savedVoices[0]);
+
             api.post(`/brdges/${params.brdgeId}/voices/${mostRecent.id}/activate`)
                 .then(() => {
                     setSavedVoices(prev => prev.map(v => ({
@@ -1626,6 +2071,99 @@ export default function MobilePlayground({
             return () => clearTimeout(timer);
         }
     }, [isLandscape]);
+
+    // Add these components for the settings drawer
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+    // Update the video controls to include the microphone button
+    const videoControls = (
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setIsPlaying(!isPlaying)}
+                        className="text-white/90 hover:text-cyan-400 transition-colors"
+                    >
+                        {isPlaying ? <Pause size={20} /> : <Play size={20} />}
+                    </button>
+
+                    <div className="text-[11px] text-white/70 font-medium">
+                        {formatTime(currentTime)} / {formatTime(duration)}
+                    </div>
+
+                    {/* Add back the microphone button */}
+                    {localParticipant && (
+                        <button
+                            onClick={() => {
+                                if (roomState === ConnectionState.Connected) {
+                                    localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
+                                }
+                            }}
+                            className="text-white/90 hover:text-cyan-400 transition-colors"
+                        >
+                            {!localParticipant.isMicrophoneEnabled ? (
+                                <MicOff size={20} className="text-red-400" />
+                            ) : (
+                                <Mic size={20} className="text-cyan-400" />
+                            )}
+                        </button>
+                    )}
+
+                    <button
+                        onClick={() => setIsMuted(!isMuted)}
+                        className="text-white/90 hover:text-cyan-400 transition-colors"
+                    >
+                        {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                    </button>
+                </div>
+
+                {/* Settings button */}
+                {params.agentType === 'edit' && (
+                    <button
+                        onClick={() => setIsSettingsOpen(true)}
+                        className="p-2 rounded-lg bg-black/40 text-gray-400 hover:text-cyan-400"
+                    >
+                        <Settings size={20} />
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+
+    // Memoize the handlers to prevent unnecessary re-renders
+    const handleVoiceCreate = useCallback(async (name: string, recording: Blob) => {
+        if (!params.brdgeId) return;
+        try {
+            const formData = new FormData();
+            formData.append('audio', recording);
+            formData.append('name', name);
+            const response = await api.post(`/brdges/${params.brdgeId}/voice/clone`, formData);
+            if (response.data?.voice?.id) {
+                setSavedVoices(prev => [...prev, response.data.voice]);
+                setIsCreatingVoice(false);
+            }
+        } catch (error) {
+            console.error('Error cloning voice:', error);
+        }
+    }, [params.brdgeId]);
+
+    const handleUpdateAgentConfig = useCallback(async (newConfig: AgentConfig) => {
+        try {
+            const response = await fetch(
+                `${params.apiBaseUrl}/brdges/${params.brdgeId}/agent-config`,
+                {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newConfig),
+                }
+            );
+            if (response.ok) {
+                setAgentConfig(newConfig);
+            }
+        } catch (error) {
+            console.error('Error updating agent config:', error);
+        }
+    }, [params.apiBaseUrl, params.brdgeId]);
 
     // ----------------------------------------------------------------------------
     // Mobile layout rendering: if in portrait, video on top, chat below; if in landscape, show video enlarged with a toggleable side panel.
@@ -1855,7 +2393,7 @@ export default function MobilePlayground({
                     {/* Video Section - Fixed at top */}
                     <div className="flex-shrink-0 bg-black">
                         <div className="w-full">
-                            {/* Video container - increased height */}
+                            {/* Video container */}
                             <div className="relative w-full" style={{ height: '55vh' }}>
                                 <VideoPlayer
                                     videoRef={videoRef}
@@ -1871,12 +2409,64 @@ export default function MobilePlayground({
                                     isPlaying={isPlaying}
                                     setIsPlaying={setIsPlaying}
                                 />
+
+                                {/* Add video controls overlay */}
+                                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <button
+                                                onClick={() => setIsPlaying(!isPlaying)}
+                                                className="text-white/90 hover:text-cyan-400 transition-colors"
+                                            >
+                                                {isPlaying ? <Pause size={20} /> : <Play size={20} />}
+                                            </button>
+
+                                            <div className="text-[11px] text-white/70 font-medium">
+                                                {formatTime(currentTime)} / {formatTime(duration)}
+                                            </div>
+
+                                            {/* Add back the microphone button */}
+                                            {localParticipant && (
+                                                <button
+                                                    onClick={() => {
+                                                        if (roomState === ConnectionState.Connected) {
+                                                            localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
+                                                        }
+                                                    }}
+                                                    className="text-white/90 hover:text-cyan-400 transition-colors"
+                                                >
+                                                    {!localParticipant.isMicrophoneEnabled ? (
+                                                        <MicOff size={20} className="text-red-400" />
+                                                    ) : (
+                                                        <Mic size={20} className="text-cyan-400" />
+                                                    )}
+                                                </button>
+                                            )}
+
+                                            <button
+                                                onClick={() => setIsMuted(!isMuted)}
+                                                className="text-white/90 hover:text-cyan-400 transition-colors"
+                                            >
+                                                {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                                            </button>
+                                        </div>
+
+                                        {/* Settings button */}
+                                        {params.agentType === 'edit' && (
+                                            <button
+                                                onClick={() => setIsSettingsOpen(true)}
+                                                className="p-2 rounded-lg bg-black/40 text-gray-400 hover:text-cyan-400"
+                                            >
+                                                <Settings size={20} />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
 
-                            {/* Video Controls - Adjusted padding */}
+                            {/* Progress bar */}
                             <div className="bg-gray-900/95 border-t border-gray-800/50">
                                 <div className="px-4 py-3">
-                                    {/* Progress bar - Made slightly taller */}
                                     <div
                                         ref={progressBarRef}
                                         className="h-2.5 bg-gray-800/50 rounded-full cursor-pointer touch-manipulation"
@@ -1888,58 +2478,12 @@ export default function MobilePlayground({
                                             style={{ width: `${(currentTime / duration) * 100}%` }}
                                         />
                                     </div>
-
-                                    {/* Playback controls - Adjusted spacing */}
-                                    <div className="flex items-center gap-4 mt-3">
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); setIsPlaying(!isPlaying); }}
-                                            className="p-2 text-white/90 hover:text-cyan-400 transition-colors"
-                                        >
-                                            {isPlaying ? <Pause size={22} /> : <Play size={22} />}
-                                        </button>
-
-                                        <div className="flex-1 text-[13px] text-white/70 font-medium">
-                                            {formatTime(currentTime)} / {formatTime(duration)}
-                                        </div>
-
-                                        <div className="flex items-center gap-3">
-                                            {localParticipant && (
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        if (roomState === ConnectionState.Connected) {
-                                                            localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
-                                                        }
-                                                    }}
-                                                    className="p-2 transition-colors"
-                                                >
-                                                    {!localParticipant.isMicrophoneEnabled ? (
-                                                        <MicOff size={22} className="text-red-400" />
-                                                    ) : (
-                                                        <Mic size={22} className="text-cyan-400" />
-                                                    )}
-                                                </button>
-                                            )}
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    if (videoRef.current) {
-                                                        videoRef.current.muted = !isMuted;
-                                                        setIsMuted(!isMuted);
-                                                    }
-                                                }}
-                                                className="p-2 text-white/90 hover:text-cyan-400 transition-colors"
-                                            >
-                                                {isMuted ? <VolumeX size={22} /> : <Volume2 size={22} />}
-                                            </button>
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Chat Section - Adjusted spacing */}
+                    {/* Chat Section */}
                     <div className="flex-1 overflow-hidden bg-gray-900/95">
                         <div className="h-full overflow-y-auto overscroll-y-contain">
                             {/* Voice Assistant Transcription */}
@@ -1979,6 +2523,21 @@ export default function MobilePlayground({
                             </div>
                         </div>
                     </div>
+
+                    {/* Settings Drawer */}
+                    {params.agentType === 'edit' && (
+                        <SettingsDrawer
+                            isOpen={isSettingsOpen}
+                            onClose={() => setIsSettingsOpen(false)}
+                            agentConfig={agentConfig}
+                            onUpdateAgentConfig={handleUpdateAgentConfig}
+                            savedVoices={savedVoices}
+                            onVoiceCreate={handleVoiceCreate}
+                            isCreatingVoice={isCreatingVoice}
+                            setIsCreatingVoice={setIsCreatingVoice}
+                            params={params}
+                        />
+                    )}
                 </div>
             )}
         </div>
