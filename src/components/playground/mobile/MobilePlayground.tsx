@@ -1052,6 +1052,18 @@ const RotateIndicator = ({ show }: RotateIndicatorProps) => (
 // ----------------------------------------------------------------------------
 // Settings Drawer Component
 // ----------------------------------------------------------------------------
+interface SettingsDrawerProps {
+    isOpen: boolean;
+    onClose: () => void;
+    agentConfig: AgentConfig;
+    onUpdateAgentConfig: (config: AgentConfig) => void;
+    savedVoices: SavedVoice[];
+    onVoiceCreate: (name: string, recording: Blob) => Promise<void>;
+    isCreatingVoice: boolean;
+    setIsCreatingVoice: (creating: boolean) => void;
+    params: { brdgeId: string | null };
+}
+
 const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
     isOpen,
     onClose,
@@ -1222,7 +1234,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                                     <div>
                                         <h3 className="text-[14px] font-medium text-gray-300 mb-1">Knowledge Base</h3>
                                         <p className="text-[12px] text-gray-400">
-                                            Add custom knowledge to enhance your AI agent's responses.
+                                            Add custom knowledge to enhance your AI agent&apos;s responses.
                                         </p>
                                     </div>
                                     <motion.button
