@@ -810,7 +810,7 @@ const VideoPlayer = ({
                     >
                         <source
                             src={videoUrl}
-                            type={videoUrl?.endsWith('.webm') ? 'video/webm' : 'video/mp4'}
+                            type={videoUrl?.endsWith('.webm') ? 'video/webm' : videoUrl?.endsWith('.mov') ? 'video/quicktime' : 'video/mp4'}
                         />
                     </video>
                 </div>
