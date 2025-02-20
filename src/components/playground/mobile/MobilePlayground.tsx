@@ -37,16 +37,39 @@ import {
     Radio,
     RotateCcw,
     ChevronRight,
-    Settings
+    Settings,
+    Globe,
+    Lock,
+    Check,
+    Copy
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import styled, { keyframes, css } from 'styled-components';
+import TextareaAutosize from 'react-textarea-autosize';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Placeholder from '@tiptap/extension-placeholder';
+import { useSwipeable } from 'react-swipeable';
+import axios from 'axios';
 
 export interface PlaygroundProps {
     logo?: ReactNode;
     themeColors: string[];
     onConnect: (connect: boolean, opts?: { token: string; url: string }) => void;
     agentType?: 'edit' | 'view';
+    params: {
+        brdgeId: string | null;
+    };
+}
+
+// Add ConnectionParams interface
+interface ConnectionParams {
+    brdgeId: string | null;
+    apiBaseUrl: string;
+    coreApiUrl: string;
+    userId?: string;
+    agentType: 'edit' | 'view';
+    token?: string;
 }
 
 const headerHeight = 16; // Changed from 28 to 16
@@ -104,13 +127,10 @@ interface RecordingData {
 
 interface Brdge {
     id: number;
-    name: string;
-    presentation_filename: string;
-    audio_filename: string;
-    folder: string;
-    user_id: number;
+    public_id: string;
     shareable: boolean;
-    public_id: string | null;
+    presentation_filename?: string;
+    agent_personality?: string;
 }
 
 interface TranscriptWord {
@@ -1062,6 +1082,10 @@ interface SettingsDrawerProps {
     isCreatingVoice: boolean;
     setIsCreatingVoice: (creating: boolean) => void;
     params: { brdgeId: string | null };
+    brdge?: Brdge | null;
+    onUpdateBrdge: (updatedBrdge: Brdge) => void;
+    isUploading: boolean;
+    onPresentationClick: () => void;
 }
 
 const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
@@ -1073,16 +1097,31 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
     onVoiceCreate,
     isCreatingVoice,
     setIsCreatingVoice,
-    params
+    params,
+    brdge,
+    onUpdateBrdge,
+    isUploading,
+    onPresentationClick
 }) => {
-    const [activeTab, setActiveTab] = useState<'agent' | 'voice'>('agent');
+    const [activeTab, setActiveTab] = useState<'agent' | 'voice' | 'share'>('agent');
     const [isSaving, setIsSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
+    const [linkCopied, setLinkCopied] = useState(false);
+
+    // NEW: Local state for agent personality to avoid re-rendering on every keystroke
+    const [localPersonality, setLocalPersonality] = useState(agentConfig.personality);
+    useEffect(() => {
+        setLocalPersonality(agentConfig.personality);
+    }, [agentConfig.personality]);
 
     const handleSave = async () => {
         setIsSaving(true);
         try {
-            await onUpdateAgentConfig(agentConfig);
+            // Use the locally stored text here
+            await onUpdateAgentConfig({
+                ...agentConfig,
+                personality: localPersonality
+            });
             setSaveSuccess(true);
             setTimeout(() => setSaveSuccess(false), 2000);
         } catch (error) {
@@ -1090,6 +1129,62 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
         } finally {
             setIsSaving(false);
         }
+    };
+
+    const handleShareToggle = async () => {
+        if (!params.brdgeId) {
+            console.error('No brdgeId in params');
+            return;
+        }
+
+        const token = localStorage.getItem('token');
+        if (!token) {
+            console.error('No authentication token found');
+            return;
+        }
+
+        try {
+            const response = await api.post(
+                `/brdges/${params.brdgeId}/toggle_shareable`,
+                {},
+                {
+                    withCredentials: true,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json'
+                    }
+                }
+            );
+
+            if (response.data && typeof response.data.shareable === 'boolean' && brdge) {
+                // Update brdge state while maintaining all required properties
+                const updatedBrdge: Brdge = {
+                    ...brdge,
+                    id: parseInt(params.brdgeId),
+                    shareable: response.data.shareable,
+                    public_id: brdge.public_id
+                };
+
+                onUpdateBrdge(updatedBrdge);
+
+                // Show feedback to user
+                console.log(response.data.message || `Bridge is now ${response.data.shareable ? 'shareable' : 'not shareable'}`);
+            }
+        } catch (error: any) {
+            console.error('Error toggling share status:', error);
+            if (error.response) {
+                console.error('Error response:', error.response.data);
+            }
+        }
+    };
+
+    const handleCopyLink = () => {
+        if (!brdge?.public_id || !params.brdgeId) return;
+        const shareableUrl = `${window.location.origin}/viewBridge/${params.brdgeId}-${brdge.public_id.substring(0, 6)}`;
+        navigator.clipboard.writeText(shareableUrl);
+        setLinkCopied(true);
+        setTimeout(() => setLinkCopied(false), 2000);
     };
 
     return (
@@ -1174,28 +1269,29 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
             <div className="flex border-b border-gray-800">
                 <button
                     onClick={() => setActiveTab('agent')}
-                    className={`flex-1 px-4 py-3 text-[14px] font-medium relative ${activeTab === 'agent' ? 'text-cyan-400' : 'text-gray-400'
-                        }`}
+                    className={`flex-1 px-4 py-3 text-[14px] font-medium relative ${activeTab === 'agent' ? 'text-cyan-400' : 'text-gray-400'}`}
                 >
                     AI Agent
                     {activeTab === 'agent' && (
-                        <motion.div
-                            layoutId="activeSettingsTab"
-                            className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400"
-                        />
+                        <motion.div layoutId="activeSettingsTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400" />
                     )}
                 </button>
                 <button
                     onClick={() => setActiveTab('voice')}
-                    className={`flex-1 px-4 py-3 text-[14px] font-medium relative ${activeTab === 'voice' ? 'text-cyan-400' : 'text-gray-400'
-                        }`}
+                    className={`flex-1 px-4 py-3 text-[14px] font-medium relative ${activeTab === 'voice' ? 'text-cyan-400' : 'text-gray-400'}`}
                 >
                     Voice Clone
                     {activeTab === 'voice' && (
-                        <motion.div
-                            layoutId="activeSettingsTab"
-                            className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400"
-                        />
+                        <motion.div layoutId="activeSettingsTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400" />
+                    )}
+                </button>
+                <button
+                    onClick={() => setActiveTab('share')}
+                    className={`flex-1 px-4 py-3 text-[14px] font-medium relative ${activeTab === 'share' ? 'text-cyan-400' : 'text-gray-400'}`}
+                >
+                    Share
+                    {activeTab === 'share' && (
+                        <motion.div layoutId="activeSettingsTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400" />
                     )}
                 </button>
             </div>
@@ -1217,15 +1313,51 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                                 <p className="text-[12px] text-gray-400 mb-3">
                                     Describe how you want your AI agent to behave and interact.
                                 </p>
-                                <textarea
-                                    value={agentConfig.personality}
-                                    onChange={(e) => onUpdateAgentConfig({
-                                        ...agentConfig,
-                                        personality: e.target.value
-                                    })}
-                                    placeholder="Example: A friendly and knowledgeable AI assistant that explains concepts clearly and engages in natural conversation..."
-                                    className="w-full h-32 bg-black/20 rounded-lg border border-gray-800 p-3 text-[14px] text-gray-300"
-                                />
+                                <div className="relative">
+                                    <textarea
+                                        value={localPersonality}
+                                        onChange={(e) => setLocalPersonality(e.target.value)}
+                                        onBlur={() => {
+                                            // (Optional) update parent on blur if desired.
+                                        }}
+                                        placeholder="Example: A friendly and knowledgeable AI assistant..."
+                                        className="w-full bg-black/20 rounded-lg border border-gray-800 
+                                                 p-4 text-[14px] leading-relaxed text-gray-300 
+                                                 min-h-[120px] resize-none
+                                                 focus:outline-none focus:ring-1 
+                                                 focus:ring-cyan-500/50 focus:border-cyan-500/30
+                                                 transition-all duration-300"
+                                        rows={4}
+                                        style={{
+                                            caretColor: '#22d3ee'
+                                        }}
+                                    />
+                                </div>
+                            </section>
+
+                            {/* Core Presentation */}
+                            <section>
+                                <h3 className="text-[14px] font-medium text-gray-300 mb-2">Core Presentation</h3>
+                                <div className="relative">
+                                    <div className="flex items-center justify-between bg-[#1E1E1E]/50 backdrop-blur-sm border border-gray-800/50 rounded-lg p-3 transition-all duration-300 hover:border-cyan-500/30">
+                                        <div className="flex items-center gap-2">
+                                            <FileText size={16} className="text-cyan-400" />
+                                            <span className="text-[14px] text-gray-300">
+                                                {brdge?.presentation_filename ||
+                                                    agentConfig.knowledgeBase.find(k => k.type === 'presentation')?.name ||
+                                                    "No presentation file"}
+                                            </span>
+                                        </div>
+                                        {!brdge?.presentation_filename &&
+                                            !agentConfig.knowledgeBase.find(k => k.type === 'presentation')?.name ? (
+                                            <button onClick={onPresentationClick} className="group flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] bg-gradient-to-r from-cyan-500/10 to-transparent text-cyan-400/90 border border-cyan-500/20 transition-all duration-300 hover:border-cyan-500/40 hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]">
+                                                {isUploading ? "Uploading..." : "Upload PDF"}
+                                            </button>
+                                        ) : (
+                                            <span className="text-xs text-gray-400">PDF</span>
+                                        )}
+                                    </div>
+                                </div>
                             </section>
 
                             {/* Knowledge Base */}
@@ -1261,14 +1393,14 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
 
                                 <div className="space-y-4">
                                     {agentConfig.knowledgeBase.map((entry) => (
-                                        <KnowledgeBubble
+                                        <KnowledgeCard
                                             key={entry.id}
                                             entry={entry}
-                                            onEdit={(id, content, name) => {
+                                            onEdit={(id, content, title) => {
                                                 onUpdateAgentConfig({
                                                     ...agentConfig,
                                                     knowledgeBase: agentConfig.knowledgeBase.map(e =>
-                                                        e.id === id ? { ...e, content, ...(name && { name }) } : e
+                                                        e.id === id ? { ...e, content, name: title } : e
                                                     )
                                                 });
                                             }}
@@ -1283,7 +1415,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                                 </div>
                             </section>
                         </motion.div>
-                    ) : (
+                    ) : activeTab === 'voice' ? (
                         <motion.div
                             key="voice"
                             initial={{ opacity: 0, y: 10 }}
@@ -1291,6 +1423,13 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                             exit={{ opacity: 0, y: -10 }}
                             className="space-y-6"
                         >
+                            {/* Explanatory Text for Voice Clone */}
+                            <section>
+                                <p className="text-[12px] text-gray-300 mb-2">
+                                    Create a personalized voice clone to enable a natural text-to-speech experience.
+                                    Please record a short sample of your voice (10–20 seconds) for best results.
+                                </p>
+                            </section>
                             {/* Voice Clone Content */}
                             {isCreatingVoice ? (
                                 <VoiceCreation
@@ -1305,7 +1444,116 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                                 />
                             )}
                         </motion.div>
-                    )}
+                    ) : activeTab === 'share' ? (
+                        <motion.div
+                            key="share"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="space-y-6"
+                        >
+                            <section>
+                                <h3 className="text-[14px] font-medium text-gray-300 mb-2">Bridge Sharing</h3>
+                                <p className="text-[12px] text-gray-400 mb-3">
+                                    Control who can access your bridge. Make it public to share with others.
+                                </p>
+
+                                {/* Sharing Toggle Section */}
+                                <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
+                                    <div className="flex items-center gap-3">
+                                        {brdge?.shareable ? (
+                                            <Globe size={18} className="text-cyan-400" />
+                                        ) : (
+                                            <Lock size={18} className="text-gray-400" />
+                                        )}
+                                        <div>
+                                            <span className="text-[13px] font-medium text-gray-300">
+                                                {brdge?.shareable ? 'Public Access' : 'Private Access'}
+                                            </span>
+                                            <p className="text-[11px] text-gray-400">
+                                                {brdge?.shareable
+                                                    ? 'Anyone with the link can view this bridge'
+                                                    : 'Only you can view this bridge'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="relative">
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                className="sr-only peer"
+                                                checked={brdge?.shareable || false}
+                                                onChange={handleShareToggle}
+                                            />
+                                            <div className="w-11 h-6 
+                                                bg-gray-700/50 
+                                                peer-focus:outline-none 
+                                                peer-focus:ring-2 
+                                                peer-focus:ring-cyan-400/20 
+                                                rounded-full 
+                                                peer 
+                                                peer-checked:after:translate-x-full 
+                                                peer-checked:bg-cyan-400/20
+                                                after:content-[''] 
+                                                after:absolute 
+                                                after:top-[2px] 
+                                                after:left-[2px] 
+                                                after:bg-gray-400 
+                                                after:peer-checked:bg-cyan-400 
+                                                after:rounded-full 
+                                                after:h-5 
+                                                after:w-5 
+                                                after:transition-all"
+                                            />
+                                        </label>
+                                    </div>
+                                </div>
+                            </section>
+
+                            {/* Shareable Link Section */}
+                            <section>
+                                <h3 className="text-[14px] font-medium text-gray-300 mb-2">Shareable Link</h3>
+                                <div className="relative">
+                                    <div className="flex items-center gap-2 bg-black/20 rounded-lg border border-gray-800 p-3">
+                                        <div className="flex-1 overflow-hidden">
+                                            <p className="text-[12px] text-gray-300 truncate">
+                                                {brdge?.shareable && brdge.public_id
+                                                    ? `${window.location.origin}/viewBridge/${params.brdgeId}-${brdge.public_id.substring(0, 6)}`
+                                                    : "Bridge is private"}
+                                            </p>
+                                        </div>
+                                        {brdge?.shareable && brdge.public_id && (
+                                            <button
+                                                onClick={handleCopyLink}
+                                                className={`
+                                                    flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] 
+                                                    transition-all duration-300
+                                                    ${linkCopied
+                                                        ? 'bg-green-500/20 text-green-400 border-green-500/30'
+                                                        : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
+                                                    }
+                                                    border hover:border-cyan-500/40 
+                                                    hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]
+                                                `}
+                                            >
+                                                {linkCopied ? (
+                                                    <>
+                                                        <Check size={12} />
+                                                        <span>Copied!</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Copy size={12} />
+                                                        <span>Copy Link</span>
+                                                    </>
+                                                )}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </section>
+                        </motion.div>
+                    ) : null}
                 </AnimatePresence>
             </div>
         </motion.div>
@@ -1384,6 +1632,12 @@ const VoiceCreation: React.FC<{
                 </button>
             </div>
 
+            {/* Sample text to read */}
+            <div className="px-3 py-2 bg-black/20 border border-gray-800/50 rounded-lg text-[11px] text-gray-300">
+                "In just a few quick steps, my voice-based AI assistant will be integrated into my content.
+                This way you can speak to others without being there… how cool is that?"
+            </div>
+
             <div className="space-y-4">
                 <input
                     type="text"
@@ -1395,16 +1649,9 @@ const VoiceCreation: React.FC<{
 
                 <button
                     onClick={isRecording ? stopRecording : startRecording}
-                    className={`
-                        w-full py-3 rounded-lg text-[14px] font-medium
-                        flex items-center justify-center gap-2
-                        ${isRecording ? 'bg-red-500/20 text-red-400' : 'bg-cyan-500/20 text-cyan-400'}
-                    `}
+                    className="w-full py-3 rounded-lg text-[14px] font-medium flex items-center justify-center gap-2 bg-cyan-500/20 text-cyan-400"
                 >
-                    <span className={`
-                        w-2 h-2 rounded-full 
-                        ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-cyan-500'}
-                    `} />
+                    <span className="w-2 h-2 rounded-full bg-cyan-500" />
                     {isRecording ? (
                         <>Recording... {formatTime(recordingTime)}</>
                     ) : (
@@ -1422,11 +1669,7 @@ const VoiceCreation: React.FC<{
                         <button
                             onClick={() => onVoiceCreate(voiceName, currentRecording)}
                             disabled={!voiceName}
-                            className={`
-                                w-full py-3 rounded-lg text-[14px] font-medium
-                                bg-cyan-500/20 text-cyan-400
-                                disabled:opacity-50 disabled:cursor-not-allowed
-                            `}
+                            className="w-full py-3 rounded-lg text-[14px] font-medium bg-cyan-500/20 text-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             Create Voice Clone
                         </button>
@@ -1507,7 +1750,8 @@ export default function MobilePlayground({
     logo,
     themeColors,
     onConnect,
-    agentType
+    agentType,
+    params = { brdgeId: null }
 }: PlaygroundProps) {
     // Add viewport meta handling
     useEffect(() => {
@@ -1555,29 +1799,28 @@ export default function MobilePlayground({
     const [savedVoices, setSavedVoices] = useState<SavedVoice[]>([]);
     const [showRotateIndicator, setShowRotateIndicator] = useState(false);
 
-    // URL and connection params
-    const [params, setParams] = useState({
-        brdgeId: null as string | null,
-        apiBaseUrl: null as string | null,
+    // Update connectionParams state with proper type
+    const [connectionParams, setConnectionParams] = useState<ConnectionParams>({
+        brdgeId: params.brdgeId,
+        apiBaseUrl: API_BASE_URL || 'http://localhost:5000/api',
         coreApiUrl: API_BASE_URL,
-        userId: null as string | null,
-        agentType: 'edit' as 'edit' | 'view'
+        agentType: agentType || 'edit'
     });
 
     // Video URL state
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
     const fetchVideoUrl = useCallback(async () => {
-        if (!params.brdgeId || !params.apiBaseUrl) return;
+        if (!connectionParams.brdgeId || !connectionParams.apiBaseUrl) return;
         try {
-            const response = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/recordings/latest/signed-url`);
+            const response = await fetch(`${connectionParams.apiBaseUrl}/brdges/${connectionParams.brdgeId}/recordings/latest/signed-url`);
             if (!response.ok) throw new Error('Failed to fetch video URL');
             const { url } = await response.json();
             setVideoUrl(url);
         } catch (error) {
             console.error('Error fetching video URL:', error);
         }
-    }, [params.brdgeId, params.apiBaseUrl]);
+    }, [connectionParams.brdgeId, connectionParams.apiBaseUrl]);
 
     useEffect(() => {
         fetchVideoUrl();
@@ -1586,9 +1829,9 @@ export default function MobilePlayground({
     // Load saved voices on mount
     useEffect(() => {
         const loadVoices = async () => {
-            if (!params.brdgeId) return;
+            if (!connectionParams.brdgeId) return;
             try {
-                const response = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/voices`);
+                const response = await fetch(`${connectionParams.apiBaseUrl}/brdges/${connectionParams.brdgeId}/voices`);
                 if (!response.ok) throw new Error('Failed to fetch voices');
                 const data = await response.json();
                 if (data.voices) {
@@ -1602,7 +1845,7 @@ export default function MobilePlayground({
             }
         };
         loadVoices();
-    }, [params.brdgeId, params.apiBaseUrl, selectedVoice]);
+    }, [connectionParams.brdgeId, connectionParams.apiBaseUrl, selectedVoice]);
 
     // LiveKit related hooks
     const { localParticipant } = useLocalParticipant();
@@ -1611,23 +1854,58 @@ export default function MobilePlayground({
     const [transcripts, setTranscripts] = useState<ChatMessageType[]>([]);
     const chat = useChat();
 
-    // Get URL params on mount
+    // Move the room connection effect inside the component
+    useEffect(() => {
+        const connectToRoom = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    console.error('No authentication token found');
+                    return;
+                }
+
+                // Use the api instance from @/api
+                const response = await api.get(`/brdges/${params.brdgeId}`);
+                if (response.data) {
+                    setBrdge(response.data);
+                }
+            } catch (error) {
+                console.error('Error connecting to room:', error);
+            }
+        };
+
+        if (params.brdgeId) {
+            connectToRoom();
+        }
+    }, [params.brdgeId]);
+
+    // Update URL params effect
     useEffect(() => {
         if (typeof window !== 'undefined') {
             const urlParams = new URLSearchParams(window.location.search);
-            const token = urlParams.get('token');
-            const newParams = {
-                brdgeId: urlParams.get('brdgeId'),
-                apiBaseUrl: urlParams.get('apiBaseUrl'),
-                coreApiUrl: API_BASE_URL,
+            const tokenParam = urlParams.get('token');
+            const storedToken = localStorage.getItem('token');
+            const token = tokenParam || storedToken || undefined;
+            const apiBaseUrl = urlParams.get('apiBaseUrl') || API_BASE_URL;
+
+            // Store token in localStorage if present
+            if (tokenParam) {
+                localStorage.setItem('token', tokenParam);
+            }
+
+            setConnectionParams(prev => ({
+                ...prev,
+                brdgeId: params.brdgeId || urlParams.get('brdgeId'),
+                apiBaseUrl,
+                coreApiUrl: apiBaseUrl,
+                token,
                 userId: token ?
                     jwtDecode<JWTPayload>(token).sub :
                     `anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                 agentType: (urlParams.get('agentType') as 'edit' | 'view') || 'edit'
-            };
-            setParams(newParams);
+            }));
         }
-    }, []);
+    }, [params.brdgeId]); // Add params.brdgeId to dependencies
 
     // Handle chat messages
     const handleChatMessage = useCallback(async (message: string) => {
@@ -1650,10 +1928,10 @@ export default function MobilePlayground({
     const [isLoadingTranscript, setIsLoadingTranscript] = useState(false);
 
     const fetchTranscript = useCallback(async () => {
-        if (!params.brdgeId || !params.apiBaseUrl) return;
+        if (!connectionParams.brdgeId || !connectionParams.apiBaseUrl) return;
         setIsLoadingTranscript(true);
         try {
-            const response = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/script`);
+            const response = await fetch(`${connectionParams.apiBaseUrl}/brdges/${connectionParams.brdgeId}/script`);
             if (!response.ok) throw new Error('Failed to fetch transcript');
             const data = await response.json();
             setTranscript(data);
@@ -1662,7 +1940,7 @@ export default function MobilePlayground({
         } finally {
             setIsLoadingTranscript(false);
         }
-    }, [params.brdgeId, params.apiBaseUrl]);
+    }, [connectionParams.brdgeId, connectionParams.apiBaseUrl]);
 
     useEffect(() => {
         fetchTranscript();
@@ -1682,9 +1960,9 @@ export default function MobilePlayground({
 
     useEffect(() => {
         const fetchAgentConfig = async () => {
-            if (!params.brdgeId || !params.apiBaseUrl) return;
+            if (!connectionParams.brdgeId || !connectionParams.apiBaseUrl) return;
             try {
-                const response = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/agent-config`);
+                const response = await fetch(`${connectionParams.apiBaseUrl}/brdges/${connectionParams.brdgeId}/agent-config`);
                 if (!response.ok) throw new Error('Failed to fetch agent config');
                 const data = await response.json();
                 setAgentConfig(data);
@@ -1693,12 +1971,12 @@ export default function MobilePlayground({
             }
         };
         fetchAgentConfig();
-    }, [params.brdgeId, params.apiBaseUrl]);
+    }, [connectionParams.brdgeId, connectionParams.apiBaseUrl]);
 
     const updateAgentConfig = async (newConfig: AgentConfig) => {
         try {
             const response = await fetch(
-                `${params.apiBaseUrl}/brdges/${params.brdgeId}/agent-config`,
+                `${connectionParams.apiBaseUrl}/brdges/${connectionParams.brdgeId}/agent-config`,
                 {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
@@ -1718,11 +1996,11 @@ export default function MobilePlayground({
     const [voiceCloneProgress, setVoiceCloneProgress] = useState(0);
 
     const cloneVoice = async (name: string) => {
-        if (!params.brdgeId || !params.apiBaseUrl) return;
+        if (!connectionParams.brdgeId || !connectionParams.apiBaseUrl) return;
         try {
             setIsVoiceCloning(true);
             const response = await fetch(
-                `${params.apiBaseUrl}/brdges/${params.brdgeId}/voices/clone`,
+                `${connectionParams.apiBaseUrl}/brdges/${connectionParams.brdgeId}/voices/clone`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1730,7 +2008,7 @@ export default function MobilePlayground({
                 }
             );
             if (!response.ok) throw new Error('Failed to clone voice');
-            const voicesResponse = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/voices`);
+            const voicesResponse = await fetch(`${connectionParams.apiBaseUrl}/brdges/${connectionParams.brdgeId}/voices`);
             if (voicesResponse.ok) {
                 const data = await voicesResponse.json();
                 setSavedVoices(data.voices);
@@ -1749,30 +2027,49 @@ export default function MobilePlayground({
 
     useEffect(() => {
         const fetchBrdge = async () => {
-            if (!params.brdgeId || !params.apiBaseUrl) return;
+            if (!params.brdgeId) {
+                console.error('No brdgeId in params');
+                return;
+            }
+
             setIsLoadingBrdge(true);
             try {
-                const url = `${params.apiBaseUrl}/brdges/${params.brdgeId}`;
-                const response = await fetch(url);
-                if (!response.ok) throw new Error('Failed to fetch brdge');
-                const data = await response.json();
-                setBrdge(data);
-                setAgentConfig(prev => ({
-                    ...prev,
-                    personality: data.agent_personality || "friendly ai assistant"
-                }));
+                const response = await api.get(`/brdges/${params.brdgeId}`, {
+                    withCredentials: true,
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (response.data) {
+                    setBrdge(response.data);
+                    // Update connectionParams with the correct brdgeId
+                    setConnectionParams(prev => ({
+                        ...prev,
+                        brdgeId: params.brdgeId
+                    }));
+
+                    // Also update agent config if available
+                    if (response.data.agent_personality) {
+                        setAgentConfig(prev => ({
+                            ...prev,
+                            personality: response.data.agent_personality
+                        }));
+                    }
+                }
             } catch (error) {
                 console.error('Error fetching brdge:', error);
             } finally {
                 setIsLoadingBrdge(false);
             }
         };
+
         fetchBrdge();
-    }, [params.brdgeId, params.apiBaseUrl]);
+    }, [params.brdgeId]);
 
     useEffect(() => {
-        console.log('Current params:', params);
-    }, [params]);
+        console.log('Current connection params:', connectionParams);
+    }, []);
 
     // Handlers for knowledge base editing and removal
     const handleKnowledgeEdit = useCallback((id: string, content: string, name?: string) => {
@@ -1802,13 +2099,13 @@ export default function MobilePlayground({
     }, [agentConfig, updateAgentConfig]);
 
     // Tab state
-    const [activeTab, setActiveTab] = useState<ConfigTab>(params.agentType === 'view' ? 'chat' : 'ai-agent');
+    const [activeTab, setActiveTab] = useState<ConfigTab>(connectionParams.agentType === 'view' ? 'chat' : 'ai-agent');
 
     useEffect(() => {
-        if (params.agentType === 'view') {
+        if (connectionParams.agentType === 'view') {
             setActiveTab('chat');
         }
-    }, [params.agentType]);
+    }, [connectionParams.agentType]);
 
     // Recording and voice cloning refs and states
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -1868,14 +2165,14 @@ export default function MobilePlayground({
     };
 
     const handleCloneVoice = async () => {
-        if (!currentRecording || !voiceName || !params.brdgeId) return;
+        if (!currentRecording || !voiceName || !connectionParams.brdgeId) return;
         setIsCloning(true);
         try {
             const formData = new FormData();
             formData.append('audio', currentRecording);
             formData.append('name', voiceName);
-            const response = await api.post(`/brdges/${params.brdgeId}/voice/clone`, formData);
-            const voicesResponse = await api.get(`/brdges/${params.brdgeId}/voices`);
+            const response = await api.post(`/brdges/${connectionParams.brdgeId}/voice/clone`, formData);
+            const voicesResponse = await api.get(`/brdges/${connectionParams.brdgeId}/voices`);
             if (voicesResponse.data?.voices) {
                 setSavedVoices(voicesResponse.data.voices);
                 if (response.data?.voice?.id) {
@@ -1898,7 +2195,7 @@ export default function MobilePlayground({
             // If there's only one voice, make it active
             const voice = savedVoices[0];
             if (voice.status !== 'active') {
-                api.post(`/brdges/${params.brdgeId}/voices/${voice.id}/activate`)
+                api.post(`/brdges/${connectionParams.brdgeId}/voices/${voice.id}/activate`)
                     .then(() => {
                         setSavedVoices([{ ...voice, status: 'active' }]);
                     })
@@ -1910,7 +2207,7 @@ export default function MobilePlayground({
                 return new Date(current.created_at) > new Date(prev.created_at) ? current : prev;
             }, savedVoices[0]);
 
-            api.post(`/brdges/${params.brdgeId}/voices/${mostRecent.id}/activate`)
+            api.post(`/brdges/${connectionParams.brdgeId}/voices/${mostRecent.id}/activate`)
                 .then(() => {
                     setSavedVoices(prev => prev.map(v => ({
                         ...v,
@@ -1919,7 +2216,7 @@ export default function MobilePlayground({
                 })
                 .catch(error => console.error('Error activating most recent voice:', error));
         }
-    }, [savedVoices, params.brdgeId]);
+    }, [savedVoices, connectionParams.brdgeId]);
 
     const tabs = [
         { id: 'chat', label: 'Chat' }
@@ -2017,7 +2314,7 @@ export default function MobilePlayground({
     const [isUploading, setIsUploading] = useState(false);
 
     const handlePresentationUpload = async (file: File) => {
-        if (!params.brdgeId) return;
+        if (!connectionParams.brdgeId) return;
         try {
             setIsUploading(true);
             if (file.size > 20 * 1024 * 1024) {
@@ -2026,7 +2323,7 @@ export default function MobilePlayground({
             }
             const formData = new FormData();
             formData.append('presentation', file);
-            const response = await api.post(`/brdges/${params.brdgeId}/presentation`, formData);
+            const response = await api.post(`/brdges/${connectionParams.brdgeId}/presentation`, formData);
             setBrdge(prev => {
                 if (!prev) return null;
                 return {
@@ -2051,11 +2348,11 @@ export default function MobilePlayground({
     };
 
     useEffect(() => {
-        const canAutoConnect = params.userId && params.brdgeId;
+        const canAutoConnect = connectionParams.userId && connectionParams.brdgeId;
         if (canAutoConnect && roomState === ConnectionState.Disconnected) {
             onConnect(true);
         }
-    }, [params, roomState, onConnect]);
+    }, [connectionParams, roomState, onConnect]);
 
     useEffect(() => {
         if (roomState === ConnectionState.Connected && localParticipant) {
@@ -2130,7 +2427,7 @@ export default function MobilePlayground({
                 </div>
 
                 {/* Settings button */}
-                {params.agentType === 'edit' && (
+                {connectionParams.agentType === 'edit' && (
                     <button
                         onClick={() => setIsSettingsOpen(true)}
                         className="p-2 rounded-lg bg-black/40 text-gray-400 hover:text-cyan-400"
@@ -2144,12 +2441,12 @@ export default function MobilePlayground({
 
     // Memoize the handlers to prevent unnecessary re-renders
     const handleVoiceCreate = useCallback(async (name: string, recording: Blob) => {
-        if (!params.brdgeId) return;
+        if (!connectionParams.brdgeId) return;
         try {
             const formData = new FormData();
             formData.append('audio', recording);
             formData.append('name', name);
-            const response = await api.post(`/brdges/${params.brdgeId}/voice/clone`, formData);
+            const response = await api.post(`/brdges/${connectionParams.brdgeId}/voice/clone`, formData);
             if (response.data?.voice?.id) {
                 setSavedVoices(prev => [...prev, response.data.voice]);
                 setIsCreatingVoice(false);
@@ -2157,12 +2454,12 @@ export default function MobilePlayground({
         } catch (error) {
             console.error('Error cloning voice:', error);
         }
-    }, [params.brdgeId]);
+    }, [connectionParams.brdgeId]);
 
     const handleUpdateAgentConfig = useCallback(async (newConfig: AgentConfig) => {
         try {
             const response = await fetch(
-                `${params.apiBaseUrl}/brdges/${params.brdgeId}/agent-config`,
+                `${connectionParams.apiBaseUrl}/brdges/${connectionParams.brdgeId}/agent-config`,
                 {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
@@ -2175,7 +2472,7 @@ export default function MobilePlayground({
         } catch (error) {
             console.error('Error updating agent config:', error);
         }
-    }, [params.apiBaseUrl, params.brdgeId]);
+    }, [connectionParams.apiBaseUrl, connectionParams.brdgeId]);
 
     // ----------------------------------------------------------------------------
     // Mobile layout rendering: if in portrait, video on top, chat below; if in landscape, show video enlarged with a toggleable side panel.
@@ -2464,7 +2761,7 @@ export default function MobilePlayground({
                                         </div>
 
                                         {/* Settings button */}
-                                        {params.agentType === 'edit' && (
+                                        {connectionParams.agentType === 'edit' && (
                                             <button
                                                 onClick={() => setIsSettingsOpen(true)}
                                                 className="p-2 rounded-lg bg-black/40 text-gray-400 hover:text-cyan-400"
@@ -2537,7 +2834,7 @@ export default function MobilePlayground({
                     </div>
 
                     {/* Settings Drawer */}
-                    {params.agentType === 'edit' && (
+                    {connectionParams.agentType === 'edit' && (
                         <SettingsDrawer
                             isOpen={isSettingsOpen}
                             onClose={() => setIsSettingsOpen(false)}
@@ -2547,7 +2844,11 @@ export default function MobilePlayground({
                             onVoiceCreate={handleVoiceCreate}
                             isCreatingVoice={isCreatingVoice}
                             setIsCreatingVoice={setIsCreatingVoice}
-                            params={params}
+                            params={connectionParams}
+                            brdge={brdge}
+                            onUpdateBrdge={setBrdge}
+                            isUploading={isUploading}
+                            onPresentationClick={() => fileInputRef.current?.click()}
                         />
                     )}
                 </div>
@@ -2555,3 +2856,167 @@ export default function MobilePlayground({
         </div>
     );
 }
+
+// ----------------------------------------------------------------------------
+// Knowledge Entry Component
+// ----------------------------------------------------------------------------
+interface KnowledgeEntryProps {
+    content: string;
+    onUpdate: (content: string, title?: string) => void;
+    placeholder?: string;
+}
+
+// Update the KnowledgeEntry component with proper typing
+const KnowledgeEntry: React.FC<KnowledgeEntryProps> = ({
+    content,
+    onUpdate,
+    placeholder = 'First line becomes the title...\nAdd your knowledge here...'
+}) => {
+    const editor = useEditor({
+        extensions: [
+            StarterKit,
+            Placeholder.configure({
+                placeholder,
+                showOnlyWhenEditable: true,
+            })
+        ],
+        content,
+        onUpdate: ({ editor }) => {
+            const content = editor.getHTML();
+            const div = document.createElement('div');
+            div.innerHTML = content;
+            const firstLine = div.textContent?.split('\n')[0] || 'New Entry';
+            const title = firstLine.slice(0, 50);
+            onUpdate(content, title);
+        },
+        editorProps: {
+            attributes: {
+                class: `prose prose-invert max-w-none focus:outline-none
+                        prose-p:text-gray-300 prose-p:text-[14px] prose-p:leading-relaxed
+                        prose-headings:text-cyan-400
+                        min-h-[120px]
+                        selection:bg-cyan-500/20 selection:text-cyan-400`
+            }
+        }
+    });
+
+    return (
+        <div className="relative rounded-lg overflow-hidden">
+            <EditorContent
+                editor={editor}
+                className="bg-black/20 
+                           border border-gray-800/50 rounded-lg
+                           focus-within:border-cyan-500/30
+                           focus-within:ring-1 focus-within:ring-cyan-500/50
+                           focus-within:shadow-[0_0_15px_rgba(34,211,238,0.1)]
+                           transition-all duration-300"
+            />
+            <div className="absolute bottom-3 right-3 text-[11px] text-gray-500">
+                Click to edit
+            </div>
+        </div>
+    );
+};
+
+// ----------------------------------------------------------------------------
+// Knowledge Card Component
+// ----------------------------------------------------------------------------
+interface KnowledgeCardProps {
+    entry: AgentConfig['knowledgeBase'][0];
+    onEdit: (id: string, content: string, title: string) => void;
+    onRemove: (id: string) => void;
+}
+
+const KnowledgeCard: React.FC<KnowledgeCardProps> = ({
+    entry,
+    onEdit,
+    onRemove
+}) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const [showActions, setShowActions] = useState(false);
+
+    // NEW: Local state for the card's content to avoid re-renders on every keystroke
+    const [localContent, setLocalContent] = useState(entry.content);
+    useEffect(() => {
+        setLocalContent(entry.content);
+    }, [entry.content]);
+
+    const handleClick = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsExpanded(!isExpanded);
+    };
+
+    return (
+        <div className="relative overflow-hidden rounded-lg">
+            <div
+                className="relative bg-[#1E1E1E]/50 backdrop-blur-sm border border-gray-800/50 rounded-lg transition-colors duration-300 hover:border-cyan-500/30 shadow-lg shadow-black/10"
+                style={{ transform: `translateX(${showActions ? '-80px' : '0'})` }}
+            >
+                {/* Header */}
+                <div className="p-4 border-b border-gray-800/50">
+                    <button
+                        onClick={handleClick}
+                        className="w-full flex items-center justify-between group"
+                    >
+                        <div className="flex items-center gap-2">
+                            <div className={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${isExpanded ? 'bg-cyan-400' : 'bg-gray-600'} group-hover:bg-cyan-400`} />
+                            <span className="text-[14px] font-medium text-gray-300 group-hover:text-cyan-400 transition-colors duration-300 truncate pr-2">
+                                {entry.name || 'New Entry'}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-gray-500">
+                            <div
+                                style={{
+                                    transform: `rotate(${isExpanded ? '180deg' : '0'})`,
+                                    transition: 'transform 0.2s ease'
+                                }}
+                            >
+                                <ChevronDown size={16} className="group-hover:text-cyan-400 transition-colors duration-300" />
+                            </div>
+                        </div>
+                    </button>
+                </div>
+
+                {/* Content */}
+                {isExpanded && (
+                    <div className="p-4 pt-3">
+                        <textarea
+                            value={localContent}
+                            onChange={(e) => setLocalContent(e.target.value)}
+                            onBlur={() => {
+                                const rawTitle = localContent.split("\n")[0]?.trim() || "New Entry";
+                                // Limit the title to 20 characters maximum
+                                const computedTitle = rawTitle.length > 20 ? rawTitle.slice(0, 20) + "…" : rawTitle;
+                                onEdit(entry.id, localContent, computedTitle);
+                            }}
+                            className="w-full bg-black/20 rounded-lg border border-gray-800 
+                                     p-4 text-[14px] leading-relaxed text-gray-300 
+                                     min-h-[120px] resize-none
+                                     focus:outline-none focus:ring-1 
+                                     focus:ring-cyan-500/50 focus:border-cyan-500/30
+                                     transition-all duration-300"
+                            placeholder="Add your knowledge here..."
+                            rows={6}
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </div>
+                )}
+            </div>
+
+            {/* Improved delete button with larger touch target and label */}
+            <div className="absolute top-2 right-2">
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onRemove(entry.id);
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 bg-red-500/20 text-red-400 rounded-full hover:bg-red-500/30 active:bg-red-500/40 transition-colors duration-300"
+                >
+                    <X size={16} />
+                    <span className="text-sm font-medium">Delete</span>
+                </button>
+            </div>
+        </div>
+    );
+};

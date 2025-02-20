@@ -50,18 +50,22 @@ export function HomeInner() {
   const { toastMessage, setToastMessage } = useToast();
   const [brdgeId, setBrdgeId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [urlParams, setUrlParams] = useState<{ brdgeId: string | null }>({ brdgeId: null });
 
   // Get URL params including brdgeId and detect mobile devices
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const urlParams = new URLSearchParams(window.location.search);
-      setBrdgeId(urlParams.get('brdgeId'));
+      const searchParams = new URLSearchParams(window.location.search);
+      const brdgeIdParam = searchParams.get('brdgeId');
+
+      setUrlParams({ brdgeId: brdgeIdParam });
+      setBrdgeId(brdgeIdParam);
 
       // Function to check if device is mobile
       const checkMobile = () => {
         const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         const isSmallScreen = window.innerWidth <= 768;
-        setIsMobile(isMobileDevice || isSmallScreen || urlParams.get('mobile') === '1');
+        setIsMobile(isMobileDevice || isSmallScreen || searchParams.get('mobile') === '1');
       };
 
       // Initial check
@@ -199,6 +203,7 @@ export function HomeInner() {
           >
             <PlaygroundComponent
               themeColors={themeColors}
+              params={urlParams}
               onConnect={(c) => {
                 const m = process.env.NEXT_PUBLIC_LIVEKIT_URL ? "env" : mode;
                 handleConnect(c, m);
