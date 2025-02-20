@@ -59,6 +59,7 @@ export interface PlaygroundProps {
     agentType?: 'edit' | 'view';
     params: {
         brdgeId: string | null;
+        token?: string;  // Add this line
     };
 }
 
@@ -1137,28 +1138,19 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
             return;
         }
 
-        const token = localStorage.getItem('token');
-        if (!token) {
-            console.error('No authentication token found');
-            return;
-        }
-
         try {
             const response = await api.post(
                 `/brdges/${params.brdgeId}/toggle_shareable`,
-                {},
+                {}, // Empty body
                 {
-                    withCredentials: true,
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`,
-                        'Accept': 'application/json'
+                        'Content-Type': 'application/json'
                     }
                 }
             );
 
             if (response.data && typeof response.data.shareable === 'boolean' && brdge) {
-                // Update brdge state while maintaining all required properties
+                // Update brdge state
                 const updatedBrdge: Brdge = {
                     ...brdge,
                     id: parseInt(params.brdgeId),
@@ -1167,15 +1159,9 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                 };
 
                 onUpdateBrdge(updatedBrdge);
-
-                // Show feedback to user
-                console.log(response.data.message || `Bridge is now ${response.data.shareable ? 'shareable' : 'not shareable'}`);
             }
         } catch (error: any) {
             console.error('Error toggling share status:', error);
-            if (error.response) {
-                console.error('Error response:', error.response.data);
-            }
         }
     };
 
@@ -1751,7 +1737,7 @@ export default function MobilePlayground({
     themeColors,
     onConnect,
     agentType,
-    params = { brdgeId: null }
+    params = { brdgeId: null, token: undefined }
 }: PlaygroundProps) {
     // Add viewport meta handling
     useEffect(() => {
@@ -1804,7 +1790,8 @@ export default function MobilePlayground({
         brdgeId: params.brdgeId,
         apiBaseUrl: API_BASE_URL || 'http://localhost:5000/api',
         coreApiUrl: API_BASE_URL,
-        agentType: agentType || 'edit'
+        agentType: agentType || 'edit',
+        token: params.token  // Add this line
     });
 
     // Video URL state
@@ -1858,14 +1845,19 @@ export default function MobilePlayground({
     useEffect(() => {
         const connectToRoom = async () => {
             try {
-                const token = localStorage.getItem('token');
+                const token = params.token || localStorage.getItem('token');
                 if (!token) {
                     console.error('No authentication token found');
                     return;
                 }
 
-                // Use the api instance from @/api
-                const response = await api.get(`/brdges/${params.brdgeId}`);
+                // Use the api instance from @/api with the token
+                const response = await api.get(`/brdges/${params.brdgeId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
                 if (response.data) {
                     setBrdge(response.data);
                 }
@@ -1877,13 +1869,13 @@ export default function MobilePlayground({
         if (params.brdgeId) {
             connectToRoom();
         }
-    }, [params.brdgeId]);
+    }, [params.brdgeId, params.token]); // Add params.token to dependencies
 
     // Update URL params effect
     useEffect(() => {
         if (typeof window !== 'undefined') {
             const urlParams = new URLSearchParams(window.location.search);
-            const tokenParam = urlParams.get('token');
+            const tokenParam = params.token || urlParams.get('token');
             const storedToken = localStorage.getItem('token');
             const token = tokenParam || storedToken || undefined;
             const apiBaseUrl = urlParams.get('apiBaseUrl') || API_BASE_URL;
@@ -1905,7 +1897,7 @@ export default function MobilePlayground({
                 agentType: (urlParams.get('agentType') as 'edit' | 'view') || 'edit'
             }));
         }
-    }, [params.brdgeId]); // Add params.brdgeId to dependencies
+    }, [params.brdgeId, params.token]); // Add params.token to dependencies
 
     // Handle chat messages
     const handleChatMessage = useCallback(async (message: string) => {

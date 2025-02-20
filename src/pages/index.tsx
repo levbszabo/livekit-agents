@@ -203,7 +203,10 @@ export function HomeInner() {
           >
             <PlaygroundComponent
               themeColors={themeColors}
-              params={urlParams}
+              params={{
+                brdgeId: brdgeId,
+                token: token
+              }}
               onConnect={(c) => {
                 const m = process.env.NEXT_PUBLIC_LIVEKIT_URL ? "env" : mode;
                 handleConnect(c, m);
