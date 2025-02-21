@@ -1631,8 +1631,8 @@ const VoiceCreation: React.FC<{
 
             {/* Sample text to read */}
             <div className="px-3 py-2 bg-black/20 border border-gray-800/50 rounded-lg text-[11px] text-gray-300">
-                "In just a few quick steps, my voice-based AI assistant will be integrated into my content.
-                This way you can speak to others without being there… how cool is that?"
+                &quot;In just a few quick steps, my voice-based AI assistant will be integrated into my content.
+                This way you can speak to others without being there… how cool is that?&quot;
             </div>
 
             <div className="space-y-4">

@@ -1560,47 +1560,47 @@ export default function Playground({
 
   // Update the handlePresentationUpload function
   const handlePresentationUpload = async (file: File) => {
-    if (!params.brdgeId) return;
+    if (!params.brdgeId || !params.apiBaseUrl) return;
 
+    setIsUploading(true);
     try {
-      setIsUploading(true);
-      // Validate file size (20MB limit)
-      if (file.size > 20 * 1024 * 1024) {
-        console.error('File size exceeds 20MB limit');
-        return;
-      }
-
+      // Create FormData
       const formData = new FormData();
-      formData.append('presentation', file);
+      formData.append('file', file);
 
-      const response = await api.post(
-        `/brdges/${params.brdgeId}/presentation`,
-        formData
-      );
-
-      // Update both brdge and agentConfig states
-      setBrdge(prev => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          presentation_filename: response.data.presentation_filename
-        };
+      // Upload the file
+      const response = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/upload/presentation`, {
+        method: 'POST',
+        body: formData
       });
 
-      // Update agentConfig knowledgeBase
+      if (!response.ok) throw new Error('Failed to upload file');
+
+      const data = await response.json();
+
+      // Update the brdge state with the new filename
+      setBrdge(prev => prev ? {
+        ...prev,
+        presentation_filename: data.filename || file.name
+      } : null);
+
+      // Update agent config if needed
       setAgentConfig(prev => ({
         ...prev,
-        knowledgeBase: prev.knowledgeBase.map(entry =>
-          entry.type === 'presentation'
-            ? { ...entry, name: response.data.presentation_filename }
-            : entry
-        )
+        knowledgeBase: [
+          ...prev.knowledgeBase.filter(k => k.type !== 'presentation'),
+          {
+            id: `presentation_${Date.now()}`,
+            type: 'presentation',
+            name: file.name,
+            content: ''
+          }
+        ]
       }));
 
-      console.log('Presentation uploaded successfully:', response.data.presentation_filename);
-
-    } catch (error: any) {
-      console.error('Error uploading presentation:', error?.response?.data || error);
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      // You might want to show an error message to the user here
     } finally {
       setIsUploading(false);
     }
@@ -1658,7 +1658,7 @@ export default function Playground({
             {isPlaying ? <Pause size={16} /> : <Play size={16} />}
           </button>
 
-          <div className="flex-1 text-[10px] text-white/60 font-medium">
+          <div className="flex-1 text-[11px] text-white/60 font-medium">
             {formatTime(currentTime)} / {formatTime(videoRef.current?.duration || 0)}
           </div>
 
@@ -2275,12 +2275,18 @@ export default function Playground({
                                     ...prev,
                                     personality: newPersonality
                                   }));
+
+                                  // Debounce the save
+                                  debouncedUpdateConfig({
+                                    ...agentConfig,
+                                    personality: newPersonality
+                                  });
                                 }}
                                 onKeyDown={(e) => {
                                   // Handle special key combinations
                                   if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
-                                    // Allow CMD/CTRL + A to select all
-                                    e.target.select();
+                                    // Type assertion to HTMLTextAreaElement to access select()
+                                    (e.target as HTMLTextAreaElement).select();
                                   }
                                 }}
                                 placeholder="Describe how you want the AI agent to behave and interact..."
@@ -2299,34 +2305,20 @@ export default function Playground({
                               />
                             </div>
                           </section>
-
-                          {/* First, add this section right before the Knowledge Base section: */}
+                          {/* Document Knowledge Section */}
                           <section className={styles.section.wrapper}>
                             <h2 className={styles.section.title}>Document Knowledge</h2>
                             <motion.div
                               layout
-                              className="
-                                relative group
-                                bg-[#1E1E1E]/50 backdrop-blur-sm
-                                border border-gray-800/50 rounded-lg p-3
-                                transition-all duration-300
-                                hover:border-cyan-500/30
-                                hover:shadow-[0_0_20px_rgba(34,211,238,0.07)]
-                              "
+                              className="relative group bg-[#1E1E1E]/50 backdrop-blur-sm border border-gray-800/50 rounded-lg p-3 transition-all duration-300 hover:border-cyan-500/30 hover:shadow-[0_0_20px_rgba(34,211,238,0.07)]"
                             >
                               {/* Background gradient effect */}
-                              <div className="
-                                absolute inset-0 
-                                bg-gradient-to-r from-cyan-500/[0.02] to-transparent
-                                opacity-0 transition-opacity duration-300
-                                group-hover:opacity-100
-                                pointer-events-none
-                              "/>
+                              <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/[0.02] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 pointer-events-none" />
 
-                              <div className="relative flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <FileText size={12} className="text-cyan-400 group-hover:animate-pulse" />
-                                  <span className="text-[12px] text-gray-300 group-hover:text-cyan-400/90 transition-colors duration-300">
+                              <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <FileText size={12} className="text-cyan-400 group-hover:animate-pulse shrink-0" />
+                                  <span className="text-[12px] text-gray-300 group-hover:text-cyan-400/90 transition-colors duration-300 truncate">
                                     {brdge?.presentation_filename ||
                                       agentConfig.knowledgeBase.find(k => k.type === 'presentation')?.name ||
                                       "No document uploaded"}
@@ -2335,53 +2327,46 @@ export default function Playground({
 
                                 {!brdge?.presentation_filename &&
                                   !agentConfig.knowledgeBase.find(k => k.type === 'presentation')?.name ? (
-                                  <motion.button
-                                    whileHover={{ scale: 1.02 }}
-                                    whileTap={{ scale: 0.98 }}
-                                    onClick={() => fileInputRef.current?.click()}
-                                    className={`
-                                      group flex items-center gap-2 px-3 py-1.5 rounded-lg
-                                      bg-gradient-to-r from-cyan-500/10 to-transparent
-                                      text-cyan-400 border border-cyan-500/20
-                                      transition-all duration-300
-                                      hover:border-cyan-500/40
-                                      hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]
-                                      ${isUploading ? 'opacity-50 cursor-wait' : ''}
-                                    `}
-                                    disabled={isUploading}
-                                  >
-                                    {isUploading ? (
-                                      <>
-                                        <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                        <span className="text-[11px]">Uploading...</span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Plus size={12} className="text-cyan-400/70 group-hover:text-cyan-400 transition-colors duration-300" />
-                                        <span className="text-[11px] text-cyan-400/70 group-hover:text-cyan-400 transition-colors duration-300">
-                                          Upload PDF
-                                        </span>
-                                      </>
-                                    )}
-                                  </motion.button>
+                                  <div className="flex-shrink-0">
+                                    <motion.button
+                                      whileHover={{ scale: 1.02 }}
+                                      whileTap={{ scale: 0.98 }}
+                                      onClick={() => fileInputRef.current?.click()}
+                                      className={`
+                                        relative z-20 group flex items-center gap-1.5
+                                        w-full sm:w-auto
+                                        px-3 py-1.5 rounded-lg text-[11px]
+                                        bg-gradient-to-r from-cyan-500/10 to-transparent
+                                        text-cyan-400/90 border border-cyan-500/20
+                                        transition-all duration-300
+                                        hover:border-cyan-500/40 hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]
+                                        ${isUploading ? 'opacity-50 cursor-wait' : 'cursor-pointer pointer-events-auto'}
+                                        justify-center sm:justify-start
+                                      `}
+                                      disabled={isUploading}
+                                    >
+                                      {isUploading ? (
+                                        <>
+                                          <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                          <span>Uploading...</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Plus size={12} className="group-hover:rotate-90 transition-transform duration-300" />
+                                          <span>Upload PDF</span>
+                                        </>
+                                      )}
+                                    </motion.button>
+                                  </div>
                                 ) : (
-                                  <div className="flex items-center gap-2">
-                                    <span className="
-                                      text-[10px] text-gray-600/70 
-                                      px-2 py-0.5 
-                                      bg-black/20 rounded-md
-                                      border border-gray-800/50
-                                      group-hover:border-cyan-500/20
-                                      transition-all duration-300
-                                    ">
+                                  <div className="flex items-center gap-2 flex-shrink-0">
+                                    <span className="text-[10px] text-gray-600/70 px-2 py-0.5 bg-black/20 rounded-md border border-gray-800/50 group-hover:border-cyan-500/20 transition-all duration-300">
                                       PDF
                                     </span>
                                     <motion.button
                                       whileTap={{ scale: 0.95 }}
                                       onClick={() => {
-                                        // Clear the file
                                         if (fileInputRef.current) fileInputRef.current.value = '';
-                                        // Update the state
                                         setBrdge(prev => prev ? { ...prev, presentation_filename: '' } : null);
                                         setAgentConfig(prev => ({
                                           ...prev,
@@ -2390,7 +2375,7 @@ export default function Playground({
                                           )
                                         }));
                                       }}
-                                      className="p-1.5 rounded-md hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all duration-300"
+                                      className="p-1.5 rounded-md hover:bg-red-500/10 transition-all duration-300"
                                     >
                                       <X size={11} className="text-gray-400 hover:text-red-400" />
                                     </motion.button>
@@ -2399,7 +2384,6 @@ export default function Playground({
                               </div>
                             </motion.div>
 
-                            {/* Then add a divider before the Knowledge Base section */}
                             <div className={styles.divider} />
 
                             {/* Knowledge Base Section */}
