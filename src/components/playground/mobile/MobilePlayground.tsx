@@ -41,7 +41,9 @@ import {
     Globe,
     Lock,
     Check,
-    Copy
+    Copy,
+    Link,
+    Info
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import styled, { keyframes, css } from 'styled-components';
@@ -128,9 +130,13 @@ interface RecordingData {
 
 interface Brdge {
     id: number;
-    public_id: string;
+    name: string;
+    user_id: number;
+    presentation_filename: string;
+    audio_filename: string;
+    folder: string;
     shareable: boolean;
-    presentation_filename?: string;
+    public_id: string;
     agent_personality?: string;
 }
 
@@ -1149,18 +1155,20 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                 }
             );
 
-            if (response.data && typeof response.data.shareable === 'boolean' && brdge) {
-                // Update brdge state
+            // Check for the new response format
+            if (response.status === 200 && response.data && 'shareable' in response.data && brdge) {
+                // Create updated brdge object with the new shareable status
                 const updatedBrdge: Brdge = {
                     ...brdge,
-                    id: parseInt(params.brdgeId),
+                    id: brdge.id,
                     shareable: response.data.shareable,
                     public_id: brdge.public_id
                 };
 
+                // Update the brdge state immediately
                 onUpdateBrdge(updatedBrdge);
             }
-        } catch (error: any) {
+        } catch (error) {
             console.error('Error toggling share status:', error);
         }
     };
@@ -1436,108 +1444,111 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -10 }}
-                            className="space-y-6"
+                            className="space-y-4 px-4"
                         >
-                            <section>
-                                <h3 className="text-[14px] font-medium text-gray-300 mb-2">Bridge Sharing</h3>
-                                <p className="text-[12px] text-gray-400 mb-3">
-                                    Control who can access your bridge. Make it public to share with others.
-                                </p>
-
-                                {/* Sharing Toggle Section */}
-                                <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-800">
+                            {/* Status Section */}
+                            <section className="mb-4">
+                                <div className="flex items-center justify-between p-4 bg-black/20 
+                                              rounded-lg border border-gray-800/50 transition-all duration-300">
                                     <div className="flex items-center gap-3">
                                         {brdge?.shareable ? (
-                                            <Globe size={18} className="text-cyan-400" />
+                                            <div className="w-8 h-8 rounded-full bg-cyan-500/10 
+                                                          flex items-center justify-center">
+                                                <Globe size={18} className="text-cyan-400" />
+                                            </div>
                                         ) : (
-                                            <Lock size={18} className="text-gray-400" />
+                                            <div className="w-8 h-8 rounded-full bg-gray-800/50 
+                                                          flex items-center justify-center">
+                                                <Lock size={18} className="text-gray-400" />
+                                            </div>
                                         )}
                                         <div>
-                                            <span className="text-[13px] font-medium text-gray-300">
+                                            <span className="text-[14px] font-medium text-gray-300 block">
                                                 {brdge?.shareable ? 'Public Access' : 'Private Access'}
                                             </span>
-                                            <p className="text-[11px] text-gray-400">
+                                            <span className="text-[12px] text-gray-400">
                                                 {brdge?.shareable
-                                                    ? 'Anyone with the link can view this bridge'
-                                                    : 'Only you can view this bridge'}
-                                            </p>
+                                                    ? 'Anyone with the link can view'
+                                                    : 'Only you can view'}
+                                            </span>
                                         </div>
                                     </div>
-                                    <div className="relative">
-                                        <label className="relative inline-flex items-center cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                className="sr-only peer"
-                                                checked={brdge?.shareable || false}
-                                                onChange={handleShareToggle}
-                                            />
-                                            <div className="w-11 h-6 
-                                                bg-gray-700/50 
-                                                peer-focus:outline-none 
-                                                peer-focus:ring-2 
-                                                peer-focus:ring-cyan-400/20 
-                                                rounded-full 
-                                                peer 
-                                                peer-checked:after:translate-x-full 
-                                                peer-checked:bg-cyan-400/20
-                                                after:content-[''] 
-                                                after:absolute 
-                                                after:top-[2px] 
-                                                after:left-[2px] 
-                                                after:bg-gray-400 
-                                                after:peer-checked:bg-cyan-400 
-                                                after:rounded-full 
-                                                after:h-5 
-                                                after:w-5 
-                                                after:transition-all"
-                                            />
-                                        </label>
-                                    </div>
+                                    <motion.button
+                                        onClick={handleShareToggle}
+                                        className={`
+                                            relative w-11 h-6 rounded-full 
+                                            transition-all duration-300 ease-in-out
+                                            ${brdge?.shareable
+                                                ? 'bg-cyan-500/20 border-cyan-500/30'
+                                                : 'bg-gray-700/50 border-gray-800'
+                                            }
+                                            border
+                                            flex items-center
+                                            cursor-pointer
+                                            hover:shadow-[0_0_10px_rgba(34,211,238,0.2)]
+                                        `}
+                                    >
+                                        <motion.div
+                                            initial={false}
+                                            animate={{
+                                                x: brdge?.shareable ? 20 : 2,
+                                            }}
+                                            transition={{
+                                                type: "spring",
+                                                stiffness: 500,
+                                                damping: 30
+                                            }}
+                                            className={`
+                                                w-4 h-4 rounded-full
+                                                ${brdge?.shareable
+                                                    ? 'bg-cyan-400'
+                                                    : 'bg-gray-400'
+                                                }
+                                            `}
+                                        />
+                                    </motion.button>
                                 </div>
                             </section>
 
-                            {/* Shareable Link Section */}
-                            <section>
-                                <h3 className="text-[14px] font-medium text-gray-300 mb-2">Shareable Link</h3>
-                                <div className="relative">
-                                    <div className="flex items-center gap-2 bg-black/20 rounded-lg border border-gray-800 p-3">
-                                        <div className="flex-1 overflow-hidden">
-                                            <p className="text-[12px] text-gray-300 truncate">
-                                                {brdge?.shareable && brdge.public_id
-                                                    ? `${window.location.origin}/viewBridge/${params.brdgeId}-${brdge.public_id.substring(0, 6)}`
-                                                    : "Bridge is private"}
+                            {/* Share Link Section - Only show when public */}
+                            {brdge?.shareable && (
+                                <section className="mb-4">
+                                    <div className="flex items-center gap-2 p-4 
+                                                   bg-black/20 rounded-lg border border-gray-800/50">
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[13px] text-gray-300 truncate font-mono">
+                                                {`${window.location.origin}/viewBridge/${params.brdgeId}-${brdge.public_id.substring(0, 6)}`}
                                             </p>
                                         </div>
-                                        {brdge?.shareable && brdge.public_id && (
-                                            <button
-                                                onClick={handleCopyLink}
-                                                className={`
-                                                    flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] 
-                                                    transition-all duration-300
-                                                    ${linkCopied
-                                                        ? 'bg-green-500/20 text-green-400 border-green-500/30'
-                                                        : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
-                                                    }
-                                                    border hover:border-cyan-500/40 
-                                                    hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]
-                                                `}
-                                            >
-                                                {linkCopied ? (
-                                                    <>
-                                                        <Check size={12} />
-                                                        <span>Copied!</span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Copy size={12} />
-                                                        <span>Copy Link</span>
-                                                    </>
-                                                )}
-                                            </button>
-                                        )}
+                                        <button
+                                            onClick={handleCopyLink}
+                                            className={`
+                                                flex items-center gap-2 px-3 py-1.5 
+                                                rounded-lg text-[13px] whitespace-nowrap
+                                                transition-all duration-300
+                                                ${linkCopied
+                                                    ? 'bg-green-500/20 text-green-400 border-green-500/30'
+                                                    : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
+                                                }
+                                                border hover:border-cyan-500/40
+                                                active:scale-95
+                                            `}
+                                        >
+                                            {linkCopied ? (
+                                                <>
+                                                    <Check size={14} />
+                                                    <span>Copied!</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Copy size={14} />
+                                                    <span>Copy Link</span>
+                                                </>
+                                            )}
+                                        </button>
                                     </div>
-                                </div>
-                            </section>
+                                </section>
+                            )}
                         </motion.div>
                     ) : null}
                 </AnimatePresence>

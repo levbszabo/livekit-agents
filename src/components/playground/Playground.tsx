@@ -18,7 +18,7 @@ import {
   PanelGroup,
   PanelResizeHandle
 } from 'react-resizable-panels';
-import { Plus, FileText, X, Edit2, Save, ChevronDown, ChevronUp, Play, Pause, Volume2, VolumeX, Maximize2, Mic, MicOff, Radio } from 'lucide-react';
+import { Plus, FileText, X, Edit2, Save, ChevronDown, ChevronUp, Play, Pause, Volume2, VolumeX, Maximize2, Mic, MicOff, Radio, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import styled, { keyframes } from 'styled-components';
 
@@ -371,21 +371,16 @@ interface KnowledgeBubbleProps {
 
 // Add this new component for knowledge bubbles
 const KnowledgeBubble: React.FC<KnowledgeBubbleProps> = ({ entry, onEdit, onRemove }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
   const [content, setContent] = useState(entry.content);
-  const [name, setName] = useState(entry.name);
+  const [isExpanded, setIsExpanded] = useState(false);
 
-  const handleBubbleClick = () => {
-    if (!isEditing) {
-      setIsExpanded(!isExpanded);
+  // Auto-update name based on content
+  useEffect(() => {
+    const newName = content.trim().slice(0, 20) + (content.length > 20 ? '...' : '');
+    if (newName !== entry.name && content.trim() !== '') {
+      onEdit(entry.id, content, newName);
     }
-  };
-
-  const handleSave = () => {
-    onEdit(entry.id, content, name);
-    setIsEditing(false);
-  };
+  }, [content, entry.id, entry.name, onEdit]);
 
   return (
     <motion.div
@@ -399,105 +394,70 @@ const KnowledgeBubble: React.FC<KnowledgeBubbleProps> = ({ entry, onEdit, onRemo
         layout
         className={`
           ${styles.knowledgeBase.bubble}
-          ${isEditing ? 'cursor-default' : 'cursor-pointer'}
+          cursor-pointer
+          group
         `}
       >
         <div className="relative">
           {/* Title section */}
           <div
-            className="flex items-center justify-between gap-2"
-            onClick={!isEditing ? handleBubbleClick : undefined}
+            className="flex items-center justify-between gap-2 mb-2"
+            onClick={() => setIsExpanded(!isExpanded)}
           >
-            {isEditing ? (
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSave();
-                }}
-                className={`${styles.knowledgeBase.input} z-50`}
-                autoFocus
-                onClick={(e) => e.stopPropagation()}
-              />
-            ) : (
+            <div className="flex items-center gap-2">
+              <motion.div
+                animate={{ rotate: isExpanded ? 90 : 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <ChevronRight size={12} className="text-gray-400 group-hover:text-cyan-400" />
+              </motion.div>
               <span className="font-satoshi text-[12px] text-gray-300 group-hover:text-cyan-400/90 transition-colors duration-300">
-                {name}
+                {entry.name || 'New Entry'}
               </span>
-            )}
-
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (isEditing) handleSave();
-                  else setIsEditing(true);
-                }}
-                className="p-1.5 rounded-md hover:bg-cyan-500/10 z-50"
-              >
-                {isEditing ? (
-                  <Save size={11} className="text-cyan-400" />
-                ) : (
-                  <Edit2 size={11} className="text-gray-400 group-hover:text-cyan-400" />
-                )}
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRemove(entry.id);
-                }}
-                className="p-1.5 rounded-md hover:bg-cyan-500/10 z-50"
-              >
-                <X size={11} className="text-gray-400 group-hover:text-red-400" />
-              </motion.button>
-              {!isEditing && (
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsExpanded(!isExpanded);
-                  }}
-                  className="p-1.5 rounded-md hover:bg-cyan-500/10 z-50"
-                >
-                  {isExpanded ? (
-                    <ChevronUp size={11} className="text-gray-400 group-hover:text-cyan-400" />
-                  ) : (
-                    <ChevronDown size={11} className="text-gray-400 group-hover:text-cyan-400" />
-                  )}
-                </motion.button>
-              )}
             </div>
+
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove(entry.id);
+              }}
+              className="p-1.5 rounded-md hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all duration-300 z-50"
+            >
+              <X size={11} className="text-gray-400 hover:text-red-400" />
+            </motion.button>
           </div>
 
           {/* Content section */}
           <AnimatePresence>
-            {(isEditing || isExpanded) && (
+            {isExpanded && (
               <motion.div
-                layout
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
                 transition={{ duration: 0.2 }}
-                className="mt-2"
+                className="relative"
               >
                 <textarea
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   onBlur={() => {
-                    if (isEditing) handleSave();
+                    if (content.trim() !== entry.content) {
+                      onEdit(entry.id, content);
+                    }
                   }}
-                  readOnly={!isEditing}
                   onClick={(e) => e.stopPropagation()}
                   className={`
                     ${styles.knowledgeBase.content}
-                    ${!isEditing && 'border-transparent bg-transparent cursor-default'}
-                    z-50
+                    min-h-[100px]
+                    resize-none
+                    transition-all duration-300
+                    focus:ring-1 focus:ring-cyan-500/50 
+                    focus:border-cyan-500/30
+                    hover:border-cyan-500/20
+                    placeholder:text-gray-600/50
                   `}
-                  placeholder={isEditing ? "Enter knowledge content..." : ""}
+                  placeholder="Enter knowledge content..."
                 />
               </motion.div>
             )}
@@ -939,6 +899,21 @@ const loadingAnimation = keyframes`
   100% { background-position: -200% 0; }
 `;
 
+// First, add a debounced save utility at the top of the file
+const useDebounce = (callback: Function, delay: number) => {
+  const timeoutRef = useRef<NodeJS.Timeout>();
+
+  return useCallback((...args: any[]) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    timeoutRef.current = setTimeout(() => {
+      callback(...args);
+    }, delay);
+  }, [callback, delay]);
+};
+
 export default function Playground({
   logo,
   themeColors,
@@ -1208,27 +1183,29 @@ export default function Playground({
     console.log('Current params:', params);
   }, [params]);
 
-  // Handler for editing knowledge entries
-  const handleKnowledgeEdit = useCallback((id: string, content: string, name?: string) => {
-    setAgentConfig(prev => ({
-      ...prev,
-      knowledgeBase: prev.knowledgeBase.map(entry =>
-        entry.id === id
-          ? { ...entry, content, ...(name && { name }) }
-          : entry
-      )
-    }));
+  // Add this near your other state declarations
+  const debouncedUpdateConfig = useDebounce((newConfig: AgentConfig) => {
+    updateAgentConfig(newConfig);
+  }, 500);
 
-    // Update the backend
-    updateAgentConfig({
-      ...agentConfig,
-      knowledgeBase: agentConfig.knowledgeBase.map(entry =>
-        entry.id === id
-          ? { ...entry, content, ...(name && { name }) }
-          : entry
-      )
+  // Update the handleKnowledgeEdit function to use debouncing
+  const handleKnowledgeEdit = useCallback((id: string, content: string, name?: string) => {
+    setAgentConfig(prev => {
+      const newConfig = {
+        ...prev,
+        knowledgeBase: prev.knowledgeBase.map(entry =>
+          entry.id === id
+            ? { ...entry, content, ...(name && { name }) }
+            : entry
+        )
+      };
+
+      // Debounce the API call
+      debouncedUpdateConfig(newConfig);
+
+      return newConfig;
     });
-  }, [agentConfig, updateAgentConfig]);
+  }, [debouncedUpdateConfig]);
 
   // Handler for removing knowledge entries
   const handleKnowledgeRemove = useCallback((id: string) => {
@@ -2290,53 +2267,42 @@ export default function Playground({
                               hover:before:opacity-100
                             ">
                               <textarea
-                                value={agentConfig.personality}
-                                onChange={(e) => setAgentConfig({
-                                  ...agentConfig,
-                                  personality: e.target.value
-                                })}
-                                placeholder="Describe the agent's personality and behavior..."
-                                className={`${styles.input.base} ${styles.input.textarea}`}
+                                value={agentConfig.personality || ''}
+                                onChange={(e) => {
+                                  const newPersonality = e.target.value;
+                                  // Ensure we're always working with the latest state
+                                  setAgentConfig(prev => ({
+                                    ...prev,
+                                    personality: newPersonality
+                                  }));
+                                }}
+                                onKeyDown={(e) => {
+                                  // Handle special key combinations
+                                  if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
+                                    // Allow CMD/CTRL + A to select all
+                                    e.target.select();
+                                  }
+                                }}
+                                placeholder="Describe how you want the AI agent to behave and interact..."
+                                className={`
+                                  ${styles.input.base} ${styles.input.textarea}
+                                  min-h-[120px]
+                                  focus:ring-1 focus:ring-cyan-500/50 
+                                  focus:border-cyan-500/30
+                                  hover:border-cyan-500/20
+                                  placeholder:text-gray-600/50
+                                  transition-all duration-300
+                                  selection:bg-cyan-500/20
+                                  selection:text-cyan-400
+                                `}
+                                spellCheck={false}
                               />
                             </div>
                           </section>
 
-                          {/* Knowledge Base Section */}
+                          {/* First, add this section right before the Knowledge Base section: */}
                           <section className={styles.section.wrapper}>
-                            <div className="flex items-center justify-between mb-4">
-                              <h2 className={styles.section.title}>Knowledge Base</h2>
-                              <motion.button
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
-                                onClick={() => {
-                                  const newEntry = {
-                                    id: `kb_${Date.now()}`,
-                                    type: "custom",
-                                    name: "New Knowledge Entry",
-                                    content: ""
-                                  };
-                                  setAgentConfig(prev => ({
-                                    ...prev,
-                                    knowledgeBase: [...prev.knowledgeBase, newEntry]
-                                  }));
-                                }}
-                                className={`
-                                  relative z-20
-                                  group flex items-center gap-1.5
-                                  px-3 py-1.5 rounded-lg text-[11px]
-                                  bg-gradient-to-r from-cyan-500/10 to-transparent
-                                  text-cyan-400/90 border border-cyan-500/20
-                                  transition-all duration-300
-                                  hover:border-cyan-500/40
-                                  hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]
-                                `}
-                              >
-                                <Plus size={12} className="group-hover:rotate-90 transition-transform duration-300" />
-                                <span>Add Knowledge</span>
-                              </motion.button>
-                            </div>
-
-                            {/* Core Presentation */}
+                            <h2 className={styles.section.title}>Document Knowledge</h2>
                             <motion.div
                               layout
                               className="
@@ -2346,7 +2312,6 @@ export default function Playground({
                                 transition-all duration-300
                                 hover:border-cyan-500/30
                                 hover:shadow-[0_0_20px_rgba(34,211,238,0.07)]
-                                z-10 // Ensure parent has lower z-index
                               "
                             >
                               {/* Background gradient effect */}
@@ -2358,15 +2323,16 @@ export default function Playground({
                                 pointer-events-none
                               "/>
 
-                              <div className="relative flex items-center justify-between pointer-events-auto">
+                              <div className="relative flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                   <FileText size={12} className="text-cyan-400 group-hover:animate-pulse" />
                                   <span className="text-[12px] text-gray-300 group-hover:text-cyan-400/90 transition-colors duration-300">
                                     {brdge?.presentation_filename ||
                                       agentConfig.knowledgeBase.find(k => k.type === 'presentation')?.name ||
-                                      "No presentation file"}
+                                      "No document uploaded"}
                                   </span>
                                 </div>
+
                                 {!brdge?.presentation_filename &&
                                   !agentConfig.knowledgeBase.find(k => k.type === 'presentation')?.name ? (
                                   <motion.button
@@ -2399,31 +2365,80 @@ export default function Playground({
                                     )}
                                   </motion.button>
                                 ) : (
-                                  <span className="
-                                    text-[10px] text-gray-600/70 
-                                    px-2 py-0.5 
-                                    bg-black/20 rounded-md
-                                    border border-gray-800/50
-                                    group-hover:border-cyan-500/20
-                                    transition-all duration-300
-                                  ">
-                                    PDF
-                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="
+                                      text-[10px] text-gray-600/70 
+                                      px-2 py-0.5 
+                                      bg-black/20 rounded-md
+                                      border border-gray-800/50
+                                      group-hover:border-cyan-500/20
+                                      transition-all duration-300
+                                    ">
+                                      PDF
+                                    </span>
+                                    <motion.button
+                                      whileTap={{ scale: 0.95 }}
+                                      onClick={() => {
+                                        // Clear the file
+                                        if (fileInputRef.current) fileInputRef.current.value = '';
+                                        // Update the state
+                                        setBrdge(prev => prev ? { ...prev, presentation_filename: '' } : null);
+                                        setAgentConfig(prev => ({
+                                          ...prev,
+                                          knowledgeBase: prev.knowledgeBase.map(k =>
+                                            k.type === 'presentation' ? { ...k, name: '', content: '' } : k
+                                          )
+                                        }));
+                                      }}
+                                      className="p-1.5 rounded-md hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all duration-300"
+                                    >
+                                      <X size={11} className="text-gray-400 hover:text-red-400" />
+                                    </motion.button>
+                                  </div>
                                 )}
                               </div>
                             </motion.div>
 
-                            {/* Supplementary Knowledge */}
-                            <div className="mt-4 space-y-3">
-                              <h3 className="
-                                font-satoshi text-[11px] text-gray-400/70
-                                flex items-center gap-2
-                                before:content-[''] before:w-1 before:h-1 before:rounded-full
-                                before:bg-cyan-400/30
-                              ">
-                                Supplementary Knowledge
-                              </h3>
-                              <motion.div layout className="grid grid-cols-1 gap-2">
+                            {/* Then add a divider before the Knowledge Base section */}
+                            <div className={styles.divider} />
+
+                            {/* Knowledge Base Section */}
+                            <section className={styles.section.wrapper}>
+                              <div className="flex items-center justify-between mb-4">
+                                <h2 className={styles.section.title}>Knowledge Base</h2>
+                                <motion.button
+                                  whileHover={{ scale: 1.02 }}
+                                  whileTap={{ scale: 0.98 }}
+                                  onClick={() => {
+                                    const newEntry = {
+                                      id: `kb_${Date.now()}`,
+                                      type: "custom",
+                                      name: "New Entry",
+                                      content: ""
+                                    };
+                                    setAgentConfig(prev => ({
+                                      ...prev,
+                                      knowledgeBase: [...prev.knowledgeBase, newEntry]
+                                    }));
+                                  }}
+                                  className={`
+                                    relative z-20
+                                    group flex items-center gap-1.5
+                                    px-3 py-1.5 rounded-lg text-[11px]
+                                    bg-gradient-to-r from-cyan-500/10 to-transparent
+                                    text-cyan-400/90 border border-cyan-500/20
+                                    transition-all duration-300
+                                    hover:border-cyan-500/40
+                                    hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]
+                                  `}
+                                >
+                                  <Plus size={12} className="group-hover:rotate-90 transition-transform duration-300" />
+                                  <span>Add Knowledge</span>
+                                </motion.button>
+                              </div>
+
+                              {/* Knowledge entries */}
+                              <motion.div layout className="space-y-3">
                                 <AnimatePresence>
                                   {agentConfig.knowledgeBase
                                     .filter(entry => entry.type !== "presentation")
@@ -2437,7 +2452,7 @@ export default function Playground({
                                     ))}
                                 </AnimatePresence>
                               </motion.div>
-                            </div>
+                            </section>
                           </section>
                         </div>
                       )}
@@ -2448,7 +2463,7 @@ export default function Playground({
                           transition-opacity duration-300
                         `}>
                           <div className="flex items-center justify-between mb-4">
-                            <h2 className={styles.section.title}>Voice Clone Configuration</h2>
+                            <h2 className={styles.section.title}>Voice Configuration</h2>
                             <motion.button
                               whileHover={{ scale: 1.02 }}
                               whileTap={{ scale: 0.98 }}
@@ -2513,9 +2528,9 @@ export default function Playground({
                                       min-h-0
                                       text-[11px]
                                       bg-black/20
-                                      border border-gray-800/50
+                                  border border-gray-800/50
                                       group-hover:border-cyan-500/20
-                            transition-all duration-300
+                                  transition-all duration-300
                                         `}>
                                       &ldquo;In just a few quick steps my voice based AI assistant will be integrated into my content. This way you can speak to others without being there... how cool is that?&rdquo;
                                     </div>
