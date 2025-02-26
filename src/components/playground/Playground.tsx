@@ -1297,15 +1297,38 @@ export default function Playground({
       formData.append('audio', currentRecording);
       formData.append('name', voiceName);
 
-      const response = await api.post(`/brdges/${params.brdgeId}/voice/clone`, formData);
+      // Use fetch directly instead of the api object
+      const response = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/voice/clone`, {
+        method: 'POST',
+        body: formData,
+        // Don't include credentials to avoid preflight issues
+        credentials: 'omit',
+        headers: {
+          // Don't set Content-Type header for FormData, browser will set it with boundary
+          // Include auth token if available
+          ...(localStorage.getItem('token') ? {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          } : {})
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to clone voice: ${response.status} ${response.statusText}`);
+      }
+
+      const responseData = await response.json();
+      console.log('Voice clone response:', responseData);
 
       // Refresh voice list
-      const voicesResponse = await api.get(`/brdges/${params.brdgeId}/voices`);
-      if (voicesResponse.data?.voices) {
-        setSavedVoices(voicesResponse.data.voices);
-        if (response.data?.voice?.id) {
-          setSelectedVoice(response.data.voice.id);
-          setIsCreatingVoice(false);
+      const voicesResponse = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/voices`);
+      if (voicesResponse.ok) {
+        const voicesData = await voicesResponse.json();
+        if (voicesData.voices) {
+          setSavedVoices(voicesData.voices);
+          if (responseData.voice?.id) {
+            setSelectedVoice(responseData.voice.id);
+            setIsCreatingVoice(false);
+          }
         }
       }
 
@@ -1321,13 +1344,27 @@ export default function Playground({
 
   // Add this useEffect to handle automatic voice activation
   useEffect(() => {
+    if (!params.brdgeId || !params.apiBaseUrl) return;
+
     if (savedVoices.length === 1) {
       // If there's only one voice, make it active
       const voice = savedVoices[0];
       if (voice.status !== 'active') {
-        api.post(`/brdges/${params.brdgeId}/voices/${voice.id}/activate`)
-          .then(() => {
-            setSavedVoices([{ ...voice, status: 'active' }]);
+        fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/voice/activate`, {
+          method: 'POST',
+          body: JSON.stringify({ voice_id: voice.id }),
+          headers: {
+            'Content-Type': 'application/json',
+            ...(localStorage.getItem('token') ? {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            } : {})
+          },
+          credentials: 'omit'
+        })
+          .then(response => {
+            if (response.ok) {
+              setSavedVoices([{ ...voice, status: 'active' }]);
+            }
           })
           .catch(error => console.error('Error activating single voice:', error));
       }
@@ -1337,16 +1374,28 @@ export default function Playground({
         return new Date(current.created_at) > new Date(prev.created_at) ? current : prev;
       }, savedVoices[0]);
 
-      api.post(`/brdges/${params.brdgeId}/voices/${mostRecent.id}/activate`)
-        .then(() => {
-          setSavedVoices(prev => prev.map(v => ({
-            ...v,
-            status: v.id === mostRecent.id ? 'active' : 'inactive'
-          })));
+      fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/voice/activate`, {
+        method: 'POST',
+        body: JSON.stringify({ voice_id: mostRecent.id }),
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('token') ? {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          } : {})
+        },
+        credentials: 'omit'
+      })
+        .then(response => {
+          if (response.ok) {
+            setSavedVoices(prev => prev.map(v => ({
+              ...v,
+              status: v.id === mostRecent.id ? 'active' : 'inactive'
+            })));
+          }
         })
         .catch(error => console.error('Error activating most recent voice:', error));
     }
-  }, [savedVoices, params.brdgeId]);
+  }, [savedVoices, params.brdgeId, params.apiBaseUrl]);
 
   // Update tabs array
   const tabs = params.agentType === 'view' ? [
@@ -2631,25 +2680,49 @@ export default function Playground({
                                         try {
                                           if (voice.status !== 'active') {
                                             // Activate this voice
-                                            const response = await api.post(`/brdges/${params.brdgeId}/voice/activate`, {
-                                              voice_id: voice.id
+                                            const response = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/voice/activate`, {
+                                              method: 'POST',
+                                              body: JSON.stringify({ voice_id: voice.id }),
+                                              headers: {
+                                                'Content-Type': 'application/json',
+                                                ...(localStorage.getItem('token') ? {
+                                                  'Authorization': `Bearer ${localStorage.getItem('token')}`
+                                                } : {})
+                                              },
+                                              credentials: 'omit'
                                             });
-                                            if (response.data?.voice) {
-                                              setSavedVoices(prev => prev.map(v => ({
-                                                ...v,
-                                                status: v.id === voice.id ? 'active' : 'inactive'
-                                              })));
+
+                                            if (response.ok) {
+                                              const responseData = await response.json();
+                                              if (responseData.voice) {
+                                                setSavedVoices(prev => prev.map(v => ({
+                                                  ...v,
+                                                  status: v.id === voice.id ? 'active' : 'inactive'
+                                                })));
+                                              }
                                             }
                                           } else {
                                             // Deactivate this voice
-                                            const response = await api.post(`/brdges/${params.brdgeId}/voice/deactivate`, {
-                                              voice_id: voice.id
+                                            const response = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/voice/deactivate`, {
+                                              method: 'POST',
+                                              body: JSON.stringify({ voice_id: voice.id }),
+                                              headers: {
+                                                'Content-Type': 'application/json',
+                                                ...(localStorage.getItem('token') ? {
+                                                  'Authorization': `Bearer ${localStorage.getItem('token')}`
+                                                } : {})
+                                              },
+                                              credentials: 'omit'
                                             });
-                                            if (response.data?.voice) {
-                                              setSavedVoices(prev => prev.map(v => ({
-                                                ...v,
-                                                status: v.id === voice.id ? 'inactive' : v.status
-                                              })));
+
+                                            if (response.ok) {
+                                              const responseData = await response.json();
+                                              if (responseData.voice) {
+                                                setSavedVoices(prev => prev.map(v => ({
+                                                  ...v,
+                                                  status: v.id === voice.id ? 'inactive' : v.status
+                                                })));
+                                              }
                                             }
                                           }
                                         } catch (error) {
