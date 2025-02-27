@@ -18,7 +18,7 @@ import {
   PanelGroup,
   PanelResizeHandle
 } from 'react-resizable-panels';
-import { Plus, FileText, X, Edit2, Save, ChevronDown, ChevronUp, Play, Pause, Volume2, VolumeX, Maximize2, Mic, MicOff, Radio, ChevronRight } from 'lucide-react';
+import { Plus, FileText, X, Edit2, Save, ChevronDown, ChevronUp, Play, Pause, Volume2, VolumeX, Maximize2, Mic, MicOff, Radio, ChevronRight, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import styled, { keyframes } from 'styled-components';
 
@@ -914,6 +914,56 @@ const useDebounce = (callback: Function, delay: number) => {
   }, [callback, delay]);
 };
 
+// Add animation keyframe for tooltip auto-dismiss
+const fadeOutAnimation = `
+  @keyframes fadeOut {
+    0%, 70% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  .animate-fadeOut {
+    animation: fadeOut 5s forwards;
+  }
+`;
+
+// Add style tag to head
+if (typeof document !== 'undefined') {
+  const style = document.createElement('style');
+  style.textContent = fadeOutAnimation;
+  document.head.appendChild(style);
+}
+
+// Add animation keyframe for mic button glow
+const animations = `
+  @keyframes fadeOut {
+    0%, 70% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  @keyframes pulseGlow {
+    0% { box-shadow: 0 0 5px rgba(34,211,238,0.3); }
+    50% { box-shadow: 0 0 15px rgba(34,211,238,0.4); }
+    100% { box-shadow: 0 0 5px rgba(34,211,238,0.3); }
+  }
+
+  .animate-fadeOut {
+    animation: fadeOut 5s forwards;
+  }
+
+  .animate-glow {
+    animation: pulseGlow 2s infinite;
+    animation-duration: 5s;
+    animation-iteration-count: 1;
+  }
+`;
+
+// Add style tag to head
+if (typeof document !== 'undefined') {
+  const style = document.createElement('style');
+  style.textContent = animations;
+  document.head.appendChild(style);
+}
+
 export default function Playground({
   logo,
   themeColors,
@@ -1775,6 +1825,15 @@ export default function Playground({
   }, [roomState, agentConfig, params.userId, params.brdgeId, sendData]);
 
   // Then update the main container and content area for mobile
+  const [isInfoVisible, setIsInfoVisible] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInfoVisible(false);
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <div className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
       {/* Hide header on mobile as before */}
@@ -2142,6 +2201,30 @@ export default function Playground({
                   space-y-4
                   relative
                 `}>
+                  {/* Info Tooltip */}
+                  <div className={`
+                    absolute top-12 left-1/2 -translate-x-1/2 z-20
+                    transition-all duration-500
+                    ${(isMobile || activeTab === 'chat') && isInfoVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'}
+                  `}>
+                    <div className={`
+                      relative px-3 py-2
+                      bg-cyan-950/30 backdrop-blur-sm
+                      border border-cyan-500/20
+                      rounded-lg shadow-lg
+                      text-[11px] text-cyan-300/90
+                      shadow-[0_0_15px_rgba(34,211,238,0.1)]
+                    `}>
+                      <button
+                        onClick={() => setIsInfoVisible(false)}
+                        className="absolute -top-1 -right-1 p-0.5 rounded-full bg-cyan-950/50 text-cyan-400/70 hover:text-cyan-400"
+                      >
+                        <X size={10} />
+                      </button>
+                      Click the mic button to speak or type your message below
+                    </div>
+                  </div>
+
                   {/* Chat component - Always mounted but conditionally hidden */}
                   <div className={`
                     absolute inset-0
@@ -2158,33 +2241,60 @@ export default function Playground({
                             {!isMobile && <span className="text-sm text-gray-200 font-medium">AI Chat</span>}
                           </div>
 
-                          {/* Mic toggle button - Simplified for mobile */}
-                          <button
-                            onClick={() => {
-                              if (roomState === ConnectionState.Connected && localParticipant) {
-                                localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
+                          {/* Info tooltip and Mic controls */}
+                          <div className="flex items-center gap-2">
+                            <div className="relative group">
+                              <button
+                                className="p-1.5 rounded-lg transition-all duration-300
+                                text-cyan-400/70 hover:text-cyan-400
+                                hover:bg-cyan-500/10"
+                              >
+                                <Info size={isMobile ? 12 : 14} />
+                              </button>
+                              <div className="absolute right-0 top-full mt-2 w-64 opacity-0 group-hover:opacity-100
+                                pointer-events-none group-hover:pointer-events-auto
+                                transition-all duration-300 transform translate-y-1 group-hover:translate-y-0">
+                                <div className="bg-gray-900/95 backdrop-blur-sm rounded-lg p-3 shadow-xl
+                                  border border-cyan-500/20 text-[11px] leading-relaxed text-cyan-300/90">
+                                  <div className="font-medium mb-1 text-cyan-400">Welcome to Brdge AI!</div>
+                                  Watch the video while interacting with our AI voice assistant.
+                                  Toggle your mic to speak or type messages to engage in real-time conversation.
+                                  <div className="mt-1 text-[10px] text-cyan-400/70">
+                                    Pro tip: Use the side panel to customize your experience
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Mic toggle button - Simplified for mobile */}
+                            <button
+                              onClick={() => {
+                                if (roomState === ConnectionState.Connected && localParticipant) {
+                                  localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
+                                }
+                              }}
+                              disabled={roomState !== ConnectionState.Connected}
+                              className={`
+                                ${isMobile ? 'p-1' : 'p-1.5'}
+                                rounded-lg transition-all duration-300
+                                flex items-center gap-1.5
+                                bg-cyan-500/20 text-cyan-400
+                                hover:bg-cyan-500/30 hover:shadow-[0_0_10px_rgba(34,211,238,0.15)]
+                                disabled:opacity-50 disabled:cursor-not-allowed
+                                ${isInfoVisible ? 'animate-glow' : ''}
+                              `}
+                            >
+                              {localParticipant?.isMicrophoneEnabled ?
+                                <Mic size={isMobile ? 10 : 14} /> :
+                                <MicOff size={isMobile ? 10 : 14} />
                               }
-                            }}
-                            disabled={roomState !== ConnectionState.Connected}
-                            className={`
-                              ${isMobile ? 'p-1' : 'p-1.5'}
-                              rounded-lg transition-all duration-300
-                              flex items-center gap-1.5
-                              bg-cyan-500/20 text-cyan-400
-                              hover:bg-cyan-500/30 hover:shadow-[0_0_10px_rgba(34,211,238,0.15)]
-                              disabled:opacity-50 disabled:cursor-not-allowed
-                            `}
-                          >
-                            {localParticipant?.isMicrophoneEnabled ?
-                              <Mic size={isMobile ? 10 : 14} /> :
-                              <MicOff size={isMobile ? 10 : 14} />
-                            }
-                            {!isMobile && (
-                              <span className="text-[11px] font-medium">
-                                {localParticipant?.isMicrophoneEnabled ? 'Mic: On' : 'Mic: Off'}
-                              </span>
-                            )}
-                          </button>
+                              {!isMobile && (
+                                <span className="text-[11px] font-medium">
+                                  {localParticipant?.isMicrophoneEnabled ? 'Mic: On' : 'Mic: Off'}
+                                </span>
+                              )}
+                            </button>
+                          </div>
                         </div>
                       </div>
 
