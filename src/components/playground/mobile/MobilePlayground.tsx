@@ -1386,26 +1386,28 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                                 </div>
 
                                 <div className="space-y-4">
-                                    {agentConfig.knowledgeBase.map((entry) => (
-                                        <KnowledgeCard
-                                            key={entry.id}
-                                            entry={entry}
-                                            onEdit={(id, content, title) => {
-                                                onUpdateAgentConfig({
-                                                    ...agentConfig,
-                                                    knowledgeBase: agentConfig.knowledgeBase.map(e =>
-                                                        e.id === id ? { ...e, content, name: title } : e
-                                                    )
-                                                });
-                                            }}
-                                            onRemove={(id) => {
-                                                onUpdateAgentConfig({
-                                                    ...agentConfig,
-                                                    knowledgeBase: agentConfig.knowledgeBase.filter(e => e.id !== id)
-                                                });
-                                            }}
-                                        />
-                                    ))}
+                                    {agentConfig.knowledgeBase
+                                        .filter((entry: AgentConfig['knowledgeBase'][0]) => entry.type !== 'presentation')
+                                        .map((entry: AgentConfig['knowledgeBase'][0]) => (
+                                            <KnowledgeCard
+                                                key={entry.id}
+                                                entry={entry}
+                                                onEdit={(id, content, title) => {
+                                                    onUpdateAgentConfig({
+                                                        ...agentConfig,
+                                                        knowledgeBase: agentConfig.knowledgeBase.map(e =>
+                                                            e.id === id ? { ...e, content, name: title } : e
+                                                        )
+                                                    });
+                                                }}
+                                                onRemove={(id) => {
+                                                    onUpdateAgentConfig({
+                                                        ...agentConfig,
+                                                        knowledgeBase: agentConfig.knowledgeBase.filter(e => e.id !== id)
+                                                    });
+                                                }}
+                                            />
+                                        ))}
                                 </div>
                             </section>
                         </motion.div>
@@ -1789,8 +1791,21 @@ export default function MobilePlayground({
         };
     }, []);
 
+    // Add showInitialInfo state here with other state declarations
+    const [showInitialInfo, setShowInitialInfo] = useState(true);
     const { isMobile, isLandscape } = useIsMobile();
     const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
+
+    // Add the auto-dismiss effect here with other effects
+    useEffect(() => {
+        if (showInitialInfo) {
+            const timer = setTimeout(() => {
+                setShowInitialInfo(false);
+            }, 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [showInitialInfo]);
+
     const [selectedVoice, setSelectedVoice] = useState<string | null>(null);
     const [isCreatingVoice, setIsCreatingVoice] = useState(false);
     const [savedVoices, setSavedVoices] = useState<SavedVoice[]>([]);
@@ -2797,6 +2812,70 @@ export default function MobilePlayground({
 
                     {/* Chat Section */}
                     <div className="flex-1 overflow-hidden bg-gray-900/95">
+                        {/* Initial Info Message - Auto-dismissing */}
+                        <AnimatePresence>
+                            {showInitialInfo && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: -10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -10 }}
+                                    className="relative px-4 py-3 bg-cyan-950/30 border-b border-cyan-500/20"
+                                >
+                                    <div className="flex items-start gap-2">
+                                        <Info size={14} className="text-cyan-400 mt-0.5 flex-shrink-0" />
+                                        <div>
+                                            <div className="text-[12px] text-cyan-300/90 leading-relaxed">
+                                                Click the mic button to speak or type your message below
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => setShowInitialInfo(false)}
+                                            className="absolute top-2 right-2 p-1 rounded-full hover:bg-cyan-500/10"
+                                        >
+                                            <X size={12} className="text-cyan-400/70" />
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {/* Info Tooltip - Always accessible */}
+                        <div className="sticky top-0 z-10 bg-[#121212]/95 backdrop-blur-sm border-b border-gray-800">
+                            <div className="flex items-center justify-between px-4 py-2">
+                                <div className="flex items-center gap-2">
+                                    <BrdgeLogo src="/new-img.png" alt="Brdge AI Logo" />
+                                    <span className="text-sm text-gray-200 font-medium">AI Chat</span>
+                                </div>
+
+                                <div className="relative group">
+                                    <button
+                                        className="p-1.5 rounded-lg transition-all duration-300
+                                            text-cyan-400/70 hover:text-cyan-400
+                                            hover:bg-cyan-500/10"
+                                    >
+                                        <Info size={14} />
+                                    </button>
+
+                                    <div className="absolute right-0 top-full mt-2 w-64 opacity-0 group-hover:opacity-100
+                                        pointer-events-none group-hover:pointer-events-auto
+                                        transition-all duration-300 transform translate-y-1 group-hover:translate-y-0
+                                        z-50"
+                                    >
+                                        <div className="bg-gray-900/95 backdrop-blur-sm rounded-lg p-3 shadow-xl
+                                            border border-cyan-500/20 text-[11px] leading-relaxed text-cyan-300/90"
+                                        >
+                                            <div className="font-medium mb-1 text-cyan-400">Welcome to Brdge AI!</div>
+                                            Watch the video while interacting with our AI voice assistant.
+                                            Toggle your mic to speak or type messages to engage in real-time conversation.
+                                            <div className="mt-1 text-[10px] text-cyan-400/70">
+                                                Pro tip: Ensure your environment is quiet and free of background noise.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="h-full overflow-y-auto overscroll-y-contain">
                             {/* Voice Assistant Transcription */}
                             {voiceAssistant?.audioTrack && (
@@ -2819,16 +2898,22 @@ export default function MobilePlayground({
                                             exit={{ opacity: 0, y: -5 }}
                                             className={`
                                                 ${msg.isSelf ? 'ml-auto bg-cyan-950/30' : 'mr-auto bg-gray-800/30'}
-                                                rounded-lg p-3 max-w-[85%]
+                                                rounded-lg p-3
+                                                max-w-[85%] w-auto
                                                 backdrop-blur-sm
                                                 border border-gray-700/50
                                                 transition-all duration-300
                                                 hover:border-cyan-500/30
                                                 shadow-sm
+                                                flex flex-col gap-1
                                             `}
                                         >
-                                            <span className="text-[12px] text-gray-400">{msg.name}: </span>
-                                            <span className="text-[13px] text-gray-200">{msg.message}</span>
+                                            <span className="text-[11px] text-cyan-400/70 font-medium">
+                                                {msg.name}
+                                            </span>
+                                            <span className="text-[13px] text-gray-200 leading-relaxed break-words">
+                                                {msg.message}
+                                            </span>
                                         </motion.div>
                                     ))}
                                 </AnimatePresence>
@@ -2937,9 +3022,8 @@ const KnowledgeCard: React.FC<KnowledgeCardProps> = ({
 }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [showActions, setShowActions] = useState(false);
-
-    // NEW: Local state for the card's content to avoid re-renders on every keystroke
     const [localContent, setLocalContent] = useState(entry.content);
+
     useEffect(() => {
         setLocalContent(entry.content);
     }, [entry.content]);

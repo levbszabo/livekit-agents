@@ -2260,7 +2260,7 @@ export default function Playground({
                                   Watch the video while interacting with our AI voice assistant.
                                   Toggle your mic to speak or type messages to engage in real-time conversation.
                                   <div className="mt-1 text-[10px] text-cyan-400/70">
-                                    Pro tip: Use the side panel to customize your experience
+                                    Pro tip: Ensure your environment is quiet and free of background noise.
                                   </div>
                                 </div>
                               </div>
