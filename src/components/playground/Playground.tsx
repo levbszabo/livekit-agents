@@ -2469,19 +2469,21 @@ export default function Playground({
                             </motion.button>
                           </div>
 
-                          {/* Agent Personality Section with editable fields */}
-                          <section className={styles.section.wrapper}>
-                            <h2 className={styles.section.title}>Agent Personality</h2>
+                          {/* Agent Personality Section with improved spacing */}
+                          <section className={`${styles.section.wrapper} mb-6`}>
+                            <div className="flex items-center justify-between mb-6">
+                              <h2 className={styles.section.title}>Agent Personality</h2>
+                              <div className="h-[1px] flex-1 mx-4 bg-gradient-to-r from-transparent via-gray-700/50 to-transparent" />
+                            </div>
 
-                            {/* Editable Name */}
-                            <div className="mb-4 relative z-[60]">
-                              <label className={`${styles.label} block mb-1`}>Agent Name</label>
+                            {/* Editable Name with improved spacing */}
+                            <div className="mb-8 relative z-[60]">
+                              <label className={`${styles.label} block mb-2 text-cyan-400/70`}>Agent Name</label>
                               <input
                                 type="text"
                                 value={agentConfig.agentPersonality?.name || ''}
                                 onChange={(e) => {
                                   setAgentConfig(prev => {
-                                    // Create a base personality object that matches the interface
                                     const currentPersonality = prev.agentPersonality || {
                                       name: '',
                                       expertise: [],
@@ -2512,24 +2514,26 @@ export default function Playground({
                                 }}
                                 className={`
                                   ${styles.input.base}
+                                  h-12
+                                  text-[15px]
                                   focus:ring-1 focus:ring-cyan-500/50 
                                   focus:border-cyan-500/30
                                   hover:border-cyan-500/20
                                   placeholder:text-gray-600/50
                                   relative z-[60]
+                                  bg-[#1E1E1E]/80
                                 `}
                                 placeholder="Enter agent name..."
                               />
                             </div>
 
-                            {/* Editable Persona Background */}
-                            <div className="mb-4 relative z-[50]">
-                              <label className={`${styles.label} block mb-1`}>Persona Background</label>
+                            {/* Editable Persona Background with improved spacing */}
+                            <div className="mb-8 relative z-[50]">
+                              <label className={`${styles.label} block mb-2 text-cyan-400/70`}>Persona Background</label>
                               <textarea
                                 value={agentConfig.agentPersonality?.persona_background || ''}
                                 onChange={(e) => {
                                   setAgentConfig(prev => {
-                                    // Create a base personality object that matches the interface
                                     const currentPersonality = prev.agentPersonality || {
                                       name: 'AI Assistant',
                                       expertise: [],
@@ -2560,26 +2564,29 @@ export default function Playground({
                                 }}
                                 className={`
                                   ${styles.input.base} ${styles.input.textarea}
-                                  min-h-[80px]
+                                  min-h-[160px]
+                                  text-[15px]
+                                  leading-relaxed
                                   focus:ring-1 focus:ring-cyan-500/50 
                                   focus:border-cyan-500/30
                                   hover:border-cyan-500/20
                                   placeholder:text-gray-600/50
                                   relative z-[50]
+                                  bg-[#1E1E1E]/80
+                                  resize-none
                                 `}
-                                placeholder="Describe the agent's background and expertise..."
+                                placeholder="Describe the agent's background, expertise, and personality..."
                               />
                             </div>
 
-                            {/* Editable Communication Style */}
-                            <div className="mb-4 relative z-[40]">
-                              <label className={`${styles.label} block mb-1`}>Communication Style</label>
+                            {/* Editable Communication Style with improved spacing */}
+                            <div className="mb-6 relative z-[40]">
+                              <label className={`${styles.label} block mb-2 text-cyan-400/70`}>Communication Style</label>
                               <input
                                 type="text"
                                 value={agentConfig.agentPersonality?.communication_style || ''}
                                 onChange={(e) => {
                                   setAgentConfig(prev => {
-                                    // Create a base personality object that matches the interface
                                     const currentPersonality = prev.agentPersonality || {
                                       name: 'AI Assistant',
                                       expertise: [],
@@ -2610,148 +2617,46 @@ export default function Playground({
                                 }}
                                 className={`
                                   ${styles.input.base}
+                                  h-12
+                                  text-[15px]
                                   focus:ring-1 focus:ring-cyan-500/50 
                                   focus:border-cyan-500/30
                                   hover:border-cyan-500/20
                                   placeholder:text-gray-600/50
                                   relative z-[40]
+                                  bg-[#1E1E1E]/80
                                 `}
                                 placeholder="friendly, professional, technical, casual, etc."
                               />
                             </div>
                           </section>
-                          {/* Document Knowledge Section */}
-                          <section className={styles.section.wrapper}>
-                            <h2 className={styles.section.title}>Document Knowledge</h2>
+
+                          {/* Document Knowledge Section with improved spacing */}
+                          <section className={`${styles.section.wrapper} mt-2`}>
+                            <div className="flex items-center justify-between mb-4">
+                              <h2 className={styles.section.title}>Document Knowledge</h2>
+                              <div className="h-[1px] flex-1 mx-4 bg-gradient-to-r from-transparent via-gray-700/50 to-transparent" />
+                            </div>
                             <motion.div
                               layout
-                              className="relative group bg-[#1E1E1E]/50 backdrop-blur-sm border border-gray-800/50 rounded-lg p-3 transition-all duration-300 hover:border-cyan-500/30 hover:shadow-[0_0_20px_rgba(34,211,238,0.07)]"
+                              className="relative group bg-[#1E1E1E]/80 backdrop-blur-sm border border-gray-800/50 rounded-lg p-4 transition-all duration-300 hover:border-cyan-500/30 hover:shadow-[0_0_20px_rgba(34,211,238,0.07)]"
                             >
                               {/* Background gradient effect */}
                               <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/[0.02] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 pointer-events-none" />
 
                               <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <FileText size={12} className="text-cyan-400 group-hover:animate-pulse shrink-0" />
-                                  <span className="text-[12px] text-gray-300 group-hover:text-cyan-400/90 transition-colors duration-300 truncate">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div className="p-2 rounded-md bg-cyan-500/10 border border-cyan-500/20">
+                                    <FileText size={14} className="text-cyan-400 group-hover:animate-pulse shrink-0" />
+                                  </div>
+                                  <span className="text-[13px] text-gray-300 group-hover:text-cyan-400/90 transition-colors duration-300 truncate">
                                     {brdge?.presentation_filename ||
                                       agentConfig.knowledgeBase.find((k) => k.type === 'presentation')?.name ||
                                       "No document uploaded"}
                                   </span>
                                 </div>
-
-                                {!brdge?.presentation_filename &&
-                                  !agentConfig.knowledgeBase.find((k) => k.type === 'presentation')?.name ? (
-                                  <div className="flex-shrink-0">
-                                    <motion.button
-                                      whileHover={{ scale: 1.02 }}
-                                      whileTap={{ scale: 0.98 }}
-                                      onClick={() => fileInputRef.current?.click()}
-                                      className={`
-                                        relative z-20 group flex items-center gap-1.5
-                                        w-full sm:w-auto
-                                        px-3 py-1.5 rounded-lg text-[11px]
-                                        bg-gradient-to-r from-cyan-500/10 to-transparent
-                                        text-cyan-400/90 border border-cyan-500/20
-                                        transition-all duration-300
-                                        hover:border-cyan-500/40 hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]
-                                        ${isUploading ? 'opacity-50 cursor-wait' : 'cursor-pointer pointer-events-auto'}
-                                        justify-center sm:justify-start
-                                      `}
-                                      disabled={isUploading}
-                                    >
-                                      {isUploading ? (
-                                        <>
-                                          <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                          <span>Uploading...</span>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Plus size={12} className="group-hover:rotate-90 transition-transform duration-300" />
-                                          <span>Upload PDF</span>
-                                        </>
-                                      )}
-                                    </motion.button>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center gap-2 flex-shrink-0">
-                                    <span className="text-[10px] text-gray-600/70 px-2 py-0.5 bg-black/20 rounded-md border border-gray-800/50 group-hover:border-cyan-500/20 transition-all duration-300">
-                                      PDF
-                                    </span>
-                                    <motion.button
-                                      whileTap={{ scale: 0.95 }}
-                                      onClick={() => {
-                                        if (fileInputRef.current) fileInputRef.current.value = '';
-                                        setBrdge((prevBrdge) => prevBrdge ? { ...prevBrdge, presentation_filename: '' } : null);
-                                        setAgentConfig(prev => ({
-                                          ...prev,
-                                          knowledgeBase: prev.knowledgeBase.map((k) =>
-                                            k.type === 'presentation' ? { ...k, name: '', content: '' } : k
-                                          )
-                                        }));
-                                      }}
-                                      className="p-1.5 rounded-md hover:bg-red-500/10 transition-all duration-300"
-                                    >
-                                      <X size={11} className="text-gray-400 hover:text-red-400" />
-                                    </motion.button>
-                                  </div>
-                                )}
                               </div>
                             </motion.div>
-
-                            <div className={styles.divider} />
-
-                            {/* Knowledge Base Section */}
-                            <section className={styles.section.wrapper}>
-                              <div className="flex items-center justify-between mb-4">
-                                <h2 className={styles.section.title}>Knowledge Base</h2>
-                                <motion.button
-                                  whileHover={{ scale: 1.02 }}
-                                  whileTap={{ scale: 0.98 }}
-                                  onClick={() => {
-                                    const newEntry = {
-                                      id: `kb_${Date.now()}`,
-                                      type: "custom",
-                                      name: "New Entry",
-                                      content: ""
-                                    };
-                                    setAgentConfig(prev => ({
-                                      ...prev,
-                                      knowledgeBase: [...prev.knowledgeBase, newEntry]
-                                    }));
-                                  }}
-                                  className={`
-                                    relative z-20
-                                    group flex items-center gap-1.5
-                                    px-3 py-1.5 rounded-lg text-[11px]
-                                    bg-gradient-to-r from-cyan-500/10 to-transparent
-                                    text-cyan-400/90 border border-cyan-500/20
-                                    transition-all duration-300
-                                    hover:border-cyan-500/40
-                                    hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]
-                                  `}
-                                >
-                                  <Plus size={12} className="group-hover:rotate-90 transition-transform duration-300" />
-                                  <span>Add Knowledge</span>
-                                </motion.button>
-                              </div>
-
-                              {/* Knowledge entries */}
-                              <motion.div layout className="space-y-3">
-                                <AnimatePresence>
-                                  {agentConfig.knowledgeBase
-                                    .filter(entry => entry.type !== "presentation")
-                                    .map((entry) => (
-                                      <KnowledgeBubble
-                                        key={entry.id}
-                                        entry={entry}
-                                        onEdit={handleKnowledgeEdit}
-                                        onRemove={handleKnowledgeRemove}
-                                      />
-                                    ))}
-                                </AnimatePresence>
-                              </motion.div>
-                            </section>
                           </section>
                         </div>
                       )}
@@ -3052,21 +2957,6 @@ export default function Playground({
         )}
       </div>
 
-      {/* Hidden file input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".pdf"
-        className="hidden"
-        onChange={async (e) => {
-          const file = e.target.files?.[0];
-          if (file) {
-            await handlePresentationUpload(file);
-            // Clear the input value to allow uploading the same file again
-            e.target.value = '';
-          }
-        }}
-      />
       {isMobile && <MobileFAB />}
     </div>
   );
