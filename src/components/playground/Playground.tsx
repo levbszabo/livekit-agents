@@ -351,9 +351,31 @@ const MobileConfigDrawer = ({
   );
 };
 
-// First, let's define a proper interface for our agent config
+// First, let's update the AgentConfig interface to include structured personality
 interface AgentConfig {
   personality: string;
+  agentPersonality?: {
+    name: string;
+    expertise: string[];
+    knowledge_areas: Array<{
+      topic: string;
+      confidence_level: string;
+      key_talking_points: string[];
+    }>;
+    persona_background: string;
+    response_templates: {
+      greeting?: string | null;
+      not_sure?: string | null;
+      follow_up_questions?: string[];
+    };
+    communication_style: string;
+    voice_characteristics?: {
+      pace?: string;
+      tone?: string;
+      common_phrases?: string[];
+      emphasis_patterns?: string;
+    };
+  };
   knowledgeBase: Array<{
     id: string;
     type: string;
@@ -1105,12 +1127,30 @@ export default function Playground({
   // Add these state variables
   const [agentConfig, setAgentConfig] = useState<AgentConfig>({
     personality: "",
+    agentPersonality: {
+      name: "AI Assistant",
+      expertise: [],
+      knowledge_areas: [],
+      persona_background: "A helpful AI assistant",
+      response_templates: {
+        greeting: null,
+        not_sure: null,
+        follow_up_questions: []
+      },
+      communication_style: "friendly",
+      voice_characteristics: {
+        pace: "measured",
+        tone: "neutral",
+        common_phrases: [],
+        emphasis_patterns: ""
+      }
+    },
     knowledgeBase: [
       { id: "presentation", type: "presentation", name: "", content: "" }
     ]
   });
 
-  // Update the useEffect that fetches agent config
+  // Update the useEffect that fetches agent config to handle the structured personality
   useEffect(() => {
     const fetchAgentConfig = async () => {
       if (!params.brdgeId || !params.apiBaseUrl) return;
@@ -1123,6 +1163,11 @@ export default function Playground({
 
         const data = await response.json();
         console.log('Received agent config:', data);
+
+        // Ensure backwards compatibility - if script data exists, populate the agentPersonality field
+        if (data.script && data.script.agent_personality) {
+          data.agentPersonality = data.script.agent_personality;
+        }
 
         setAgentConfig(data);
       } catch (error) {
@@ -1141,7 +1186,14 @@ export default function Playground({
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newConfig),
+          body: JSON.stringify({
+            personality: newConfig.personality,
+            agentPersonality: newConfig.agentPersonality,
+            knowledgeBase: newConfig.knowledgeBase,
+            script: {
+              agent_personality: newConfig.agentPersonality // Explicitly update script.agent_personality field
+            }
+          }),
         }
       );
       if (response.ok) {
@@ -1640,12 +1692,14 @@ export default function Playground({
   const handleSaveConfig = async () => {
     setIsSaving(true);
     try {
+      // Update the agent config in the backend
       await updateAgentConfig(agentConfig);
       setSaveSuccess(true);
-      // Reset success state after 2 seconds
       setTimeout(() => setSaveSuccess(false), 2000);
     } catch (error) {
-      console.error('Error saving config:', error);
+      console.error('Failed to save agent config:', error);
+      // Use an alert instead of toast
+      alert('Failed to save configuration. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -2415,52 +2469,154 @@ export default function Playground({
                             </motion.button>
                           </div>
 
-                          {/* Agent Personality Section */}
+                          {/* Agent Personality Section with editable fields */}
                           <section className={styles.section.wrapper}>
                             <h2 className={styles.section.title}>Agent Personality</h2>
-                            <div className="
-                              relative group
-                              before:absolute before:inset-0
-                              before:bg-gradient-to-r before:from-cyan-500/[0.02] before:to-transparent
-                              before:opacity-0 before:transition-opacity before:duration-300
-                              hover:before:opacity-100
-                            ">
-                              <textarea
-                                value={agentConfig.personality || ''}
-                                onChange={(e) => {
-                                  const newPersonality = e.target.value;
-                                  // Ensure we're always working with the latest state
-                                  setAgentConfig(prev => ({
-                                    ...prev,
-                                    personality: newPersonality
-                                  }));
 
-                                  // Debounce the save
-                                  debouncedUpdateConfig({
-                                    ...agentConfig,
-                                    personality: newPersonality
+                            {/* Editable Name */}
+                            <div className="mb-4 relative z-[60]">
+                              <label className={`${styles.label} block mb-1`}>Agent Name</label>
+                              <input
+                                type="text"
+                                value={agentConfig.agentPersonality?.name || ''}
+                                onChange={(e) => {
+                                  setAgentConfig(prev => {
+                                    // Create a base personality object that matches the interface
+                                    const currentPersonality = prev.agentPersonality || {
+                                      name: '',
+                                      expertise: [],
+                                      knowledge_areas: [],
+                                      persona_background: 'A helpful AI assistant',
+                                      response_templates: {
+                                        greeting: 'Hello! How can I help you today?',
+                                        not_sure: 'I\'m not sure about that, but I\'d be happy to help with what I know.',
+                                        follow_up_questions: []
+                                      },
+                                      communication_style: 'friendly',
+                                      voice_characteristics: {
+                                        pace: 'measured',
+                                        tone: 'neutral',
+                                        common_phrases: [],
+                                        emphasis_patterns: ''
+                                      }
+                                    };
+
+                                    return {
+                                      ...prev,
+                                      agentPersonality: {
+                                        ...currentPersonality,
+                                        name: e.target.value
+                                      }
+                                    };
                                   });
                                 }}
-                                onKeyDown={(e) => {
-                                  // Handle special key combinations
-                                  if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
-                                    // Type assertion to HTMLTextAreaElement to access select()
-                                    (e.target as HTMLTextAreaElement).select();
-                                  }
-                                }}
-                                placeholder="Describe how you want the AI agent to behave and interact..."
                                 className={`
-                                  ${styles.input.base} ${styles.input.textarea}
-                                  min-h-[120px]
+                                  ${styles.input.base}
                                   focus:ring-1 focus:ring-cyan-500/50 
                                   focus:border-cyan-500/30
                                   hover:border-cyan-500/20
                                   placeholder:text-gray-600/50
-                                  transition-all duration-300
-                                  selection:bg-cyan-500/20
-                                  selection:text-cyan-400
+                                  relative z-[60]
                                 `}
-                                spellCheck={false}
+                                placeholder="Enter agent name..."
+                              />
+                            </div>
+
+                            {/* Editable Persona Background */}
+                            <div className="mb-4 relative z-[50]">
+                              <label className={`${styles.label} block mb-1`}>Persona Background</label>
+                              <textarea
+                                value={agentConfig.agentPersonality?.persona_background || ''}
+                                onChange={(e) => {
+                                  setAgentConfig(prev => {
+                                    // Create a base personality object that matches the interface
+                                    const currentPersonality = prev.agentPersonality || {
+                                      name: 'AI Assistant',
+                                      expertise: [],
+                                      knowledge_areas: [],
+                                      persona_background: '',
+                                      response_templates: {
+                                        greeting: 'Hello! How can I help you today?',
+                                        not_sure: 'I\'m not sure about that, but I\'d be happy to help with what I know.',
+                                        follow_up_questions: []
+                                      },
+                                      communication_style: 'friendly',
+                                      voice_characteristics: {
+                                        pace: 'measured',
+                                        tone: 'neutral',
+                                        common_phrases: [],
+                                        emphasis_patterns: ''
+                                      }
+                                    };
+
+                                    return {
+                                      ...prev,
+                                      agentPersonality: {
+                                        ...currentPersonality,
+                                        persona_background: e.target.value
+                                      }
+                                    };
+                                  });
+                                }}
+                                className={`
+                                  ${styles.input.base} ${styles.input.textarea}
+                                  min-h-[80px]
+                                  focus:ring-1 focus:ring-cyan-500/50 
+                                  focus:border-cyan-500/30
+                                  hover:border-cyan-500/20
+                                  placeholder:text-gray-600/50
+                                  relative z-[50]
+                                `}
+                                placeholder="Describe the agent's background and expertise..."
+                              />
+                            </div>
+
+                            {/* Editable Communication Style */}
+                            <div className="mb-4 relative z-[40]">
+                              <label className={`${styles.label} block mb-1`}>Communication Style</label>
+                              <input
+                                type="text"
+                                value={agentConfig.agentPersonality?.communication_style || ''}
+                                onChange={(e) => {
+                                  setAgentConfig(prev => {
+                                    // Create a base personality object that matches the interface
+                                    const currentPersonality = prev.agentPersonality || {
+                                      name: 'AI Assistant',
+                                      expertise: [],
+                                      knowledge_areas: [],
+                                      persona_background: 'A helpful AI assistant',
+                                      response_templates: {
+                                        greeting: 'Hello! How can I help you today?',
+                                        not_sure: 'I\'m not sure about that, but I\'d be happy to help with what I know.',
+                                        follow_up_questions: []
+                                      },
+                                      communication_style: '',
+                                      voice_characteristics: {
+                                        pace: 'measured',
+                                        tone: 'neutral',
+                                        common_phrases: [],
+                                        emphasis_patterns: ''
+                                      }
+                                    };
+
+                                    return {
+                                      ...prev,
+                                      agentPersonality: {
+                                        ...currentPersonality,
+                                        communication_style: e.target.value
+                                      }
+                                    };
+                                  });
+                                }}
+                                className={`
+                                  ${styles.input.base}
+                                  focus:ring-1 focus:ring-cyan-500/50 
+                                  focus:border-cyan-500/30
+                                  hover:border-cyan-500/20
+                                  placeholder:text-gray-600/50
+                                  relative z-[40]
+                                `}
+                                placeholder="friendly, professional, technical, casual, etc."
                               />
                             </div>
                           </section>
@@ -2479,13 +2635,13 @@ export default function Playground({
                                   <FileText size={12} className="text-cyan-400 group-hover:animate-pulse shrink-0" />
                                   <span className="text-[12px] text-gray-300 group-hover:text-cyan-400/90 transition-colors duration-300 truncate">
                                     {brdge?.presentation_filename ||
-                                      agentConfig.knowledgeBase.find(k => k.type === 'presentation')?.name ||
+                                      agentConfig.knowledgeBase.find((k) => k.type === 'presentation')?.name ||
                                       "No document uploaded"}
                                   </span>
                                 </div>
 
                                 {!brdge?.presentation_filename &&
-                                  !agentConfig.knowledgeBase.find(k => k.type === 'presentation')?.name ? (
+                                  !agentConfig.knowledgeBase.find((k) => k.type === 'presentation')?.name ? (
                                   <div className="flex-shrink-0">
                                     <motion.button
                                       whileHover={{ scale: 1.02 }}
@@ -2526,10 +2682,10 @@ export default function Playground({
                                       whileTap={{ scale: 0.95 }}
                                       onClick={() => {
                                         if (fileInputRef.current) fileInputRef.current.value = '';
-                                        setBrdge(prev => prev ? { ...prev, presentation_filename: '' } : null);
+                                        setBrdge((prevBrdge) => prevBrdge ? { ...prevBrdge, presentation_filename: '' } : null);
                                         setAgentConfig(prev => ({
                                           ...prev,
-                                          knowledgeBase: prev.knowledgeBase.map(k =>
+                                          knowledgeBase: prev.knowledgeBase.map((k) =>
                                             k.type === 'presentation' ? { ...k, name: '', content: '' } : k
                                           )
                                         }));
