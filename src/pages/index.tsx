@@ -50,15 +50,19 @@ export function HomeInner() {
   const { toastMessage, setToastMessage } = useToast();
   const [brdgeId, setBrdgeId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
-  const [urlParams, setUrlParams] = useState<{ brdgeId: string | null }>({ brdgeId: null });
+  const [urlParams, setUrlParams] = useState<{ brdgeId: string | null; token: string | null }>({ brdgeId: null, token: null });
 
   // Get URL params including brdgeId and detect mobile devices
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const searchParams = new URLSearchParams(window.location.search);
       const brdgeIdParam = searchParams.get('brdgeId');
+      const tokenParam = searchParams.get('token');
 
-      setUrlParams({ brdgeId: brdgeIdParam });
+      setUrlParams({
+        brdgeId: brdgeIdParam,
+        token: tokenParam || null
+      });
       setBrdgeId(brdgeIdParam);
 
       // Function to check if device is mobile
@@ -203,14 +207,12 @@ export function HomeInner() {
           >
             <PlaygroundComponent
               themeColors={themeColors}
-              params={{
-                brdgeId: brdgeId,
-                token: token
-              }}
+              params={urlParams}
               onConnect={(c) => {
                 const m = process.env.NEXT_PUBLIC_LIVEKIT_URL ? "env" : mode;
                 handleConnect(c, m);
               }}
+              agentType={urlParams?.agentType as 'edit' | 'view'}
             />
             <RoomAudioRenderer />
             <StartAudio label="Click to enable audio playback" />
