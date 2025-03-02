@@ -3358,8 +3358,8 @@ export default function Playground({
                                 <div className="bg-black/20 rounded-lg p-3 border border-gray-800/50">
                                   <h5 className="text-[12px] text-gray-300/90 mb-2">Sample text to read:</h5>
                                   <p className="text-[12px] text-gray-400/90 leading-relaxed italic">
-                                    "In just a few quick steps my voice based AI assistant will be integrated into my content.
-                                    This way you can speak to others without being there... how cool is that?"
+                                    &ldquo;In just a few quick steps my voice based AI assistant will be integrated into my content.
+                                    This way you can speak to others without being there... how cool is that?&rdquo;
                                   </p>
                                 </div>
 
