@@ -18,7 +18,7 @@ import {
   PanelGroup,
   PanelResizeHandle
 } from 'react-resizable-panels';
-import { Plus, FileText, X, Edit2, Save, ChevronDown, ChevronUp, Play, Pause, Volume2, VolumeX, Maximize2, Mic, MicOff, Radio, ChevronRight, Info } from 'lucide-react';
+import { Plus, FileText, X, Edit2, Save, ChevronDown, ChevronUp, Play, Pause, Volume2, VolumeX, Maximize2, Mic, MicOff, Radio, ChevronRight, Info, Link, Lock, Globe, Copy, Check, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import styled, { keyframes } from 'styled-components';
 
@@ -67,7 +67,7 @@ interface SavedVoice {
 }
 
 type MobileTab = 'chat' | 'script' | 'voice' | 'info';
-type ConfigTab = 'ai-agent' | 'voice-clone' | 'chat';
+type ConfigTab = 'ai-agent' | 'voice-clone' | 'chat' | 'share';
 
 interface DataChannelMessage {
   payload: Uint8Array;
@@ -1785,7 +1785,8 @@ export default function Playground({
   ] : [
     { id: 'ai-agent', label: 'AI Agent' },
     { id: 'voice-clone', label: 'Voice Clone' },
-    { id: 'chat', label: 'Chat' }
+    { id: 'chat', label: 'Chat' },
+    { id: 'share', label: 'Share' }
   ];
 
   // Update the data channel usage
@@ -2185,6 +2186,127 @@ export default function Playground({
 
     return [...bridgeVoices, ...otherBridgeVoices] as EnhancedVoice[];
   }, [savedVoices, userVoices, params.brdgeId]);
+
+  // In the main component, add state for link copying
+  const [isCopied, setIsCopied] = useState(false);
+  const [shareableLink, setShareableLink] = useState('');
+
+  // Add this function to toggle the shareable status of the brdge
+  const toggleShareable = async () => {
+    if (!params.brdgeId || !params.apiBaseUrl || !brdge) return;
+
+    try {
+      const response = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/toggle_shareable`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('token') ? {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          } : {})
+        },
+        credentials: 'omit'
+      });
+
+      if (!response.ok) throw new Error('Failed to toggle shareable status');
+
+      const data = await response.json();
+
+      // Update the brdge object with the new shareable status
+      setBrdge(prev => prev ? { ...prev, shareable: data.shareable } : null);
+
+      // Update the shareable link
+      updateShareableLink(data.shareable);
+    } catch (error) {
+      console.error('Error toggling shareable status:', error);
+    }
+  };
+
+  // Function to format and update the shareable link
+  const updateShareableLink = useCallback((isShareable: boolean) => {
+    if (!brdge || !isShareable) {
+      setShareableLink('');
+      return;
+    }
+
+    // Determine the correct base URL based on environment
+    let baseUrl = window.location.origin;
+
+    // In development, if we're on port 3001 (iframe), change to port 3000 (main app)
+    if (baseUrl.includes('localhost:3001')) {
+      baseUrl = baseUrl.replace('3001', '3000');
+    }
+
+    // In production, we keep the current origin (https://brdge-ai.com)
+    // Construct the shareable URL with the correct path format
+    const shareableUrl = `${baseUrl}/viewBridge/${brdge.id}-${brdge.public_id?.substring(0, 6)}`;
+    setShareableLink(shareableUrl);
+  }, [brdge]);
+
+  // Update the shareable link when the brdge changes
+  useEffect(() => {
+    if (brdge) {
+      updateShareableLink(brdge.shareable);
+    }
+  }, [brdge, updateShareableLink]);
+
+  // Function to copy link to clipboard
+  const copyLinkToClipboard = () => {
+    if (!shareableLink) {
+      console.error('Cannot copy - shareableLink is empty');
+      return;
+    }
+
+    console.log('Copying link to clipboard:', shareableLink);
+
+    // Try using the modern Clipboard API first
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(shareableLink)
+        .then(() => {
+          console.log('Successfully copied using Clipboard API');
+          setIsCopied(true);
+          setTimeout(() => setIsCopied(false), 2000);
+        })
+        .catch(err => {
+          console.error('Clipboard API failed:', err);
+          // Fall back to execCommand method
+          fallbackCopyToClipboard();
+        });
+    } else {
+      // For browsers that don't support clipboard API
+      fallbackCopyToClipboard();
+    }
+  };
+
+  // Fallback copy method using document.execCommand
+  const fallbackCopyToClipboard = () => {
+    try {
+      // Create a temporary textarea element
+      const textArea = document.createElement('textarea');
+      textArea.value = shareableLink;
+
+      // Make it invisible but part of the document
+      textArea.style.position = 'fixed';
+      textArea.style.opacity = '0';
+      document.body.appendChild(textArea);
+
+      // Select and copy
+      textArea.select();
+      const success = document.execCommand('copy');
+
+      // Clean up
+      document.body.removeChild(textArea);
+
+      if (success) {
+        console.log('Successfully copied using execCommand fallback');
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+      } else {
+        console.error('execCommand copy failed');
+      }
+    } catch (err) {
+      console.error('Fallback copy method failed:', err);
+    }
+  };
 
   return (
     <div className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
@@ -2703,11 +2825,11 @@ export default function Playground({
                     <>
                       {activeTab === 'ai-agent' && (
                         <div className={`
-                          h-full
+                          h-full pt-0 overflow-hidden
                           ${activeTab === 'ai-agent' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}
                           transition-opacity duration-300
                         `}>
-                          <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center justify-between mb-1">
                             <h2 className={styles.section.title}>AI Agent Configuration</h2>
                             <motion.button
                               whileHover={{ scale: 1.02 }}
@@ -2716,7 +2838,7 @@ export default function Playground({
                               disabled={isSaving}
                               className={`
                                 group flex items-center gap-1.5
-                                px-3 py-1.5 rounded-lg
+                                px-3 py-1 rounded-lg
                                 bg-gradient-to-r 
                                 ${saveSuccess
                                   ? 'from-green-500/20 to-green-400/10 border-green-500/30'
@@ -2767,191 +2889,255 @@ export default function Playground({
                             </motion.button>
                           </div>
 
-                          {/* Agent Personality Section with improved spacing */}
-                          <section className={`${styles.section.wrapper} mb-6`}>
-                            <div className="flex items-center justify-between mb-6">
-                              <h2 className={styles.section.title}>Agent Personality</h2>
-                              <div className="h-[1px] flex-1 mx-4 bg-gradient-to-r from-transparent via-gray-700/50 to-transparent" />
+                          {/* Agent Personality Section - Streamlined styling */}
+                          <section className="relative mb-3 p-2 rounded-lg group">
+                            {/* Background and border effects */}
+                            <div className="absolute inset-0 border border-gray-800/50 rounded-lg transition-all duration-300 group-hover:border-cyan-500/20 group-hover:shadow-[0_0_15px_rgba(34,211,238,0.05)]"></div>
+                            <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/[0.02] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 rounded-lg"></div>
+
+                            {/* Section Header - Minimized height */}
+                            <div className="flex items-center mb-2 relative z-10">
+                              <div className="w-1.5 h-1.5 rounded-full bg-cyan-400/70 shadow-[0_0_5px_rgba(34,211,238,0.5)] mr-1.5"></div>
+                              <h2 className="font-satoshi text-[14px] font-medium tracking-[-0.01em] text-cyan-400">Agent Personality</h2>
+                              <div className="h-[1px] flex-1 ml-2 mr-1 bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent"></div>
                             </div>
 
-                            {/* Editable Name with improved spacing */}
-                            <div className="mb-8 relative z-[60]">
-                              <label className={`${styles.label} block mb-2 text-cyan-400/70`}>Agent Name</label>
-                              <input
-                                type="text"
-                                value={agentConfig.agentPersonality?.name || ''}
-                                onChange={(e) => {
-                                  setAgentConfig(prev => {
-                                    const currentPersonality = prev.agentPersonality || {
-                                      name: '',
-                                      expertise: [],
-                                      knowledge_areas: [],
-                                      persona_background: 'A helpful AI assistant',
-                                      response_templates: {
-                                        greeting: 'Hello! How can I help you today?',
-                                        not_sure: 'I\'m not sure about that, but I\'d be happy to help with what I know.',
-                                        follow_up_questions: []
-                                      },
-                                      communication_style: 'friendly',
-                                      voice_characteristics: {
-                                        pace: 'measured',
-                                        tone: 'neutral',
-                                        common_phrases: [],
-                                        emphasis_patterns: ''
-                                      }
-                                    };
+                            <div className="space-y-3 relative z-10">
+                              {/* Agent Name Field - More compact */}
+                              <div className="relative z-10 group/field transition-all duration-300">
+                                <label className="block mb-1 text-[11px] font-medium text-cyan-400/80 transition-colors group-focus-within/field:text-cyan-400">Agent Name</label>
+                                <div className="relative">
+                                  <input
+                                    type="text"
+                                    value={agentConfig.agentPersonality?.name || ''}
+                                    onChange={(e) => {
+                                      setAgentConfig(prev => {
+                                        const currentPersonality = prev.agentPersonality || {
+                                          name: '',
+                                          expertise: [],
+                                          knowledge_areas: [],
+                                          persona_background: 'A helpful AI assistant',
+                                          response_templates: {
+                                            greeting: 'Hello! How can I help you today?',
+                                            not_sure: 'I\'m not sure about that, but I\'d be happy to help with what I know.',
+                                            follow_up_questions: []
+                                          },
+                                          communication_style: 'friendly',
+                                          voice_characteristics: {
+                                            pace: 'measured',
+                                            tone: 'neutral',
+                                            common_phrases: [],
+                                            emphasis_patterns: ''
+                                          }
+                                        };
 
-                                    return {
-                                      ...prev,
-                                      agentPersonality: {
-                                        ...currentPersonality,
-                                        name: e.target.value
-                                      }
-                                    };
-                                  });
-                                }}
-                                className={`
-                                  ${styles.input.base}
-                                  h-12
-                                  text-[15px]
-                                  focus:ring-1 focus:ring-cyan-500/50 
-                                  focus:border-cyan-500/30
-                                  hover:border-cyan-500/20
-                                  placeholder:text-gray-600/50
-                                  relative z-[60]
-                                  bg-[#1E1E1E]/80
-                                `}
-                                placeholder="Enter agent name..."
-                              />
-                            </div>
+                                        return {
+                                          ...prev,
+                                          agentPersonality: {
+                                            ...currentPersonality,
+                                            name: e.target.value
+                                          }
+                                        };
+                                      });
+                                    }}
+                                    className={`
+                                      w-full px-3 py-2
+                                      text-[14px] text-white
+                                      bg-[#1E1E1E]/80 backdrop-blur-sm
+                                      border border-gray-800/50 rounded-lg
+                                      transition-all duration-300
+                                      focus:ring-1 focus:ring-cyan-500/50 
+                                      focus:border-cyan-500/30
+                                      focus:shadow-[0_0_15px_rgba(34,211,238,0.1)]
+                                      hover:border-cyan-500/20
+                                      placeholder:text-gray-600/50
+                                      relative z-10
+                                    `}
+                                    placeholder="Enter agent name..."
+                                  />
+                                </div>
+                              </div>
 
-                            {/* Editable Persona Background with improved spacing */}
-                            <div className="mb-8 relative z-[50]">
-                              <label className={`${styles.label} block mb-2 text-cyan-400/70`}>Persona Background</label>
-                              <textarea
-                                value={agentConfig.agentPersonality?.persona_background || ''}
-                                onChange={(e) => {
-                                  setAgentConfig(prev => {
-                                    const currentPersonality = prev.agentPersonality || {
-                                      name: 'AI Assistant',
-                                      expertise: [],
-                                      knowledge_areas: [],
-                                      persona_background: '',
-                                      response_templates: {
-                                        greeting: 'Hello! How can I help you today?',
-                                        not_sure: 'I\'m not sure about that, but I\'d be happy to help with what I know.',
-                                        follow_up_questions: []
-                                      },
-                                      communication_style: 'friendly',
-                                      voice_characteristics: {
-                                        pace: 'measured',
-                                        tone: 'neutral',
-                                        common_phrases: [],
-                                        emphasis_patterns: ''
-                                      }
-                                    };
+                              {/* Persona Background Field - Optimized space */}
+                              <div className="relative z-10 group/field transition-all duration-300">
+                                <label className="block mb-1 text-[11px] font-medium text-cyan-400/80 transition-colors group-focus-within/field:text-cyan-400">Persona Background</label>
+                                <div className="relative">
+                                  <textarea
+                                    value={agentConfig.agentPersonality?.persona_background || ''}
+                                    onChange={(e) => {
+                                      setAgentConfig(prev => {
+                                        const currentPersonality = prev.agentPersonality || {
+                                          name: 'AI Assistant',
+                                          expertise: [],
+                                          knowledge_areas: [],
+                                          persona_background: '',
+                                          response_templates: {
+                                            greeting: 'Hello! How can I help you today?',
+                                            not_sure: 'I\'m not sure about that, but I\'d be happy to help with what I know.',
+                                            follow_up_questions: []
+                                          },
+                                          communication_style: 'friendly',
+                                          voice_characteristics: {
+                                            pace: 'measured',
+                                            tone: 'neutral',
+                                            common_phrases: [],
+                                            emphasis_patterns: ''
+                                          }
+                                        };
 
-                                    return {
-                                      ...prev,
-                                      agentPersonality: {
-                                        ...currentPersonality,
-                                        persona_background: e.target.value
-                                      }
-                                    };
-                                  });
-                                }}
-                                className={`
-                                  ${styles.input.base} ${styles.input.textarea}
-                                  min-h-[160px]
-                                  text-[15px]
-                                  leading-relaxed
-                                  focus:ring-1 focus:ring-cyan-500/50 
-                                  focus:border-cyan-500/30
-                                  hover:border-cyan-500/20
-                                  placeholder:text-gray-600/50
-                                  relative z-[50]
-                                  bg-[#1E1E1E]/80
-                                  resize-none
-                                `}
-                                placeholder="Describe the agent's background, expertise, and personality..."
-                              />
-                            </div>
+                                        return {
+                                          ...prev,
+                                          agentPersonality: {
+                                            ...currentPersonality,
+                                            persona_background: e.target.value
+                                          }
+                                        };
+                                      });
+                                    }}
+                                    className={`
+                                      w-full
+                                      min-h-[140px]
+                                      px-3 py-2
+                                      text-[14px] leading-relaxed
+                                      text-white
+                                      bg-[#1E1E1E]/80 backdrop-blur-sm
+                                      border border-gray-800/50 rounded-lg
+                                      transition-all duration-300
+                                      focus:ring-1 focus:ring-cyan-500/50 
+                                      focus:border-cyan-500/30
+                                      focus:shadow-[0_0_15px_rgba(34,211,238,0.1)]
+                                      hover:border-cyan-500/20
+                                      placeholder:text-gray-600/50
+                                      relative z-10
+                                      resize-none
+                                      scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-700/30
+                                      hover:scrollbar-thumb-cyan-500/20
+                                    `}
+                                    placeholder="Describe the agent's background, expertise, and personality..."
+                                  />
+                                  <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/[0.01] to-transparent opacity-0 transition-opacity duration-300 group-hover/field:opacity-100 rounded-lg pointer-events-none"></div>
+                                </div>
+                                <div className="mt-0.5 text-[10px] text-gray-500/70 opacity-70 px-1">
+                                  Customize how the AI represents you to users
+                                </div>
+                              </div>
 
-                            {/* Editable Communication Style with improved spacing */}
-                            <div className="mb-6 relative z-[40]">
-                              <label className={`${styles.label} block mb-2 text-cyan-400/70`}>Communication Style</label>
-                              <input
-                                type="text"
-                                value={agentConfig.agentPersonality?.communication_style || ''}
-                                onChange={(e) => {
-                                  setAgentConfig(prev => {
-                                    const currentPersonality = prev.agentPersonality || {
-                                      name: 'AI Assistant',
-                                      expertise: [],
-                                      knowledge_areas: [],
-                                      persona_background: 'A helpful AI assistant',
-                                      response_templates: {
-                                        greeting: 'Hello! How can I help you today?',
-                                        not_sure: 'I\'m not sure about that, but I\'d be happy to help with what I know.',
-                                        follow_up_questions: []
-                                      },
-                                      communication_style: '',
-                                      voice_characteristics: {
-                                        pace: 'measured',
-                                        tone: 'neutral',
-                                        common_phrases: [],
-                                        emphasis_patterns: ''
-                                      }
-                                    };
+                              {/* Communication Style Field - Optimized */}
+                              <div className="relative z-10 group/field transition-all duration-300">
+                                <label className="block mb-1 text-[11px] font-medium text-cyan-400/80 transition-colors group-focus-within/field:text-cyan-400">Communication Style</label>
+                                <div className="relative">
+                                  <input
+                                    type="text"
+                                    value={agentConfig.agentPersonality?.communication_style || ''}
+                                    onChange={(e) => {
+                                      setAgentConfig(prev => {
+                                        const currentPersonality = prev.agentPersonality || {
+                                          name: 'AI Assistant',
+                                          expertise: [],
+                                          knowledge_areas: [],
+                                          persona_background: 'A helpful AI assistant',
+                                          response_templates: {
+                                            greeting: 'Hello! How can I help you today?',
+                                            not_sure: 'I\'m not sure about that, but I\'d be happy to help with what I know.',
+                                            follow_up_questions: []
+                                          },
+                                          communication_style: '',
+                                          voice_characteristics: {
+                                            pace: 'measured',
+                                            tone: 'neutral',
+                                            common_phrases: [],
+                                            emphasis_patterns: ''
+                                          }
+                                        };
 
-                                    return {
-                                      ...prev,
-                                      agentPersonality: {
-                                        ...currentPersonality,
-                                        communication_style: e.target.value
-                                      }
-                                    };
-                                  });
-                                }}
-                                className={`
-                                  ${styles.input.base}
-                                  h-12
-                                  text-[15px]
-                                  focus:ring-1 focus:ring-cyan-500/50 
-                                  focus:border-cyan-500/30
-                                  hover:border-cyan-500/20
-                                  placeholder:text-gray-600/50
-                                  relative z-[40]
-                                  bg-[#1E1E1E]/80
-                                `}
-                                placeholder="friendly, professional, technical, casual, etc."
-                              />
+                                        return {
+                                          ...prev,
+                                          agentPersonality: {
+                                            ...currentPersonality,
+                                            communication_style: e.target.value
+                                          }
+                                        };
+                                      });
+                                    }}
+                                    className={`
+                                      w-full px-3 py-2
+                                      text-[14px] text-white
+                                      bg-[#1E1E1E]/80 backdrop-blur-sm
+                                      border border-gray-800/50 rounded-lg
+                                      transition-all duration-300
+                                      focus:ring-1 focus:ring-cyan-500/50 
+                                      focus:border-cyan-500/30
+                                      focus:shadow-[0_0_15px_rgba(34,211,238,0.1)]
+                                      hover:border-cyan-500/20
+                                      placeholder:text-gray-600/50
+                                      relative z-10
+                                    `}
+                                    placeholder="friendly, professional, technical, casual, etc."
+                                  />
+                                </div>
+                                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                  {["friendly", "professional", "technical", "casual", "energetic", "authoritative"].map(style => (
+                                    <button
+                                      key={style}
+                                      type="button"
+                                      onClick={() => {
+                                        setAgentConfig(prev => ({
+                                          ...prev,
+                                          agentPersonality: {
+                                            ...prev.agentPersonality!,
+                                            communication_style: style
+                                          }
+                                        }));
+                                      }}
+                                      className={`
+                                        px-2 py-0.5 rounded-full text-[10px]
+                                        transition-all duration-300
+                                        border 
+                                        ${agentConfig.agentPersonality?.communication_style === style
+                                          ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
+                                          : 'bg-gray-800/20 text-gray-400 border-gray-800/50 hover:text-gray-300 hover:border-gray-700'
+                                        }
+                                      `}
+                                    >
+                                      {style}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
                             </div>
                           </section>
 
-                          {/* Document Knowledge Section with improved spacing */}
-                          <section className={`${styles.section.wrapper} mt-2`}>
-                            <div className="flex items-center justify-between mb-4">
-                              <h2 className={styles.section.title}>Document Knowledge</h2>
-                              <div className="h-[1px] flex-1 mx-4 bg-gradient-to-r from-transparent via-gray-700/50 to-transparent" />
+                          {/* Document Knowledge Section - Also optimized */}
+                          <section className="relative p-2 rounded-lg group mt-2">
+                            {/* Background and border effects */}
+                            <div className="absolute inset-0 border border-gray-800/50 rounded-lg transition-all duration-300 group-hover:border-cyan-500/20 group-hover:shadow-[0_0_15px_rgba(34,211,238,0.05)]"></div>
+                            <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/[0.02] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 rounded-lg"></div>
+
+                            {/* Section Header */}
+                            <div className="flex items-center mb-2 relative z-10">
+                              <div className="w-1.5 h-1.5 rounded-full bg-cyan-400/70 shadow-[0_0_5px_rgba(34,211,238,0.5)] mr-1.5"></div>
+                              <h2 className="font-satoshi text-[14px] font-medium tracking-[-0.01em] text-cyan-400">Document Knowledge</h2>
+                              <div className="h-[1px] flex-1 ml-2 mr-1 bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent"></div>
                             </div>
+
                             <motion.div
                               layout
-                              className="relative group bg-[#1E1E1E]/80 backdrop-blur-sm border border-gray-800/50 rounded-lg p-4 transition-all duration-300 hover:border-cyan-500/30 hover:shadow-[0_0_20px_rgba(34,211,238,0.07)]"
+                              className="relative group bg-[#1E1E1E]/80 backdrop-blur-sm border border-gray-800/50 rounded-lg p-2.5 transition-all duration-300 hover:border-cyan-500/30 hover:shadow-[0_0_20px_rgba(34,211,238,0.07)]"
                             >
                               {/* Background gradient effect */}
-                              <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/[0.02] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 pointer-events-none" />
+                              <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/[0.02] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 pointer-events-none rounded-lg"></div>
 
-                              <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                <div className="flex items-center gap-3 min-w-0">
-                                  <div className="p-2 rounded-md bg-cyan-500/10 border border-cyan-500/20">
-                                    <FileText size={14} className="text-cyan-400 group-hover:animate-pulse shrink-0" />
-                                  </div>
-                                  <span className="text-[13px] text-gray-300 group-hover:text-cyan-400/90 transition-colors duration-300 truncate">
+                              <div className="relative flex items-center gap-2.5 min-w-0">
+                                <div className="p-1.5 rounded-md bg-cyan-500/10 border border-cyan-500/20 flex-shrink-0">
+                                  <FileText size={15} className="text-cyan-400 group-hover:animate-pulse" />
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-[13px] text-gray-300 group-hover:text-cyan-400/90 transition-colors duration-300 truncate font-medium">
                                     {brdge?.presentation_filename ||
                                       agentConfig.knowledgeBase.find((k) => k.type === 'presentation')?.name ||
                                       "No document uploaded"}
                                   </span>
+                                  <span className="text-[10px] text-gray-500/70">Source for AI knowledge</span>
                                 </div>
                               </div>
                             </motion.div>
@@ -2960,12 +3146,12 @@ export default function Playground({
                       )}
                       {activeTab === 'voice-clone' && (
                         <div className={`
-                          h-full overflow-y-auto
+                          h-full pt-0 overflow-y-auto
                           ${activeTab === 'voice-clone' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}
                           transition-opacity duration-300
                         `}>
-                          <div className="mb-6 border-b border-gray-800/30 pb-4">
-                            <div className="flex items-center justify-between mb-6">
+                          <div className="mb-3 border-b border-gray-800/30 pb-3">
+                            <div className="flex items-center justify-between mb-1">
                               <h2 className={styles.section.title}>Voice Configuration</h2>
                               <div className="h-[1px] flex-1 mx-4 bg-gradient-to-r from-transparent via-gray-700/50 to-transparent" />
                             </div>
@@ -3374,6 +3560,167 @@ export default function Playground({
                                 )}
                               </div>
                             )}
+                          </div>
+                        </div>
+                      )}
+                      {activeTab === 'share' && (
+                        <div className={`
+                          h-full pt-0 overflow-y-auto
+                          ${activeTab === 'share' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}
+                          transition-opacity duration-300
+                        `}>
+                          <div className="flex items-center justify-between mb-1">
+                            <h2 className={styles.section.title}>Sharing Configuration</h2>
+                          </div>
+
+                          <div className="mb-6 border-b border-gray-800/30 pb-3">
+                            {/* Public/Private Toggle Section */}
+                            <section className="relative p-2 rounded-lg group mb-4">
+                              {/* Background and border effects */}
+                              <div className="absolute inset-0 border border-gray-800/50 rounded-lg transition-all duration-300 group-hover:border-cyan-500/20 group-hover:shadow-[0_0_15px_rgba(34,211,238,0.05)]"></div>
+                              <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/[0.02] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 rounded-lg"></div>
+
+                              {/* Section Header */}
+                              <div className="flex items-center mb-2 relative z-10">
+                                <div className="w-1.5 h-1.5 rounded-full bg-cyan-400/70 shadow-[0_0_5px_rgba(34,211,238,0.5)] mr-1.5"></div>
+                                <h2 className="font-satoshi text-[14px] font-medium tracking-[-0.01em] text-cyan-400">Public Access</h2>
+                                <div className="h-[1px] flex-1 ml-2 mr-1 bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent"></div>
+                              </div>
+
+                              {/* Toggle control */}
+                              <div className="flex items-center justify-between p-4 bg-gray-900/40 backdrop-blur-sm rounded-lg border border-gray-800/50 hover:border-cyan-500/20 transition-all duration-300 relative z-10">
+                                <div className="flex flex-col">
+                                  <div className="flex items-center gap-2">
+                                    {brdge?.shareable ? (
+                                      <>
+                                        <Globe size={18} className="text-cyan-400 filter drop-shadow-[0_0_8px_rgba(34,211,238,0.4)]" />
+                                        <h3 className="text-[14px] font-medium text-cyan-400">Public</h3>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Lock size={18} className="text-gray-400" />
+                                        <h3 className="text-[14px] font-medium text-gray-400">Private</h3>
+                                      </>
+                                    )}
+                                  </div>
+                                  <p className="text-[12px] text-gray-400 mt-1">
+                                    {brdge?.shareable
+                                      ? "Anyone with the link can view this bridge"
+                                      : "Only you can view this bridge"}
+                                  </p>
+                                </div>
+
+                                <div className="flex items-center">
+                                  <label className="relative inline-flex items-center cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={brdge?.shareable || false}
+                                      onChange={toggleShareable}
+                                      className="sr-only peer"
+                                    />
+                                    <div className={`
+                                      w-11 h-6 rounded-full
+                                      after:content-[''] after:absolute after:top-[2px] after:left-[2px]
+                                      after:bg-white after:rounded-full after:h-5 after:w-5
+                                      after:transition-all peer-checked:after:translate-x-full
+                                      ${brdge?.shareable
+                                        ? 'bg-cyan-500/30 border-cyan-500/50 after:shadow-[0_0_8px_rgba(34,211,238,0.4)]'
+                                        : 'bg-gray-800 border-gray-700'}
+                                      border transition-all duration-300
+                                    `}></div>
+                                  </label>
+                                </div>
+                              </div>
+                            </section>
+
+                            {/* Share Link Section */}
+                            <section className="relative p-2 rounded-lg group mb-4">
+                              {/* Background and border effects */}
+                              <div className="absolute inset-0 border border-gray-800/50 rounded-lg transition-all duration-300 group-hover:border-cyan-500/20 group-hover:shadow-[0_0_15px_rgba(34,211,238,0.05)]"></div>
+                              <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/[0.02] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 rounded-lg"></div>
+
+                              {/* Section Header */}
+                              <div className="flex items-center mb-2 relative z-10">
+                                <div className="w-1.5 h-1.5 rounded-full bg-cyan-400/70 shadow-[0_0_5px_rgba(34,211,238,0.5)] mr-1.5"></div>
+                                <h2 className="font-satoshi text-[14px] font-medium tracking-[-0.01em] text-cyan-400">Share Link</h2>
+                                <div className="h-[1px] flex-1 ml-2 mr-1 bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent"></div>
+                              </div>
+
+                              {/* Link display and copy button */}
+                              <div className={`
+                                relative p-4 bg-gray-900/40 backdrop-blur-sm rounded-lg
+                                border transition-all duration-300 z-10
+                                ${brdge?.shareable
+                                  ? 'border-cyan-500/20 hover:border-cyan-500/30 hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]'
+                                  : 'border-gray-800/50 opacity-50'}
+                              `}>
+                                {brdge?.shareable ? (
+                                  <div className="flex flex-col space-y-3">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <Link size={15} className="text-cyan-400" />
+                                        <span className="text-[13px] text-white">Shareable Link</span>
+                                      </div>
+                                      <a
+                                        href={shareableLink}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-1 text-[11px] text-cyan-400 hover:text-cyan-300 transition-colors"
+                                      >
+                                        <span>Open</span>
+                                        <ExternalLink size={11} />
+                                      </a>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                      <div className="flex-1 px-3 py-2 bg-black/30 border border-gray-800/50 rounded-lg text-[13px] text-gray-300 truncate">
+                                        {shareableLink}
+                                      </div>
+                                      <button
+                                        onClick={copyLinkToClipboard}
+                                        className={`
+                                          p-2 rounded-lg transition-all duration-300
+                                          ${isCopied
+                                            ? 'bg-green-500/10 text-green-400'
+                                            : 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20'}
+                                        `}
+                                      >
+                                        {isCopied ? <Check size={18} /> : <Copy size={18} />}
+                                      </button>
+                                    </div>
+
+                                    <div className="text-[11px] text-gray-500">
+                                      {isCopied ? (
+                                        <span className="text-green-400">✓ Link copied to clipboard!</span>
+                                      ) : (
+                                        "Share this link with anyone you want to give access to your bridge"
+                                      )}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col items-center justify-center py-4">
+                                    <Lock size={24} className="text-gray-500 mb-2" />
+                                    <p className="text-[13px] text-gray-400 text-center">
+                                      Enable public access to get a shareable link
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            </section>
+
+                            {/* Privacy Information */}
+                            <div className="bg-gray-900/20 border border-gray-800/30 rounded-lg p-3 mt-6">
+                              <div className="flex items-start gap-2">
+                                <Info size={14} className="text-gray-400 mt-0.5" />
+                                <div>
+                                  <h4 className="text-[12px] font-medium text-white/80 mb-1">Privacy Information</h4>
+                                  <p className="text-[11px] text-gray-400 leading-relaxed">
+                                    When shared publicly, anyone with the link can view and interact with your bridge.
+                                    You can disable public access at any time by toggling the switch above.
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       )}
