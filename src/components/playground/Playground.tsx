@@ -1241,7 +1241,7 @@ export default function Playground({
   }, []);
 
   // Add this function to make authenticated API requests
-  const makeAuthenticatedRequest = useCallback(async (url, options = {}) => {
+  const makeAuthenticatedRequest = useCallback(async (url: string, options: RequestInit = {}) => {
     try {
       const token = localStorage.getItem('token');
       const headers = {
