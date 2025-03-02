@@ -2677,7 +2677,7 @@ export default function Playground({
                 `}>
                   {/* Info Tooltip */}
                   <div className={`
-                    absolute top-12 left-1/2 -translate-x-1/2 z-20
+                    absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20
                     transition-all duration-500
                     ${(isMobile || activeTab === 'chat') && isInfoVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'}
                   `}>
@@ -2695,7 +2695,7 @@ export default function Playground({
                       >
                         <X size={10} />
                       </button>
-                      Click the mic button to speak or type your message below
+                      Click the mic button to speak or type a message into the chat.
                     </div>
                   </div>
 
