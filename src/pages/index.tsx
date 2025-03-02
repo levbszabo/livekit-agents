@@ -50,7 +50,7 @@ export function HomeInner() {
   const { toastMessage, setToastMessage } = useToast();
   const [brdgeId, setBrdgeId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
-  const [urlParams, setUrlParams] = useState<{ brdgeId: string | null; token: string | null }>({ brdgeId: null, token: null });
+  const [urlParams, setUrlParams] = useState<{ brdgeId: string | null; token?: string; agentType?: 'edit' | 'view' }>({ brdgeId: null, token: undefined, agentType: 'edit' });
 
   // Get URL params including brdgeId and detect mobile devices
   useEffect(() => {
@@ -61,7 +61,7 @@ export function HomeInner() {
 
       setUrlParams({
         brdgeId: brdgeIdParam,
-        token: tokenParam || null
+        token: tokenParam || undefined
       });
       setBrdgeId(brdgeIdParam);
 
