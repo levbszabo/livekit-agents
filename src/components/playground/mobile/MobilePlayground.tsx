@@ -43,7 +43,8 @@ import {
     Check,
     Copy,
     Link,
-    Info
+    Info,
+    Monitor
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import styled, { keyframes, css } from 'styled-components';
@@ -1095,6 +1096,56 @@ interface SettingsDrawerProps {
     onPresentationClick: () => void;
 }
 
+// Add this component near the top with other component definitions
+const MobileEditDisclaimer = () => (
+    <div className="flex flex-col items-center justify-center h-full px-4 py-8">
+        <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-md bg-gradient-to-b from-amber-500/10 to-amber-500/5
+                backdrop-blur-sm border border-amber-500/20 rounded-xl p-6 
+                shadow-[0_0_30px_rgba(245,158,11,0.1)]"
+        >
+            <div className="flex flex-col items-center text-center">
+                {/* Icon */}
+                <div className="w-12 h-12 rounded-full bg-amber-500/10 
+                    flex items-center justify-center mb-4
+                    border border-amber-500/20">
+                    <Monitor className="w-6 h-6 text-amber-400" />
+                </div>
+
+                {/* Title */}
+                <h3 className="text-[16px] font-semibold text-amber-400 mb-3">
+                    Desktop Required for Editing
+                </h3>
+
+                {/* Description */}
+                <p className="text-[14px] text-amber-300/80 leading-relaxed mb-6">
+                    Editing Brdges is only available on desktop browsers to ensure the best possible experience.
+                    Please switch to a desktop device to access the editing features.
+                </p>
+
+                {/* Divider */}
+                <div className="w-full h-px bg-gradient-to-r from-transparent via-amber-500/20 to-transparent my-6" />
+
+                {/* Additional Info */}
+                <div className="flex items-start gap-2 text-left w-full bg-amber-500/5 rounded-lg p-4">
+                    <Info className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                        <h4 className="text-[13px] font-medium text-amber-400 mb-1">
+                            What can I do on mobile?
+                        </h4>
+                        <p className="text-[12px] text-amber-300/70 leading-relaxed">
+                            You can still view and interact with your Brdge on mobile devices.
+                            Editing features will be available when you return on a desktop browser.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </motion.div>
+    </div>
+);
+
 const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
     isOpen,
     onClose,
@@ -1110,77 +1161,6 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
     isUploading,
     onPresentationClick
 }) => {
-    const [activeTab, setActiveTab] = useState<'agent' | 'voice' | 'share'>('agent');
-    const [isSaving, setIsSaving] = useState(false);
-    const [saveSuccess, setSaveSuccess] = useState(false);
-    const [linkCopied, setLinkCopied] = useState(false);
-
-    // NEW: Local state for agent personality to avoid re-rendering on every keystroke
-    const [localPersonality, setLocalPersonality] = useState(agentConfig.personality);
-    useEffect(() => {
-        setLocalPersonality(agentConfig.personality);
-    }, [agentConfig.personality]);
-
-    const handleSave = async () => {
-        setIsSaving(true);
-        try {
-            // Use the locally stored text here
-            await onUpdateAgentConfig({
-                ...agentConfig,
-                personality: localPersonality
-            });
-            setSaveSuccess(true);
-            setTimeout(() => setSaveSuccess(false), 2000);
-        } catch (error) {
-            console.error('Error saving config:', error);
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    const handleShareToggle = async () => {
-        if (!params.brdgeId) {
-            console.error('No brdgeId in params');
-            return;
-        }
-
-        try {
-            const response = await api.post(
-                `/brdges/${params.brdgeId}/toggle_shareable`,
-                {}, // Empty body
-                {
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                }
-            );
-
-            // Check for the new response format
-            if (response.status === 200 && response.data && 'shareable' in response.data && brdge) {
-                // Create updated brdge object with the new shareable status
-                const updatedBrdge: Brdge = {
-                    ...brdge,
-                    id: brdge.id,
-                    shareable: response.data.shareable,
-                    public_id: brdge.public_id
-                };
-
-                // Update the brdge state immediately
-                onUpdateBrdge(updatedBrdge);
-            }
-        } catch (error) {
-            console.error('Error toggling share status:', error);
-        }
-    };
-
-    const handleCopyLink = () => {
-        if (!brdge?.public_id || !params.brdgeId) return;
-        const shareableUrl = `${window.location.origin}/viewBridge/${params.brdgeId}-${brdge.public_id.substring(0, 6)}`;
-        navigator.clipboard.writeText(shareableUrl);
-        setLinkCopied(true);
-        setTimeout(() => setLinkCopied(false), 2000);
-    };
-
     return (
         <motion.div
             initial={{ x: '100%' }}
@@ -1194,551 +1174,20 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                 paddingRight: 'env(safe-area-inset-right)'
             }}
         >
-            {/* Header with Save Button */}
+            {/* Simplified Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-800">
-                <h2 className="text-[16px] font-medium text-cyan-400">Settings</h2>
-                <div className="flex items-center gap-2">
-                    <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={handleSave}
-                        disabled={isSaving}
-                        className={`
-                            group flex items-center gap-1.5
-                            px-3 py-1.5 rounded-lg
-                            ${saveSuccess
-                                ? 'bg-green-500/20 text-green-400 border-green-500/30'
-                                : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
-                            }
-                            border
-                            transition-all duration-300
-                            disabled:opacity-50 disabled:cursor-not-allowed
-                        `}
-                    >
-                        {isSaving ? (
-                            <>
-                                <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                <span className="text-[11px]">Saving...</span>
-                            </>
-                        ) : saveSuccess ? (
-                            <>
-                                <motion.div
-                                    initial={{ scale: 0 }}
-                                    animate={{ scale: 1 }}
-                                    className="text-green-400"
-                                >
-                                    <svg
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        className="w-3 h-3"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M5 13l4 4L19 7"
-                                        />
-                                    </svg>
-                                </motion.div>
-                                <span className="text-[11px]">Saved!</span>
-                            </>
-                        ) : (
-                            <>
-                                <Save size={12} className="group-hover:rotate-12 transition-transform duration-300" />
-                                <span className="text-[11px]">Save Changes</span>
-                            </>
-                        )}
-                    </motion.button>
-                    <button
-                        onClick={onClose}
-                        className="p-2 rounded-lg hover:bg-cyan-500/10 text-gray-400 hover:text-cyan-400"
-                    >
-                        <X size={20} />
-                    </button>
-                </div>
-            </div>
-
-            {/* Tabs */}
-            <div className="flex border-b border-gray-800">
+                <h2 className="text-[16px] font-medium text-amber-400">Settings</h2>
                 <button
-                    onClick={() => setActiveTab('agent')}
-                    className={`flex-1 px-4 py-3 text-[14px] font-medium relative ${activeTab === 'agent' ? 'text-cyan-400' : 'text-gray-400'}`}
-                >
-                    AI Agent
-                    {activeTab === 'agent' && (
-                        <motion.div layoutId="activeSettingsTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400" />
-                    )}
-                </button>
-                <button
-                    onClick={() => setActiveTab('voice')}
-                    className={`flex-1 px-4 py-3 text-[14px] font-medium relative ${activeTab === 'voice' ? 'text-cyan-400' : 'text-gray-400'}`}
-                >
-                    Voice Clone
-                    {activeTab === 'voice' && (
-                        <motion.div layoutId="activeSettingsTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400" />
-                    )}
-                </button>
-                <button
-                    onClick={() => setActiveTab('share')}
-                    className={`flex-1 px-4 py-3 text-[14px] font-medium relative ${activeTab === 'share' ? 'text-cyan-400' : 'text-gray-400'}`}
-                >
-                    Share
-                    {activeTab === 'share' && (
-                        <motion.div layoutId="activeSettingsTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400" />
-                    )}
-                </button>
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-4">
-                <AnimatePresence mode="wait">
-                    {activeTab === 'agent' ? (
-                        <motion.div
-                            key="agent"
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            className="space-y-6"
-                        >
-                            {/* Agent Personality */}
-                            <section>
-                                <h3 className="text-[14px] font-medium text-gray-300 mb-2">Agent Personality</h3>
-                                <p className="text-[12px] text-gray-400 mb-3">
-                                    Describe how you want your AI agent to behave and interact.
-                                </p>
-                                <div className="relative">
-                                    <textarea
-                                        value={localPersonality}
-                                        onChange={(e) => setLocalPersonality(e.target.value)}
-                                        onBlur={() => {
-                                            // (Optional) update parent on blur if desired.
-                                        }}
-                                        placeholder="Example: A friendly and knowledgeable AI assistant..."
-                                        className="w-full bg-black/20 rounded-lg border border-gray-800 
-                                                 p-4 text-[14px] leading-relaxed text-gray-300 
-                                                 min-h-[120px] resize-none
-                                                 focus:outline-none focus:ring-1 
-                                                 focus:ring-cyan-500/50 focus:border-cyan-500/30
-                                                 transition-all duration-300"
-                                        rows={4}
-                                        style={{
-                                            caretColor: '#22d3ee'
-                                        }}
-                                    />
-                                </div>
-                            </section>
-
-                            {/* Core Presentation */}
-                            <section>
-                                <h3 className="text-[14px] font-medium text-gray-300 mb-2">Core Presentation</h3>
-                                <div className="relative">
-                                    <div className="flex items-center justify-between bg-[#1E1E1E]/50 backdrop-blur-sm border border-gray-800/50 rounded-lg p-3 transition-all duration-300 hover:border-cyan-500/30">
-                                        <div className="flex items-center gap-2">
-                                            <FileText size={16} className="text-cyan-400" />
-                                            <span className="text-[14px] text-gray-300">
-                                                {brdge?.presentation_filename ||
-                                                    agentConfig.knowledgeBase.find(k => k.type === 'presentation')?.name ||
-                                                    "No presentation file"}
-                                            </span>
-                                        </div>
-                                        {!brdge?.presentation_filename &&
-                                            !agentConfig.knowledgeBase.find(k => k.type === 'presentation')?.name ? (
-                                            <button onClick={onPresentationClick} className="group flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] bg-gradient-to-r from-cyan-500/10 to-transparent text-cyan-400/90 border border-cyan-500/20 transition-all duration-300 hover:border-cyan-500/40 hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]">
-                                                {isUploading ? "Uploading..." : "Upload PDF"}
-                                            </button>
-                                        ) : (
-                                            <span className="text-xs text-gray-400">PDF</span>
-                                        )}
-                                    </div>
-                                </div>
-                            </section>
-
-                            {/* Knowledge Base */}
-                            <section>
-                                <div className="flex items-center justify-between mb-4">
-                                    <div>
-                                        <h3 className="text-[14px] font-medium text-gray-300 mb-1">Knowledge Base</h3>
-                                        <p className="text-[12px] text-gray-400">
-                                            Add custom knowledge to enhance your AI agent&apos;s responses.
-                                        </p>
-                                    </div>
-                                    <motion.button
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.98 }}
-                                        onClick={() => {
-                                            const newEntry = {
-                                                id: `kb_${Date.now()}`,
-                                                type: "custom",
-                                                name: "New Knowledge Entry",
-                                                content: ""
-                                            };
-                                            onUpdateAgentConfig({
-                                                ...agentConfig,
-                                                knowledgeBase: [...agentConfig.knowledgeBase, newEntry]
-                                            });
-                                        }}
-                                        className="px-3 py-2 rounded-lg bg-cyan-500/20 text-cyan-400 text-[13px] flex items-center gap-1.5"
-                                    >
-                                        <Plus size={14} />
-                                        Add Knowledge
-                                    </motion.button>
-                                </div>
-
-                                <div className="space-y-4">
-                                    {agentConfig.knowledgeBase
-                                        .filter((entry: AgentConfig['knowledgeBase'][0]) => entry.type !== 'presentation')
-                                        .map((entry: AgentConfig['knowledgeBase'][0]) => (
-                                            <KnowledgeCard
-                                                key={entry.id}
-                                                entry={entry}
-                                                onEdit={(id, content, title) => {
-                                                    onUpdateAgentConfig({
-                                                        ...agentConfig,
-                                                        knowledgeBase: agentConfig.knowledgeBase.map(e =>
-                                                            e.id === id ? { ...e, content, name: title } : e
-                                                        )
-                                                    });
-                                                }}
-                                                onRemove={(id) => {
-                                                    onUpdateAgentConfig({
-                                                        ...agentConfig,
-                                                        knowledgeBase: agentConfig.knowledgeBase.filter(e => e.id !== id)
-                                                    });
-                                                }}
-                                            />
-                                        ))}
-                                </div>
-                            </section>
-                        </motion.div>
-                    ) : activeTab === 'voice' ? (
-                        <motion.div
-                            key="voice"
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            className="space-y-6"
-                        >
-                            {/* Explanatory Text for Voice Clone */}
-                            <section>
-                                <p className="text-[12px] text-gray-300 mb-2">
-                                    Create a personalized voice clone to enable a natural text-to-speech experience.
-                                    Please record a short sample of your voice (10–20 seconds) for best results.
-                                </p>
-                            </section>
-                            {/* Voice Clone Content */}
-                            {isCreatingVoice ? (
-                                <VoiceCreation
-                                    onVoiceCreate={onVoiceCreate}
-                                    onCancel={() => setIsCreatingVoice(false)}
-                                />
-                            ) : (
-                                <VoiceList
-                                    voices={savedVoices}
-                                    onCreateNew={() => setIsCreatingVoice(true)}
-                                    brdgeId={params.brdgeId}
-                                />
-                            )}
-                        </motion.div>
-                    ) : activeTab === 'share' ? (
-                        <motion.div
-                            key="share"
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            className="space-y-4 px-4"
-                        >
-                            {/* Status Section */}
-                            <section className="mb-4">
-                                <div className="flex items-center justify-between p-4 bg-black/20 
-                                              rounded-lg border border-gray-800/50 transition-all duration-300">
-                                    <div className="flex items-center gap-3">
-                                        {brdge?.shareable ? (
-                                            <div className="w-8 h-8 rounded-full bg-cyan-500/10 
-                                                          flex items-center justify-center">
-                                                <Globe size={18} className="text-cyan-400" />
-                                            </div>
-                                        ) : (
-                                            <div className="w-8 h-8 rounded-full bg-gray-800/50 
-                                                          flex items-center justify-center">
-                                                <Lock size={18} className="text-gray-400" />
-                                            </div>
-                                        )}
-                                        <div>
-                                            <span className="text-[14px] font-medium text-gray-300 block">
-                                                {brdge?.shareable ? 'Public Access' : 'Private Access'}
-                                            </span>
-                                            <span className="text-[12px] text-gray-400">
-                                                {brdge?.shareable
-                                                    ? 'Anyone with the link can view'
-                                                    : 'Only you can view'}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <motion.button
-                                        onClick={handleShareToggle}
-                                        className={`
-                                            relative w-11 h-6 rounded-full 
-                                            transition-all duration-300 ease-in-out
-                                            ${brdge?.shareable
-                                                ? 'bg-cyan-500/20 border-cyan-500/30'
-                                                : 'bg-gray-700/50 border-gray-800'
-                                            }
-                                            border
-                                            flex items-center
-                                            cursor-pointer
-                                            hover:shadow-[0_0_10px_rgba(34,211,238,0.2)]
-                                        `}
-                                    >
-                                        <motion.div
-                                            initial={false}
-                                            animate={{
-                                                x: brdge?.shareable ? 20 : 2,
-                                            }}
-                                            transition={{
-                                                type: "spring",
-                                                stiffness: 500,
-                                                damping: 30
-                                            }}
-                                            className={`
-                                                w-4 h-4 rounded-full
-                                                ${brdge?.shareable
-                                                    ? 'bg-cyan-400'
-                                                    : 'bg-gray-400'
-                                                }
-                                            `}
-                                        />
-                                    </motion.button>
-                                </div>
-                            </section>
-
-                            {/* Share Link Section - Only show when public */}
-                            {brdge?.shareable && (
-                                <section className="mb-4">
-                                    <div className="flex items-center gap-2 p-4 
-                                                   bg-black/20 rounded-lg border border-gray-800/50">
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-[13px] text-gray-300 truncate font-mono">
-                                                {`${window.location.origin}/viewBridge/${params.brdgeId}-${brdge.public_id.substring(0, 6)}`}
-                                            </p>
-                                        </div>
-                                        <button
-                                            onClick={handleCopyLink}
-                                            className={`
-                                                flex items-center gap-2 px-3 py-1.5 
-                                                rounded-lg text-[13px] whitespace-nowrap
-                                                transition-all duration-300
-                                                ${linkCopied
-                                                    ? 'bg-green-500/20 text-green-400 border-green-500/30'
-                                                    : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
-                                                }
-                                                border hover:border-cyan-500/40
-                                                active:scale-95
-                                            `}
-                                        >
-                                            {linkCopied ? (
-                                                <>
-                                                    <Check size={14} />
-                                                    <span>Copied!</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Copy size={14} />
-                                                    <span>Copy Link</span>
-                                                </>
-                                            )}
-                                        </button>
-                                    </div>
-                                </section>
-                            )}
-                        </motion.div>
-                    ) : null}
-                </AnimatePresence>
-            </div>
-        </motion.div>
-    );
-};
-
-// ----------------------------------------------------------------------------
-// Voice Creation Component
-// ----------------------------------------------------------------------------
-const VoiceCreation: React.FC<{
-    onVoiceCreate: (name: string, recording: Blob) => Promise<void>;
-    onCancel: () => void;
-}> = ({ onVoiceCreate, onCancel }) => {
-    const [isRecording, setIsRecording] = useState(false);
-    const [recordingTime, setRecordingTime] = useState(0);
-    const [voiceName, setVoiceName] = useState('');
-    const [currentRecording, setCurrentRecording] = useState<Blob | null>(null);
-    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-    const timerRef = useRef<NodeJS.Timeout | null>(null);
-
-    const startRecording = async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const mediaRecorder = new MediaRecorder(stream);
-            mediaRecorderRef.current = mediaRecorder;
-
-            mediaRecorder.ondataavailable = (e) => {
-                if (e.data.size > 0) {
-                    setCurrentRecording(new Blob([e.data], { type: 'audio/wav' }));
-                }
-            };
-
-            mediaRecorder.start();
-            setIsRecording(true);
-            timerRef.current = setInterval(() => {
-                setRecordingTime(prev => prev + 1);
-            }, 1000);
-        } catch (err) {
-            console.error('Error accessing microphone:', err);
-        }
-    };
-
-    const stopRecording = () => {
-        if (mediaRecorderRef.current && isRecording) {
-            mediaRecorderRef.current.stop();
-            mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
-            setIsRecording(false);
-            if (timerRef.current) {
-                clearInterval(timerRef.current);
-                setRecordingTime(0);
-            }
-        }
-    };
-
-    useEffect(() => {
-        return () => {
-            if (timerRef.current) {
-                clearInterval(timerRef.current);
-            }
-            if (mediaRecorderRef.current && isRecording) {
-                mediaRecorderRef.current.stop();
-                mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
-            }
-        };
-    }, [isRecording]);
-
-    return (
-        <div className="space-y-4">
-            <div className="flex items-center justify-between">
-                <h3 className="text-[14px] font-medium text-gray-300">Create New Voice</h3>
-                <button
-                    onClick={onCancel}
-                    className="text-gray-400 hover:text-cyan-400"
+                    onClick={onClose}
+                    className="p-2 rounded-lg hover:bg-amber-500/10 text-amber-400"
                 >
                     <X size={20} />
                 </button>
             </div>
 
-            {/* Sample text to read */}
-            <div className="px-3 py-2 bg-black/20 border border-gray-800/50 rounded-lg text-[11px] text-gray-300">
-                &quot;In just a few quick steps, my voice-based AI assistant will be integrated into my content.
-                This way you can speak to others without being there… how cool is that?&quot;
-            </div>
-
-            <div className="space-y-4">
-                <input
-                    type="text"
-                    value={voiceName}
-                    onChange={(e) => setVoiceName(e.target.value)}
-                    placeholder="Voice name"
-                    className="w-full bg-black/20 rounded-lg border border-gray-800 p-3 text-[14px] text-gray-300"
-                />
-
-                <button
-                    onClick={isRecording ? stopRecording : startRecording}
-                    className="w-full py-3 rounded-lg text-[14px] font-medium flex items-center justify-center gap-2 bg-cyan-500/20 text-cyan-400"
-                >
-                    <span className="w-2 h-2 rounded-full bg-cyan-500" />
-                    {isRecording ? (
-                        <>Recording... {formatTime(recordingTime)}</>
-                    ) : (
-                        'Start Recording'
-                    )}
-                </button>
-
-                {currentRecording && (
-                    <div className="space-y-2">
-                        <audio
-                            src={URL.createObjectURL(currentRecording)}
-                            controls
-                            className="w-full"
-                        />
-                        <button
-                            onClick={() => onVoiceCreate(voiceName, currentRecording)}
-                            disabled={!voiceName}
-                            className="w-full py-3 rounded-lg text-[14px] font-medium bg-cyan-500/20 text-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            Create Voice Clone
-                        </button>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-};
-
-// ----------------------------------------------------------------------------
-// Voice List Component
-// ----------------------------------------------------------------------------
-const VoiceList: React.FC<{
-    voices: SavedVoice[];
-    onCreateNew: () => void;
-    brdgeId: string | null;
-}> = ({ voices, onCreateNew, brdgeId }) => {
-    const activateVoice = async (voiceId: string) => {
-        try {
-            await api.post(`/brdges/${brdgeId}/voices/${voiceId}/activate`);
-            // Voice list will be updated by parent component
-        } catch (error) {
-            console.error('Error activating voice:', error);
-        }
-    };
-
-    return (
-        <div className="space-y-4">
-            <div className="flex items-center justify-between">
-                <h3 className="text-[14px] font-medium text-gray-300">Saved Voices</h3>
-                <button
-                    onClick={onCreateNew}
-                    className="px-3 py-2 rounded-lg bg-cyan-500/20 text-cyan-400 text-[13px]"
-                >
-                    Create New
-                </button>
-            </div>
-
-            <div className="space-y-2">
-                {voices.map((voice) => (
-                    <motion.div
-                        key={voice.id}
-                        onClick={() => activateVoice(voice.id)}
-                        className={`
-                            p-3 rounded-lg border cursor-pointer
-                            ${voice.status === 'active'
-                                ? 'border-cyan-500/30 bg-cyan-500/5'
-                                : 'border-gray-800 bg-black/20'
-                            }
-                            transition-all duration-300
-                            hover:border-cyan-500/30
-                        `}
-                    >
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <div className={`
-                                    w-2 h-2 rounded-full
-                                    ${voice.status === 'active' ? 'bg-cyan-400' : 'bg-gray-600'}
-                                `} />
-                                <span className="text-[14px] text-gray-300">{voice.name}</span>
-                            </div>
-                            <span className="text-[12px] text-cyan-400/70">
-                                {voice.status === 'active' ? 'Active' : 'Click to Activate'}
-                            </span>
-                        </div>
-                    </motion.div>
-                ))}
-            </div>
-        </div>
+            {/* Only show the disclaimer */}
+            <MobileEditDisclaimer />
+        </motion.div>
     );
 };
 
