@@ -67,7 +67,7 @@ interface SavedVoice {
 }
 
 type MobileTab = 'chat' | 'script' | 'voice' | 'info';
-type ConfigTab = 'ai-agent' | 'voice-clone' | 'chat' | 'share';
+type ConfigTab = 'teaching-persona' | 'voice-clone' | 'chat' | 'share';
 
 interface DataChannelMessage {
   payload: Uint8Array;
@@ -381,6 +381,7 @@ interface AgentConfig {
       emphasis_patterns?: string;
     };
   };
+  teaching_persona?: any; // Add this line to include the new structure
   knowledgeBase: Array<{
     id: string;
     type: string;
@@ -1397,6 +1398,8 @@ export default function Playground({
   // Add this function to handle config updates
   const updateAgentConfig = async (newConfig: typeof agentConfig) => {
     try {
+      console.log('Sending updated config:', newConfig); // For debugging
+
       const response = await fetch(
         `${params.apiBaseUrl}/brdges/${params.brdgeId}/agent-config`,
         {
@@ -1405,13 +1408,13 @@ export default function Playground({
           body: JSON.stringify({
             personality: newConfig.personality,
             agentPersonality: newConfig.agentPersonality,
-            knowledgeBase: newConfig.knowledgeBase,
-            script: {
-              agent_personality: newConfig.agentPersonality // Explicitly update script.agent_personality field
-            }
+            teaching_persona: newConfig.teaching_persona, // ADD THIS LINE
+            knowledgeBase: newConfig.knowledgeBase
+            // REMOVE the script field entirely
           }),
         }
       );
+
       if (response.ok) {
         setAgentConfig(newConfig);
       }
@@ -1526,6 +1529,8 @@ export default function Playground({
 
   // Add this near your other state declarations
   const debouncedUpdateConfig = useDebounce((newConfig: AgentConfig) => {
+    // Make sure we're sending the teaching_persona field directly
+    // and not nesting it inside script.content
     updateAgentConfig(newConfig);
   }, 500);
 
@@ -1563,7 +1568,9 @@ export default function Playground({
   }, [agentConfig, updateAgentConfig]);
 
   // Add this inside the Playground component, with other state variables
-  const [activeTab, setActiveTab] = useState<ConfigTab>(params.agentType === 'view' ? 'chat' : 'ai-agent');
+  const [activeTab, setActiveTab] = useState<ConfigTab>(
+    params.agentType === 'view' ? 'chat' : 'teaching-persona'
+  );
 
   // Add an effect to update activeTab when params.agentType changes
   useEffect(() => {
@@ -1783,7 +1790,7 @@ export default function Playground({
   const tabs = params.agentType === 'view' ? [
     { id: 'chat', label: 'Chat' }
   ] : [
-    { id: 'ai-agent', label: 'AI Agent' },
+    { id: 'teaching-persona', label: 'Teaching Persona' }, // Renamed from 'ai-agent'
     { id: 'voice-clone', label: 'Voice Clone' },
     { id: 'chat', label: 'Chat' },
     { id: 'share', label: 'Share' }
@@ -1973,13 +1980,18 @@ export default function Playground({
   const handleSaveConfig = async () => {
     setIsSaving(true);
     try {
-      // Update the agent config in the backend
-      await updateAgentConfig(agentConfig);
+      // Update the agent config with the teaching persona
+      const newConfig = {
+        ...agentConfig,
+        teaching_persona: teachingPersona  // Direct update to top level
+      };
+
+      // Call your existing update function
+      await updateAgentConfig(newConfig);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
     } catch (error) {
-      console.error('Failed to save agent config:', error);
-      // Use an alert instead of toast
+      console.error('Failed to save teaching persona config:', error);
       alert('Failed to save configuration. Please try again.');
     } finally {
       setIsSaving(false);
@@ -2306,6 +2318,82 @@ export default function Playground({
     } catch (err) {
       console.error('Fallback copy method failed:', err);
     }
+  };
+
+  // Add state for teaching persona
+  const [teachingPersona, setTeachingPersona] = useState<any>(null);
+  const [speakingPaceValue, setSpeakingPaceValue] = useState(3); // 1-5 scale
+
+  // Function to load teaching persona from script
+  useEffect(() => {
+    if (agentConfig?.teaching_persona) {
+      setTeachingPersona(agentConfig.teaching_persona);
+
+      // Set speaking pace value based on extracted data
+      const pace = agentConfig.teaching_persona?.speech_characteristics?.accent?.cadence || '';
+      if (pace.toLowerCase().includes('slow')) setSpeakingPaceValue(1);
+      else if (pace.toLowerCase().includes('fast')) setSpeakingPaceValue(5);
+      else setSpeakingPaceValue(3); // Default to moderate
+    }
+  }, [agentConfig]);
+
+  // Helper function to update nested properties in teaching persona
+  const updateTeachingPersona = (path: string, value: any) => {
+    setTeachingPersona((prev: any) => {
+      // Create the updated persona first
+      const newPersona = { ...prev };
+      const keys = path.split('.');
+      let current: any = newPersona;
+
+      // Navigate to the nested property
+      for (let i = 0; i < keys.length - 1; i++) {
+        if (!current[keys[i]]) current[keys[i]] = {};
+        current = current[keys[i]];
+      }
+
+      // Update the value
+      current[keys[keys.length - 1]] = value;
+
+      // IMPORTANT: Also update the agent config with the new persona
+      // in the SAME function to ensure we use the updated value
+      const newConfig = {
+        ...agentConfig,
+        teaching_persona: newPersona  // Use newPersona, not teachingPersona state
+      };
+
+      // Call the debounced update
+      debouncedUpdateConfig(newConfig);
+
+      // Return for state update
+      return newPersona;
+    });
+  };
+
+  // Helper function to update recurring phrases
+  const updateRecurringPhrases = (phrasesText: string) => {
+    const phrases = phrasesText.split('\n')
+      .filter(p => p.trim())
+      .map(phrase => ({
+        phrase: phrase.trim(),
+        frequency: "medium",
+        usage_context: "General conversation"
+      }));
+
+    updateTeachingPersona('communication_patterns.recurring_phrases', phrases);
+  };
+
+  // Helper function to update speaking pace
+  const updateSpeakingPace = (value: number) => {
+    setSpeakingPaceValue(value);
+
+    let paceText = "moderate";
+    if (value === 1) paceText = "very slow";
+    else if (value === 2) paceText = "slow";
+    else if (value === 4) paceText = "fast";
+    else if (value === 5) paceText = "very fast";
+
+    updateTeachingPersona('speech_characteristics.accent.cadence',
+      `${paceText} with ${teachingPersona?.speech_characteristics?.accent?.cadence?.includes('uptick') ? 'upticks' : 'even tone'}`);
   };
 
   return (
@@ -2823,277 +2911,93 @@ export default function Playground({
                   {/* Only render AI Agent and Voice Clone tabs in edit mode */}
                   {!isMobile && params.agentType !== 'view' && (
                     <>
-                      {activeTab === 'ai-agent' && (
-                        <div className={`
-                          h-full pt-0 overflow-hidden
-                          ${activeTab === 'ai-agent' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}
-                          transition-opacity duration-300
-                        `}>
+                      {activeTab === 'teaching-persona' && (
+                        <div className="h-full pt-0 overflow-y-auto space-y-4">
                           <div className="flex items-center justify-between mb-1">
-                            <h2 className={styles.section.title}>AI Agent Configuration</h2>
+                            <h2 className={styles.section.title}>Teaching Persona</h2>
                             <motion.button
                               whileHover={{ scale: 1.02 }}
                               whileTap={{ scale: 0.98 }}
                               onClick={handleSaveConfig}
-                              disabled={isSaving}
                               className={`
                                 group flex items-center gap-1.5
                                 px-3 py-1 rounded-lg
-                                bg-gradient-to-r 
-                                ${saveSuccess
-                                  ? 'from-green-500/20 to-green-400/10 border-green-500/30'
-                                  : 'from-cyan-500/10 to-transparent border-cyan-500/20'
-                                }
-                                ${isSaving ? 'opacity-70 cursor-wait' : ''}
+                                ${saveSuccess ? 'from-green-500/20 to-green-400/10 border-green-500/30' : 'from-cyan-500/10 to-transparent border-cyan-500/20'}
                                 text-cyan-400 border
                                 transition-all duration-300
-                                hover:border-cyan-500/40
-                                hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]
-                                disabled:opacity-50 disabled:cursor-not-allowed
                               `}
                             >
-                              {isSaving ? (
-                                <>
-                                  <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                  <span className="text-[11px]">Saving...</span>
-                                </>
-                              ) : saveSuccess ? (
-                                <>
-                                  <motion.div
-                                    initial={{ scale: 0 }}
-                                    animate={{ scale: 1 }}
-                                    className="text-green-400"
-                                  >
-                                    <svg
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      className="w-3 h-3"
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M5 13l4 4L19 7"
-                                      />
-                                    </svg>
-                                  </motion.div>
-                                  <span className="text-[11px] text-green-400">Saved!</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Save size={12} className="group-hover:rotate-12 transition-transform duration-300" />
-                                  <span className="text-[11px]">Save Changes</span>
-                                </>
-                              )}
+                              <Save size={12} />
+                              <span className="text-[11px]">Save Changes</span>
                             </motion.button>
                           </div>
 
-                          {/* Agent Personality Section - Streamlined styling */}
+                          {/* Basic Information Section */}
                           <section className="relative mb-3 p-2 rounded-lg group">
-                            {/* Background and border effects */}
-                            <div className="absolute inset-0 border border-gray-800/50 rounded-lg transition-all duration-300 group-hover:border-cyan-500/20 group-hover:shadow-[0_0_15px_rgba(34,211,238,0.05)]"></div>
-                            <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/[0.02] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 rounded-lg"></div>
-
-                            {/* Section Header - Minimized height */}
+                            <div className="absolute inset-0 border border-gray-800/50 rounded-lg transition-all duration-300 group-hover:border-cyan-500/20"></div>
                             <div className="flex items-center mb-2 relative z-10">
                               <div className="w-1.5 h-1.5 rounded-full bg-cyan-400/70 shadow-[0_0_5px_rgba(34,211,238,0.5)] mr-1.5"></div>
-                              <h2 className="font-satoshi text-[14px] font-medium tracking-[-0.01em] text-cyan-400">Agent Personality</h2>
-                              <div className="h-[1px] flex-1 ml-2 mr-1 bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent"></div>
+                              <h2 className="font-satoshi text-[14px] font-medium tracking-[-0.01em] text-cyan-400">Instructor Profile</h2>
                             </div>
 
                             <div className="space-y-3 relative z-10">
-                              {/* Agent Name Field - More compact */}
+                              {/* Name Field */}
                               <div className="relative z-10 group/field transition-all duration-300">
-                                <label className="block mb-1 text-[11px] font-medium text-cyan-400/80 transition-colors group-focus-within/field:text-cyan-400">Agent Name</label>
-                                <div className="relative">
-                                  <input
-                                    type="text"
-                                    value={agentConfig.agentPersonality?.name || ''}
-                                    onChange={(e) => {
-                                      setAgentConfig(prev => {
-                                        const currentPersonality = prev.agentPersonality || {
-                                          name: '',
-                                          expertise: [],
-                                          knowledge_areas: [],
-                                          persona_background: 'A helpful AI assistant',
-                                          response_templates: {
-                                            greeting: 'Hello! How can I help you today?',
-                                            not_sure: 'I\'m not sure about that, but I\'d be happy to help with what I know.',
-                                            follow_up_questions: []
-                                          },
-                                          communication_style: 'friendly',
-                                          voice_characteristics: {
-                                            pace: 'measured',
-                                            tone: 'neutral',
-                                            common_phrases: [],
-                                            emphasis_patterns: ''
-                                          }
-                                        };
-
-                                        return {
-                                          ...prev,
-                                          agentPersonality: {
-                                            ...currentPersonality,
-                                            name: e.target.value
-                                          }
-                                        };
-                                      });
-                                    }}
-                                    className={`
-                                      w-full px-3 py-2
-                                      text-[14px] text-white
-                                      bg-[#1E1E1E]/80 backdrop-blur-sm
-                                      border border-gray-800/50 rounded-lg
-                                      transition-all duration-300
-                                      focus:ring-1 focus:ring-cyan-500/50 
-                                      focus:border-cyan-500/30
-                                      focus:shadow-[0_0_15px_rgba(34,211,238,0.1)]
-                                      hover:border-cyan-500/20
-                                      placeholder:text-gray-600/50
-                                      relative z-10
-                                    `}
-                                    placeholder="Enter agent name..."
-                                  />
-                                </div>
+                                <label className="block mb-1 text-[11px] font-medium text-cyan-400/80">Name</label>
+                                <input
+                                  type="text"
+                                  value={teachingPersona?.instructor_profile?.name || ''}
+                                  onChange={(e) => updateTeachingPersona('instructor_profile.name', e.target.value)}
+                                  className={styles.input.base}
+                                  placeholder="Enter instructor name..."
+                                />
                               </div>
 
-                              {/* Persona Background Field - Optimized space */}
-                              <div className="relative z-10 group/field transition-all duration-300">
-                                <label className="block mb-1 text-[11px] font-medium text-cyan-400/80 transition-colors group-focus-within/field:text-cyan-400">Persona Background</label>
-                                <div className="relative">
-                                  <textarea
-                                    value={agentConfig.agentPersonality?.persona_background || ''}
-                                    onChange={(e) => {
-                                      setAgentConfig(prev => {
-                                        const currentPersonality = prev.agentPersonality || {
-                                          name: 'AI Assistant',
-                                          expertise: [],
-                                          knowledge_areas: [],
-                                          persona_background: '',
-                                          response_templates: {
-                                            greeting: 'Hello! How can I help you today?',
-                                            not_sure: 'I\'m not sure about that, but I\'d be happy to help with what I know.',
-                                            follow_up_questions: []
-                                          },
-                                          communication_style: 'friendly',
-                                          voice_characteristics: {
-                                            pace: 'measured',
-                                            tone: 'neutral',
-                                            common_phrases: [],
-                                            emphasis_patterns: ''
-                                          }
-                                        };
-
-                                        return {
-                                          ...prev,
-                                          agentPersonality: {
-                                            ...currentPersonality,
-                                            persona_background: e.target.value
-                                          }
-                                        };
-                                      });
-                                    }}
-                                    className={`
-                                      w-full
-                                      min-h-[140px]
-                                      px-3 py-2
-                                      text-[14px] leading-relaxed
-                                      text-white
-                                      bg-[#1E1E1E]/80 backdrop-blur-sm
-                                      border border-gray-800/50 rounded-lg
-                                      transition-all duration-300
-                                      focus:ring-1 focus:ring-cyan-500/50 
-                                      focus:border-cyan-500/30
-                                      focus:shadow-[0_0_15px_rgba(34,211,238,0.1)]
-                                      hover:border-cyan-500/20
-                                      placeholder:text-gray-600/50
-                                      relative z-10
-                                      resize-none
-                                      scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-700/30
-                                      hover:scrollbar-thumb-cyan-500/20
-                                    `}
-                                    placeholder="Describe the agent's background, expertise, and personality..."
-                                  />
-                                  <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/[0.01] to-transparent opacity-0 transition-opacity duration-300 group-hover/field:opacity-100 rounded-lg pointer-events-none"></div>
+                              {/* Display extracted expertise level for context */}
+                              <div className="p-3 bg-gray-900/30 rounded-lg border border-gray-800/50">
+                                <div className="flex items-center">
+                                  <Info size={14} className="text-cyan-400/50 mr-2" />
+                                  <span className="text-[12px] text-cyan-300/80">Extracted Expertise Level</span>
                                 </div>
-                                <div className="mt-0.5 text-[10px] text-gray-500/70 opacity-70 px-1">
-                                  Customize how the AI represents you to users
-                                </div>
+                                <p className="mt-1 text-[13px] text-gray-300">
+                                  {teachingPersona?.instructor_profile?.apparent_expertise_level || 'No expertise level detected'}
+                                </p>
                               </div>
+                            </div>
+                          </section>
 
-                              {/* Communication Style Field - Optimized */}
+                          {/* Communication Style Section */}
+                          <section className="relative mb-3 p-2 rounded-lg group">
+                            <div className="absolute inset-0 border border-gray-800/50 rounded-lg transition-all duration-300 group-hover:border-cyan-500/20"></div>
+                            <div className="flex items-center mb-2 relative z-10">
+                              <div className="w-1.5 h-1.5 rounded-full bg-cyan-400/70 shadow-[0_0_5px_rgba(34,211,238,0.5)] mr-1.5"></div>
+                              <h2 className="font-satoshi text-[14px] font-medium tracking-[-0.01em] text-cyan-400">Communication Style</h2>
+                            </div>
+
+                            <div className="space-y-3 relative z-10">
+                              {/* Communication Style Field */}
                               <div className="relative z-10 group/field transition-all duration-300">
-                                <label className="block mb-1 text-[11px] font-medium text-cyan-400/80 transition-colors group-focus-within/field:text-cyan-400">Communication Style</label>
-                                <div className="relative">
-                                  <input
-                                    type="text"
-                                    value={agentConfig.agentPersonality?.communication_style || ''}
-                                    onChange={(e) => {
-                                      setAgentConfig(prev => {
-                                        const currentPersonality = prev.agentPersonality || {
-                                          name: 'AI Assistant',
-                                          expertise: [],
-                                          knowledge_areas: [],
-                                          persona_background: 'A helpful AI assistant',
-                                          response_templates: {
-                                            greeting: 'Hello! How can I help you today?',
-                                            not_sure: 'I\'m not sure about that, but I\'d be happy to help with what I know.',
-                                            follow_up_questions: []
-                                          },
-                                          communication_style: '',
-                                          voice_characteristics: {
-                                            pace: 'measured',
-                                            tone: 'neutral',
-                                            common_phrases: [],
-                                            emphasis_patterns: ''
-                                          }
-                                        };
+                                <label className="block mb-1 text-[11px] font-medium text-cyan-400/80">Overall Style</label>
+                                <input
+                                  type="text"
+                                  value={teachingPersona?.communication_patterns?.vocabulary_level || ''}
+                                  onChange={(e) => updateTeachingPersona('communication_patterns.vocabulary_level', e.target.value)}
+                                  className={styles.input.base}
+                                  placeholder="Professional, casual, technical, etc."
+                                />
 
-                                        return {
-                                          ...prev,
-                                          agentPersonality: {
-                                            ...currentPersonality,
-                                            communication_style: e.target.value
-                                          }
-                                        };
-                                      });
-                                    }}
-                                    className={`
-                                      w-full px-3 py-2
-                                      text-[14px] text-white
-                                      bg-[#1E1E1E]/80 backdrop-blur-sm
-                                      border border-gray-800/50 rounded-lg
-                                      transition-all duration-300
-                                      focus:ring-1 focus:ring-cyan-500/50 
-                                      focus:border-cyan-500/30
-                                      focus:shadow-[0_0_15px_rgba(34,211,238,0.1)]
-                                      hover:border-cyan-500/20
-                                      placeholder:text-gray-600/50
-                                      relative z-10
-                                    `}
-                                    placeholder="friendly, professional, technical, casual, etc."
-                                  />
-                                </div>
+                                {/* Style Quick Selectors */}
                                 <div className="flex flex-wrap gap-1.5 mt-1.5">
-                                  {["friendly", "professional", "technical", "casual", "energetic", "authoritative"].map(style => (
+                                  {["professional", "friendly", "technical", "casual", "authoritative"].map(style => (
                                     <button
                                       key={style}
                                       type="button"
-                                      onClick={() => {
-                                        setAgentConfig(prev => ({
-                                          ...prev,
-                                          agentPersonality: {
-                                            ...prev.agentPersonality!,
-                                            communication_style: style
-                                          }
-                                        }));
-                                      }}
+                                      onClick={() => updateTeachingPersona('communication_patterns.vocabulary_level', style)}
                                       className={`
                                         px-2 py-0.5 rounded-full text-[10px]
                                         transition-all duration-300
                                         border 
-                                        ${agentConfig.agentPersonality?.communication_style === style
+                                        ${teachingPersona?.communication_patterns?.vocabulary_level === style
                                           ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
                                           : 'bg-gray-800/20 text-gray-400 border-gray-800/50 hover:text-gray-300 hover:border-gray-700'
                                         }
@@ -3104,43 +3008,151 @@ export default function Playground({
                                   ))}
                                 </div>
                               </div>
+
+                              {/* Recurring Phrases */}
+                              <div className="relative z-10 group/field transition-all duration-300">
+                                <label className="block mb-1 text-[11px] font-medium text-cyan-400/80">Characteristic Phrases</label>
+                                <textarea
+                                  value={teachingPersona?.communication_patterns?.recurring_phrases?.map((p: any) => p.phrase).join('\n') || ''}
+                                  onChange={(e) => updateRecurringPhrases(e.target.value)}
+                                  className={`${styles.input.base} ${styles.input.textarea} min-h-[80px]`}
+                                  placeholder="Enter phrases the instructor frequently uses (one per line)..."
+                                />
+                                <div className="mt-0.5 text-[10px] text-gray-500/70 opacity-70 px-1">
+                                  These phrases will be used by the AI to sound more like the actual instructor
+                                </div>
+                              </div>
+
+                              {/* Speaking Pace with Slider */}
+                              <div className="relative z-10 group/field transition-all duration-300">
+                                <label className="block mb-1 text-[11px] font-medium text-cyan-400/80">Speaking Pace</label>
+                                <div className="space-y-2">
+                                  <input
+                                    type="range"
+                                    min="1"
+                                    max="5"
+                                    step="1"
+                                    value={speakingPaceValue}
+                                    onChange={(e) => updateSpeakingPace(parseInt(e.target.value))}
+                                    className="w-full accent-cyan-500"
+                                  />
+                                  <div className="flex justify-between text-[10px] text-gray-500">
+                                    <span>Slow</span>
+                                    <span>Moderate</span>
+                                    <span>Fast</span>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                           </section>
 
-                          {/* Document Knowledge Section - Also optimized */}
-                          <section className="relative p-2 rounded-lg group mt-2">
-                            {/* Background and border effects */}
-                            <div className="absolute inset-0 border border-gray-800/50 rounded-lg transition-all duration-300 group-hover:border-cyan-500/20 group-hover:shadow-[0_0_15px_rgba(34,211,238,0.05)]"></div>
-                            <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/[0.02] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 rounded-lg"></div>
-
-                            {/* Section Header */}
+                          {/* Response Templates Section */}
+                          <section className="relative mb-3 p-2 rounded-lg group">
+                            <div className="absolute inset-0 border border-gray-800/50 rounded-lg transition-all duration-300 group-hover:border-cyan-500/20"></div>
                             <div className="flex items-center mb-2 relative z-10">
                               <div className="w-1.5 h-1.5 rounded-full bg-cyan-400/70 shadow-[0_0_5px_rgba(34,211,238,0.5)] mr-1.5"></div>
-                              <h2 className="font-satoshi text-[14px] font-medium tracking-[-0.01em] text-cyan-400">Document Knowledge</h2>
-                              <div className="h-[1px] flex-1 ml-2 mr-1 bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent"></div>
+                              <h2 className="font-satoshi text-[14px] font-medium tracking-[-0.01em] text-cyan-400">Response Templates</h2>
                             </div>
 
-                            <motion.div
-                              layout
-                              className="relative group bg-[#1E1E1E]/80 backdrop-blur-sm border border-gray-800/50 rounded-lg p-2.5 transition-all duration-300 hover:border-cyan-500/30 hover:shadow-[0_0_20px_rgba(34,211,238,0.07)]"
-                            >
-                              {/* Background gradient effect */}
-                              <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/[0.02] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 pointer-events-none rounded-lg"></div>
+                            <div className="space-y-3 relative z-10">
+                              {/* Greeting */}
+                              <div className="relative z-10 group/field transition-all duration-300">
+                                <label className="block mb-1 text-[11px] font-medium text-cyan-400/80">Greeting</label>
+                                <input
+                                  type="text"
+                                  value={teachingPersona?.persona_simulation_guidance?.response_templates?.greeting || ''}
+                                  onChange={(e) => updateTeachingPersona('persona_simulation_guidance.response_templates.greeting', e.target.value)}
+                                  className={styles.input.base}
+                                  placeholder="How the AI greets students..."
+                                />
+                              </div>
 
-                              <div className="relative flex items-center gap-2.5 min-w-0">
-                                <div className="p-1.5 rounded-md bg-cyan-500/10 border border-cyan-500/20 flex-shrink-0">
-                                  <FileText size={15} className="text-cyan-400 group-hover:animate-pulse" />
+                              {/* Knowledge Check */}
+                              <div className="relative z-10 group/field transition-all duration-300">
+                                <label className="block mb-1 text-[11px] font-medium text-cyan-400/80">Knowledge Check</label>
+                                <input
+                                  type="text"
+                                  value={teachingPersona?.persona_simulation_guidance?.response_templates?.knowledge_check || ''}
+                                  onChange={(e) => updateTeachingPersona('persona_simulation_guidance.response_templates.knowledge_check', e.target.value)}
+                                  className={styles.input.base}
+                                  placeholder="How the AI checks understanding..."
+                                />
+                              </div>
+
+                              {/* Addressing Misconceptions */}
+                              <div className="relative z-10 group/field transition-all duration-300">
+                                <label className="block mb-1 text-[11px] font-medium text-cyan-400/80">Addressing Misconceptions</label>
+                                <input
+                                  type="text"
+                                  value={teachingPersona?.persona_simulation_guidance?.response_templates?.addressing_misconceptions || ''}
+                                  onChange={(e) => updateTeachingPersona('persona_simulation_guidance.response_templates.addressing_misconceptions', e.target.value)}
+                                  className={styles.input.base}
+                                  placeholder="How the AI corrects misunderstandings..."
+                                />
+                              </div>
+                            </div>
+                          </section>
+
+                          {/* Display-Only Teaching Insights Section */}
+                          <section className="relative mb-3 p-2 rounded-lg group">
+                            <div className="absolute inset-0 border border-gray-800/50 rounded-lg transition-all duration-300 group-hover:border-cyan-500/20"></div>
+                            <div className="flex items-center mb-2 relative z-10">
+                              <div className="w-1.5 h-1.5 rounded-full bg-cyan-400/70 shadow-[0_0_5px_rgba(34,211,238,0.5)] mr-1.5"></div>
+                              <h2 className="font-satoshi text-[14px] font-medium tracking-[-0.01em] text-cyan-400">Teaching Insights</h2>
+                              <span className="ml-2 text-[10px] px-2 py-0.5 bg-cyan-500/10 rounded-full text-cyan-400/80">Auto-Extracted</span>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-2 relative z-10">
+                              {/* Speech Characteristics Card */}
+                              <div className="p-3 bg-gray-900/30 rounded-lg border border-gray-800/50">
+                                <div className="flex justify-between items-center">
+                                  <h3 className="text-[13px] font-medium text-cyan-300/90">Speech Style</h3>
                                 </div>
-                                <div className="flex flex-col min-w-0">
-                                  <span className="text-[13px] text-gray-300 group-hover:text-cyan-400/90 transition-colors duration-300 truncate font-medium">
-                                    {brdge?.presentation_filename ||
-                                      agentConfig.knowledgeBase.find((k) => k.type === 'presentation')?.name ||
-                                      "No document uploaded"}
-                                  </span>
-                                  <span className="text-[10px] text-gray-500/70">Source for AI knowledge</span>
+                                <p className="mt-1 text-[12px] text-gray-400/90">
+                                  {teachingPersona?.speech_characteristics?.accent?.type || 'No accent detected'}
+                                </p>
+                                <p className="mt-1 text-[12px] text-gray-400/90">
+                                  Cadence: {teachingPersona?.speech_characteristics?.accent?.cadence || 'Not detected'}
+                                </p>
+                              </div>
+
+                              {/* Pedagogical Approach Card */}
+                              <div className="p-3 bg-gray-900/30 rounded-lg border border-gray-800/50">
+                                <div className="flex justify-between items-center">
+                                  <h3 className="text-[13px] font-medium text-cyan-300/90">Teaching Approach</h3>
+                                </div>
+                                <div className="mt-1 space-y-1">
+                                  {teachingPersona?.pedagogical_approach?.explanation_techniques?.map((technique: any, idx: number) => (
+                                    <div key={idx} className="flex items-start">
+                                      <span className="text-cyan-400/80 mt-1 text-[10px] mr-1">•</span>
+                                      <p className="text-[12px] text-gray-400/90">
+                                        {technique.technique}: {technique.example}
+                                      </p>
+                                    </div>
+                                  ))}
                                 </div>
                               </div>
-                            </motion.div>
+
+                              {/* Emotional Patterns Card */}
+                              <div className="p-3 bg-gray-900/30 rounded-lg border border-gray-800/50">
+                                <div className="flex justify-between items-center">
+                                  <h3 className="text-[13px] font-medium text-cyan-300/90">Emotional Patterns</h3>
+                                </div>
+                                <p className="mt-1 text-[12px] text-gray-400/90">
+                                  Humor Style: {teachingPersona?.emotional_teaching_patterns?.humor_style?.type || 'None detected'}
+                                </p>
+                                {teachingPersona?.emotional_teaching_patterns?.enthusiasm_triggers?.map((trigger: any, idx: number) => (
+                                  <div key={idx} className="mt-1">
+                                    <p className="text-[12px] text-cyan-400/80">
+                                      {trigger.topic}:
+                                    </p>
+                                    <p className="text-[12px] text-gray-400/90">
+                                      {trigger.vocal_cues}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
                           </section>
                         </div>
                       )}
