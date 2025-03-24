@@ -67,7 +67,7 @@ interface SavedVoice {
 }
 
 type MobileTab = 'chat' | 'script' | 'voice' | 'info';
-type ConfigTab = 'teaching-persona' | 'voice-clone' | 'chat' | 'share';
+type ConfigTab = 'teaching-persona' | 'voice-clone' | 'chat' | 'share' | 'engagement';
 
 interface DataChannelMessage {
   payload: Uint8Array;
@@ -356,7 +356,33 @@ const MobileConfigDrawer = ({
   );
 };
 
-// First, let's update the AgentConfig interface to include structured personality
+// First, let's create a proper TypeScript interface for engagement opportunities
+// Add this with the other interfaces near the top of the file
+interface EngagementQuizItem {
+  options?: string[];
+  question: string;
+  follow_up?: {
+    if_correct?: string;
+    if_incorrect?: string;
+  };
+  explanation?: string;
+  question_type: 'multiple_choice' | 'short_answer' | 'discussion';
+  correct_option?: string | null;
+  expected_answer?: string | null;
+  alternative_phrasings?: string[];
+}
+
+interface EngagementOpportunity {
+  id: string;
+  rationale: string;
+  timestamp: string;
+  quiz_items: EngagementQuizItem[];
+  section_id: string;
+  engagement_type: 'quiz' | 'discussion';
+  concepts_addressed: string[];
+}
+
+// Update the AgentConfig interface to use our new type
 interface AgentConfig {
   personality: string;
   agentPersonality?: {
@@ -381,13 +407,14 @@ interface AgentConfig {
       emphasis_patterns?: string;
     };
   };
-  teaching_persona?: any; // Add this line to include the new structure
+  teaching_persona?: any;
   knowledgeBase: Array<{
     id: string;
     type: string;
     name: string;
     content: string;
   }>;
+  engagement_opportunities?: EngagementOpportunity[];
 }
 
 // Add new interfaces for knowledge management
@@ -1095,6 +1122,263 @@ const VoiceSelector = ({
   );
 };
 
+// Helper functions should be moved OUTSIDE of the Playground component
+// so they're accessible to EngagementCard component
+const formatVideoTime = (timestamp: string): string => {
+  if (!timestamp || !timestamp.startsWith('00:')) return '0:00';
+  return timestamp.substring(3);
+};
+
+const getEngagementTypeIcon = (type: string) => {
+  switch (type) {
+    case 'quiz':
+      return <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 9H15M9 12H15M9 15H12M17 21H7C5.89543 21 5 20.1046 5 19V5C5 3.89543 5.89543 3 7 3H17C18.1046 3 19 3.89543 19 5V19C19 20.1046 18.1046 21 17 21Z"
+          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>;
+    case 'discussion':
+      return <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8 12H8.01M12 12H12.01M16 12H16.01M21 12C21 16.4183 16.9706 20 12 20C10.4607 20 9.01172 19.6565 7.74467 19.0511L3 20L4.39499 16.28C3.51156 15.0423 3 13.5743 3 12C3 7.58172 7.02944 4 12 4C16.9706 4 21 7.58172 21 12Z"
+          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>;
+    default:
+      return null;
+  }
+};
+
+const getQuestionTypeIcon = (type: string) => {
+  switch (type) {
+    case 'multiple_choice':
+      return <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z"
+          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>;
+    case 'short_answer':
+      return <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M11 5H6C4.89543 5 4 5.89543 4 7V19C4 20.1046 4.89543 21 6 21H18C19.1046 21 20 20.1046 20 19V14M14 5H20M20 5V11M20 5L9 16"
+          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>;
+    case 'discussion':
+      return <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8 10H16M8 14H12M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z"
+          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>;
+    default:
+      return null;
+  }
+};
+
+// The EngagementCard component definition stays outside the Playground component
+// and can now use the helper functions
+interface EngagementCardProps {
+  engagement: EngagementOpportunity;
+}
+
+const EngagementCard: React.FC<EngagementCardProps> = ({ engagement }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [expandedQuiz, setExpandedQuiz] = useState<string | null>(null);
+
+  const handleToggleExpand = () => {
+    setIsExpanded(!isExpanded);
+    if (isExpanded) {
+      setExpandedQuiz(null);
+    }
+  };
+
+  return (
+    <motion.div
+      layout
+      className={`
+        relative rounded-lg overflow-hidden
+        transition-all duration-300
+        ${isExpanded
+          ? 'bg-gradient-to-b from-cyan-900/20 to-gray-900/40 border border-cyan-500/20 shadow-[0_0_15px_rgba(34,211,238,0.07)]'
+          : 'bg-gray-900/30 border border-gray-800/50 hover:border-gray-700/50'}
+      `}
+    >
+      {/* Header section */}
+      <div
+        className="p-3 cursor-pointer"
+        onClick={handleToggleExpand}
+      >
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2">
+            {getEngagementTypeIcon(engagement.engagement_type)}
+            <span className={`text-[13px] font-medium ${isExpanded ? 'text-cyan-400' : 'text-gray-300'}`}>
+              {engagement.engagement_type === 'quiz' ? 'Quiz' : 'Discussion'}
+              {engagement.quiz_items?.length > 1 ? ` (${engagement.quiz_items.length} questions)` : ''}
+            </span>
+            {engagement.timestamp && (
+              <div className="px-1.5 py-0.5 bg-gray-800/70 rounded text-[10px] text-gray-400 flex items-center gap-1">
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 8V12L15 15M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z"
+                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                {formatVideoTime(engagement.timestamp)}
+              </div>
+            )}
+          </div>
+          <motion.div
+            animate={{ rotate: isExpanded ? 90 : 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <ChevronRight size={14} className={`${isExpanded ? 'text-cyan-400' : 'text-gray-500'}`} />
+          </motion.div>
+        </div>
+
+        {engagement.concepts_addressed && engagement.concepts_addressed.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1">
+            {engagement.concepts_addressed.map((concept, idx) => (
+              <div key={idx} className="px-1.5 py-0.5 bg-gray-800/50 rounded-sm text-[9px] text-gray-400">
+                {concept}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Expandable content */}
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <div className="px-3 pb-3 space-y-3">
+              {/* Rationale */}
+              {engagement.rationale && (
+                <div className="bg-black/20 p-2 rounded border border-gray-800/50">
+                  <div className="text-[11px] text-gray-400/70 mb-1">Rationale:</div>
+                  <div className="text-[12px] text-gray-300">{engagement.rationale}</div>
+                </div>
+              )}
+
+              {/* Quiz items */}
+              {engagement.quiz_items && engagement.quiz_items.length > 0 && (
+                <div className="space-y-2">
+                  {engagement.quiz_items.map((quiz, quizIndex) => (
+                    <div
+                      key={quizIndex}
+                      className={`
+                        rounded border transition-all duration-300
+                        ${expandedQuiz === `${quizIndex}`
+                          ? 'bg-cyan-950/20 border-cyan-500/30 shadow-[0_0_10px_rgba(34,211,238,0.05)]'
+                          : 'bg-gray-900/20 border-gray-800/50 hover:border-gray-700/70'}
+                      `}
+                    >
+                      {/* Quiz header */}
+                      <div
+                        className="p-2 cursor-pointer flex items-start justify-between"
+                        onClick={() => setExpandedQuiz(expandedQuiz === `${quizIndex}` ? null : `${quizIndex}`)}
+                      >
+                        <div className="flex items-center gap-2">
+                          {getQuestionTypeIcon(quiz.question_type)}
+                          <div className={`text-[12px] ${expandedQuiz === `${quizIndex}` ? 'text-cyan-300' : 'text-gray-300'}`}>
+                            {quiz.question_type === 'multiple_choice'
+                              ? 'Multiple Choice'
+                              : quiz.question_type === 'short_answer'
+                                ? 'Short Answer'
+                                : 'Discussion'}
+                          </div>
+                        </div>
+                        <motion.div
+                          animate={{ rotate: expandedQuiz === `${quizIndex}` ? 90 : 0 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          <ChevronRight size={12} className="text-gray-500" />
+                        </motion.div>
+                      </div>
+
+                      {/* Expanded quiz content */}
+                      <AnimatePresence>
+                        {expandedQuiz === `${quizIndex}` && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                          >
+                            <div className="px-2 pb-2 space-y-2">
+                              {/* Question */}
+                              <div className="bg-black/20 p-2 rounded border border-gray-800/50">
+                                <div className="text-[11px] text-gray-400/70 mb-1">Question:</div>
+                                <div className="text-[12px] text-gray-200">{quiz.question}</div>
+                              </div>
+
+                              {/* Options for multiple choice */}
+                              {quiz.question_type === 'multiple_choice' && quiz.options && quiz.options.length > 0 && (
+                                <div className="bg-black/20 p-2 rounded border border-gray-800/50">
+                                  <div className="text-[11px] text-gray-400/70 mb-1">Options:</div>
+                                  <div className="space-y-1">
+                                    {quiz.options.map((option, optionIndex) => (
+                                      <div key={optionIndex} className="flex items-start gap-2">
+                                        <div className={`flex items-center justify-center w-4 h-4 rounded-full mt-0.5 text-[10px] 
+                                          ${option === quiz.correct_option
+                                            ? 'bg-green-500/20 text-green-400 border border-green-500/50'
+                                            : 'bg-gray-800/70 text-gray-400 border border-gray-700/50'}`}>
+                                          {option === quiz.correct_option ? '✓' : ''}
+                                        </div>
+                                        <div className={`text-[12px] ${option === quiz.correct_option ? 'text-green-400' : 'text-gray-300'}`}>
+                                          {option}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Expected answer for short answer */}
+                              {quiz.question_type === 'short_answer' && quiz.expected_answer && (
+                                <div className="bg-black/20 p-2 rounded border border-gray-800/50">
+                                  <div className="text-[11px] text-gray-400/70 mb-1">Expected Answer:</div>
+                                  <div className="text-[12px] text-green-400">{quiz.expected_answer}</div>
+                                </div>
+                              )}
+
+                              {/* Follow-up */}
+                              {quiz.follow_up && (
+                                <div className="bg-black/20 p-2 rounded border border-gray-800/50">
+                                  <div className="text-[11px] text-gray-400/70 mb-1">Follow-up:</div>
+                                  {quiz.follow_up.if_correct && (
+                                    <div className="mb-1">
+                                      <span className="text-[11px] text-green-400/70">If correct: </span>
+                                      <span className="text-[12px] text-gray-300">{quiz.follow_up.if_correct}</span>
+                                    </div>
+                                  )}
+                                  {quiz.follow_up.if_incorrect && (
+                                    <div>
+                                      <span className="text-[11px] text-red-400/70">If incorrect: </span>
+                                      <span className="text-[12px] text-gray-300">{quiz.follow_up.if_incorrect}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Explanation */}
+                              {quiz.explanation && (
+                                <div className="bg-black/20 p-2 rounded border border-gray-800/50">
+                                  <div className="text-[11px] text-gray-400/70 mb-1">Explanation:</div>
+                                  <div className="text-[12px] text-gray-300">{quiz.explanation}</div>
+                                </div>
+                              )}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+};
+
 export default function Playground({
   logo,
   themeColors,
@@ -1367,7 +1651,26 @@ export default function Playground({
     ]
   });
 
-  // Update the useEffect that fetches agent config to handle the structured personality
+  // Add this near other state declarations
+  const [engagementOpportunities, setEngagementOpportunities] = useState<EngagementOpportunity[]>([]);
+  const [selectedEngagement, setSelectedEngagement] = useState<string | null>(null);
+
+  // Enhanced logging for debug
+  useEffect(() => {
+    if (agentConfig?.engagement_opportunities) {
+      console.log('Setting engagement opportunities from agent config:', agentConfig.engagement_opportunities);
+      console.log('Number of opportunities:', agentConfig.engagement_opportunities.length);
+      if (agentConfig.engagement_opportunities.length > 0) {
+        console.log('First opportunity sample:', agentConfig.engagement_opportunities[0]);
+      }
+      setEngagementOpportunities(agentConfig.engagement_opportunities);
+    } else {
+      console.log('No engagement opportunities found in agent config');
+      setEngagementOpportunities([]);
+    }
+  }, [agentConfig]);
+
+  // Update the useEffect that fetches agent config with debug logging
   useEffect(() => {
     const fetchAgentConfig = async () => {
       if (!params.brdgeId || !params.apiBaseUrl) return;
@@ -1380,6 +1683,7 @@ export default function Playground({
 
         const data = await response.json();
         console.log('Received agent config:', data);
+        console.log('Engagement opportunities in response:', data.engagement_opportunities);
 
         // Ensure backwards compatibility - if script data exists, populate the agentPersonality field
         if (data.script && data.script.agent_personality) {
@@ -1790,8 +2094,9 @@ export default function Playground({
   const tabs = params.agentType === 'view' ? [
     { id: 'chat', label: 'Chat' }
   ] : [
-    { id: 'teaching-persona', label: 'Teaching Persona' }, // Renamed from 'ai-agent'
+    { id: 'teaching-persona', label: 'Teaching Persona' },
     { id: 'voice-clone', label: 'Voice Clone' },
+    { id: 'engagement', label: 'Engagement' }, // Add this new tab
     { id: 'chat', label: 'Chat' },
     { id: 'share', label: 'Share' }
   ];
@@ -2369,12 +2674,33 @@ export default function Playground({
     });
   };
 
+  // Add state for the phrases text
+  const [phrasesText, setPhrasesText] = useState('');
+
+  // Initialize from existing phrases when teachingPersona changes
+  useEffect(() => {
+    if (teachingPersona?.communication_patterns?.recurring_phrases) {
+      setPhrasesText(teachingPersona.communication_patterns.recurring_phrases
+        .map((p: any) => p.phrase)
+        .join('\n')
+      );
+    }
+  }, [teachingPersona]);
+
   // Helper function to update recurring phrases
   const updateRecurringPhrases = (phrasesText: string) => {
-    const phrases = phrasesText.split('\n')
-      .filter(p => p.trim())
+    // Split text by newlines and preserve empty lines
+    // This is the key change - don't filter lines until after adding the last empty line
+    const lines = phrasesText.split('\n');
+
+    // If the last line is empty (user just pressed Enter), keep it
+    // Otherwise, filter out empty lines from the actual phrases that get saved
+    const phrases = lines
+      .filter((line, index) =>
+        line.trim() !== '' || index === lines.length - 1
+      )
       .map(phrase => ({
-        phrase: phrase.trim(),
+        phrase: phrase,  // Don't trim here to preserve spaces
         frequency: "medium",
         usage_context: "General conversation"
       }));
@@ -2395,6 +2721,58 @@ export default function Playground({
     updateTeachingPersona('speech_characteristics.accent.cadence',
       `${paceText} with ${teachingPersona?.speech_characteristics?.accent?.cadence?.includes('uptick') ? 'upticks' : 'even tone'}`);
   };
+
+  // Add this near other state declarations
+
+  // Add these helper functions to format time and get engagement type icons
+  const formatVideoTime = (timestamp: string): string => {
+    if (!timestamp || !timestamp.startsWith('00:')) return '0:00';
+
+    // Remove the "00:" prefix and return the minutes:seconds format
+    return timestamp.substring(3);
+  };
+
+  const getEngagementTypeIcon = (type: string) => {
+    switch (type) {
+      case 'quiz':
+        return <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M9 9H15M9 12H15M9 15H12M17 21H7C5.89543 21 5 20.1046 5 19V5C5 3.89543 5.89543 3 7 3H17C18.1046 3 19 3.89543 19 5V19C19 20.1046 18.1046 21 17 21Z"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>;
+      case 'discussion':
+        return <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M8 12H8.01M12 12H12.01M16 12H16.01M21 12C21 16.4183 16.9706 20 12 20C10.4607 20 9.01172 19.6565 7.74467 19.0511L3 20L4.39499 16.28C3.51156 15.0423 3 13.5743 3 12C3 7.58172 7.02944 4 12 4C16.9706 4 21 7.58172 21 12Z"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>;
+      default:
+        return null;
+    }
+  };
+
+  const getQuestionTypeIcon = (type: string) => {
+    switch (type) {
+      case 'multiple_choice':
+        return <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>;
+      case 'short_answer':
+        return <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M11 5H6C4.89543 5 4 5.89543 4 7V19C4 20.1046 4.89543 21 6 21H18C19.1046 21 20 20.1046 20 19V14M14 5H20M20 5V11M20 5L9 16"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>;
+      case 'discussion':
+        return <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M8 10H16M8 14H12M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>;
+      default:
+        return null;
+    }
+  };
+
+  // Fix the type issue with params.agentType comparison - use strict equality and type check
+  const isEditMode = agentType === 'edit' || params.agentType === 'edit';
 
   return (
     <div className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
@@ -3013,8 +3391,24 @@ export default function Playground({
                               <div className="relative z-10 group/field transition-all duration-300">
                                 <label className="block mb-1 text-[11px] font-medium text-cyan-400/80">Characteristic Phrases</label>
                                 <textarea
-                                  value={teachingPersona?.communication_patterns?.recurring_phrases?.map((p: any) => p.phrase).join('\n') || ''}
-                                  onChange={(e) => updateRecurringPhrases(e.target.value)}
+                                  value={phrasesText}
+                                  onChange={(e) => {
+                                    // Just update the text state directly
+                                    setPhrasesText(e.target.value);
+                                  }}
+                                  onBlur={() => {
+                                    // Only when focus leaves the textarea, update the actual phrases
+                                    const phrases = phrasesText
+                                      .split('\n')
+                                      .filter(line => line.trim() !== '')
+                                      .map(phrase => ({
+                                        phrase: phrase.trim(),
+                                        frequency: "medium",
+                                        usage_context: "General conversation"
+                                      }));
+
+                                    updateTeachingPersona('communication_patterns.recurring_phrases', phrases);
+                                  }}
                                   className={`${styles.input.base} ${styles.input.textarea} min-h-[80px]`}
                                   placeholder="Enter phrases the instructor frequently uses (one per line)..."
                                 />
@@ -3735,6 +4129,73 @@ export default function Playground({
                             </div>
                           </div>
                         </div>
+                      )}
+                      {/* Add this new section for the Engagement tab */}
+                      {!isMobile && isEditMode && (
+                        <>
+                          {activeTab === 'engagement' && (
+                            <div className="h-full pt-0 overflow-y-auto space-y-4">
+                              <div className="flex items-center justify-between mb-1">
+                                <h2 className={styles.section.title}>Engagement Opportunities</h2>
+                                <span className="text-xs text-gray-400">
+                                  {engagementOpportunities?.length || 0} items
+                                </span>
+                              </div>
+
+                              {/* Filter controls */}
+                              <div className="flex flex-wrap gap-2 mb-4">
+                                <button
+                                  className={`px-3 py-1 text-xs rounded-full transition-all duration-300 ${!selectedEngagement ? 'bg-cyan-500/20 text-cyan-400' : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800/70'}`}
+                                  onClick={() => setSelectedEngagement(null)}
+                                >
+                                  All Types
+                                </button>
+                                <button
+                                  className={`px-3 py-1 text-xs rounded-full flex items-center gap-1 transition-all duration-300 ${selectedEngagement === 'quiz' ? 'bg-cyan-500/20 text-cyan-400' : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800/70'}`}
+                                  onClick={() => setSelectedEngagement(selectedEngagement === 'quiz' ? null : 'quiz')}
+                                >
+                                  {getEngagementTypeIcon('quiz')}
+                                  Quizzes
+                                </button>
+                                <button
+                                  className={`px-3 py-1 text-xs rounded-full flex items-center gap-1 transition-all duration-300 ${selectedEngagement === 'discussion' ? 'bg-cyan-500/20 text-cyan-400' : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800/70'}`}
+                                  onClick={() => setSelectedEngagement(selectedEngagement === 'discussion' ? null : 'discussion')}
+                                >
+                                  {getEngagementTypeIcon('discussion')}
+                                  Discussions
+                                </button>
+                              </div>
+
+                              {/* Add some debug output to help diagnose issues */}
+                              {!engagementOpportunities || engagementOpportunities.length === 0 && (
+                                <div className="bg-gray-900/40 mb-4 p-2 rounded-lg text-xs text-gray-400">
+                                  Debug: Agent config has engagement_opportunities? {agentConfig.engagement_opportunities ? 'Yes' : 'No'}
+                                </div>
+                              )}
+
+                              {/* Engagement list */}
+                              <div className="space-y-3">
+                                {engagementOpportunities && engagementOpportunities.length > 0 ? (
+                                  engagementOpportunities
+                                    .filter(engagement => !selectedEngagement || engagement.engagement_type === selectedEngagement)
+                                    .map((engagement, index) => (
+                                      <EngagementCard
+                                        key={engagement.id || index}
+                                        engagement={engagement}
+                                      />
+                                    ))
+                                ) : (
+                                  <div className="text-center p-6 bg-gray-900/30 rounded-lg border border-gray-800/50">
+                                    <div className="text-gray-400 text-sm">No engagement opportunities found</div>
+                                    <div className="text-gray-500 text-xs mt-1">
+                                      Engagement opportunities will appear here when available in the content
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </>
                       )}
                     </>
                   )}
