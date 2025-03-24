@@ -18,9 +18,11 @@ import {
   PanelGroup,
   PanelResizeHandle
 } from 'react-resizable-panels';
-import { Plus, FileText, X, Edit2, Save, ChevronDown, ChevronUp, Play, Pause, Volume2, VolumeX, Maximize2, Mic, MicOff, Radio, ChevronRight, Info, Link, Lock, Globe, Copy, Check, ExternalLink } from 'lucide-react';
+import { Plus, FileText, X, Edit2, Save, ChevronDown, ChevronUp, Play, Pause, Volume2, VolumeX, Maximize2, Mic, MicOff, Radio, ChevronRight, Info, Link, Lock, Globe, Copy, Check, ExternalLink, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import styled, { keyframes } from 'styled-components';
+import TimelineMarkers from '../player/TimelineMarkers';
+import PlaygroundProgressBar from '../player/PlaygroundProgressBar';
 
 export interface PlaygroundProps {
   logo?: ReactNode;
@@ -372,7 +374,8 @@ interface EngagementQuizItem {
   alternative_phrasings?: string[];
 }
 
-interface EngagementOpportunity {
+// Export the interface so we can import it in other components
+export interface EngagementOpportunity {
   id: string;
   rationale: string;
   timestamp: string;
@@ -1172,22 +1175,142 @@ const getQuestionTypeIcon = (type: string) => {
 // and can now use the helper functions
 interface EngagementCardProps {
   engagement: EngagementOpportunity;
+  onEdit: (updatedEngagement: EngagementOpportunity) => void;
+  onDelete: (id: string) => void;
 }
 
-const EngagementCard: React.FC<EngagementCardProps> = ({ engagement }) => {
+const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onDelete }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [expandedQuiz, setExpandedQuiz] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedEngagement, setEditedEngagement] = useState<EngagementOpportunity>({ ...engagement });
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const handleToggleExpand = () => {
+    if (isEditing) return; // Don't collapse while editing
     setIsExpanded(!isExpanded);
     if (isExpanded) {
       setExpandedQuiz(null);
     }
   };
 
+  const handleStartEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsEditing(true);
+    setIsExpanded(true); // Always expand when editing
+    setEditedEngagement({ ...engagement });
+  };
+
+  const handleSaveEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEdit(editedEngagement);
+    setIsEditing(false);
+  };
+
+  const handleCancelEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditedEngagement({ ...engagement });
+    setIsEditing(false);
+  };
+
+  const handleDeleteQuiz = (quizIndex: number) => {
+    const updatedQuizItems = [...editedEngagement.quiz_items];
+    updatedQuizItems.splice(quizIndex, 1);
+    setEditedEngagement({
+      ...editedEngagement,
+      quiz_items: updatedQuizItems
+    });
+    // If we're in edit mode, we'll wait for save to propagate these changes
+    // If not in edit mode, we'll immediately save the changes
+    if (!isEditing) {
+      onEdit({
+        ...editedEngagement,
+        quiz_items: updatedQuizItems
+      });
+    }
+  };
+
+  const handleUpdateField = (field: keyof EngagementOpportunity, value: any) => {
+    setEditedEngagement({
+      ...editedEngagement,
+      [field]: value
+    });
+  };
+
+  const handleUpdateQuizField = (quizIndex: number, field: keyof EngagementQuizItem, value: any) => {
+    const updatedQuizItems = [...editedEngagement.quiz_items];
+    updatedQuizItems[quizIndex] = {
+      ...updatedQuizItems[quizIndex],
+      [field]: value
+    };
+    setEditedEngagement({
+      ...editedEngagement,
+      quiz_items: updatedQuizItems
+    });
+  };
+
+  // Function to update options for multiple choice questions
+  const handleUpdateOptions = (quizIndex: number, options: string[]) => {
+    const updatedQuizItems = [...editedEngagement.quiz_items];
+    updatedQuizItems[quizIndex] = {
+      ...updatedQuizItems[quizIndex],
+      options
+    };
+    setEditedEngagement({
+      ...editedEngagement,
+      quiz_items: updatedQuizItems
+    });
+  };
+
+  // Function to add a new option to a multiple choice question
+  const handleAddOption = (quizIndex: number) => {
+    const quiz = editedEngagement.quiz_items[quizIndex];
+    if (quiz.question_type !== 'multiple_choice') return;
+
+    const updatedQuizItems = [...editedEngagement.quiz_items];
+    const options = [...(quiz.options || []), 'New option'];
+    updatedQuizItems[quizIndex] = {
+      ...updatedQuizItems[quizIndex],
+      options
+    };
+    setEditedEngagement({
+      ...editedEngagement,
+      quiz_items: updatedQuizItems
+    });
+  };
+
+  // Function to update concepts addressed
+  const handleUpdateConcepts = (concepts: string[]) => {
+    setEditedEngagement({
+      ...editedEngagement,
+      concepts_addressed: concepts
+    });
+  };
+
+  // Function to add a new quiz item
+  const handleAddQuizItem = () => {
+    const newQuizItem: EngagementQuizItem = {
+      question: "New question",
+      question_type: editedEngagement.engagement_type === 'quiz' ? 'multiple_choice' : 'discussion',
+      options: editedEngagement.engagement_type === 'quiz' ? ['Option 1', 'Option 2'] : undefined,
+      correct_option: editedEngagement.engagement_type === 'quiz' ? 'Option 1' : null,
+      explanation: "Explanation for this question",
+      follow_up: {
+        if_correct: "Follow-up for correct answer",
+        if_incorrect: "Follow-up for incorrect answer"
+      }
+    };
+
+    setEditedEngagement({
+      ...editedEngagement,
+      quiz_items: [...editedEngagement.quiz_items, newQuizItem]
+    });
+  };
+
   return (
     <motion.div
       layout
+      id={`engagement-card-${engagement.id}`}
       className={`
         relative rounded-lg overflow-hidden
         transition-all duration-300
@@ -1218,22 +1341,101 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement }) => {
               </div>
             )}
           </div>
-          <motion.div
-            animate={{ rotate: isExpanded ? 90 : 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <ChevronRight size={14} className={`${isExpanded ? 'text-cyan-400' : 'text-gray-500'}`} />
-          </motion.div>
+
+          {/* Action buttons */}
+          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+            {isEditing ? (
+              <>
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleSaveEdit}
+                  className="p-1.5 rounded-md text-cyan-400 hover:bg-cyan-500/10 transition-all duration-200"
+                >
+                  <Save size={14} />
+                </motion.button>
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleCancelEdit}
+                  className="p-1.5 rounded-md text-gray-400 hover:bg-gray-800/70 transition-all duration-200"
+                >
+                  <X size={14} />
+                </motion.button>
+              </>
+            ) : (
+              <>
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleStartEdit}
+                  className="p-1.5 rounded-md text-gray-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all duration-200"
+                >
+                  <Edit2 size={14} />
+                </motion.button>
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowDeleteConfirm(true);
+                  }}
+                  className="p-1.5 rounded-md text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200"
+                >
+                  <Trash2 size={14} />
+                </motion.button>
+              </>
+            )}
+            <motion.div
+              animate={{ rotate: isExpanded ? 90 : 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!isEditing) handleToggleExpand();
+              }}
+            >
+              <ChevronRight size={14} className={`${isExpanded ? 'text-cyan-400' : 'text-gray-500'}`} />
+            </motion.div>
+          </div>
         </div>
 
-        {engagement.concepts_addressed && engagement.concepts_addressed.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1">
-            {engagement.concepts_addressed.map((concept, idx) => (
-              <div key={idx} className="px-1.5 py-0.5 bg-gray-800/50 rounded-sm text-[9px] text-gray-400">
-                {concept}
-              </div>
-            ))}
+        {/* Concepts */}
+        {isEditing ? (
+          <div className="mt-2 bg-black/20 p-2 rounded border border-gray-800/50">
+            <div className="text-[11px] text-gray-400/70 mb-1">Engagement Type:</div>
+            <select
+              value={editedEngagement.engagement_type}
+              onChange={(e) => handleUpdateField('engagement_type', e.target.value)}
+              className="w-full bg-[#1E1E1E]/80 border border-gray-700/50 rounded-lg px-3 py-2 text-[13px] text-white"
+            >
+              <option value="quiz">Quiz</option>
+              <option value="discussion">Discussion</option>
+            </select>
+
+            <div className="text-[11px] text-gray-400/70 mt-2 mb-1">Timestamp (format: 00:MM:SS):</div>
+            <input
+              type="text"
+              value={editedEngagement.timestamp}
+              onChange={(e) => handleUpdateField('timestamp', e.target.value)}
+              className="w-full bg-[#1E1E1E]/80 border border-gray-700/50 rounded-lg px-3 py-2 text-[13px] text-white"
+              placeholder="00:00:00"
+            />
+
+            <div className="text-[11px] text-gray-400/70 mt-2 mb-1">Concepts (comma separated):</div>
+            <input
+              type="text"
+              value={editedEngagement.concepts_addressed.join(', ')}
+              onChange={(e) => handleUpdateConcepts(e.target.value.split(',').map(c => c.trim()))}
+              className="w-full bg-[#1E1E1E]/80 border border-gray-700/50 rounded-lg px-3 py-2 text-[13px] text-white"
+              placeholder="Concept 1, Concept 2"
+            />
           </div>
+        ) : (
+          engagement.concepts_addressed && engagement.concepts_addressed.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {engagement.concepts_addressed.map((concept, idx) => (
+                <div key={idx} className="px-1.5 py-0.5 bg-gray-800/50 rounded-sm text-[9px] text-gray-400">
+                  {concept}
+                </div>
+              ))}
+            </div>
+          )
         )}
       </div>
 
@@ -1248,17 +1450,29 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement }) => {
           >
             <div className="px-3 pb-3 space-y-3">
               {/* Rationale */}
-              {engagement.rationale && (
+              {isEditing ? (
                 <div className="bg-black/20 p-2 rounded border border-gray-800/50">
                   <div className="text-[11px] text-gray-400/70 mb-1">Rationale:</div>
-                  <div className="text-[12px] text-gray-300">{engagement.rationale}</div>
+                  <textarea
+                    value={editedEngagement.rationale}
+                    onChange={(e) => handleUpdateField('rationale', e.target.value)}
+                    className="w-full bg-[#1E1E1E]/80 border border-gray-700/50 rounded-lg px-3 py-2 text-[13px] text-white min-h-[80px]"
+                    placeholder="Enter rationale..."
+                  />
                 </div>
+              ) : (
+                engagement.rationale && (
+                  <div className="bg-black/20 p-2 rounded border border-gray-800/50">
+                    <div className="text-[11px] text-gray-400/70 mb-1">Rationale:</div>
+                    <div className="text-[12px] text-gray-300">{engagement.rationale}</div>
+                  </div>
+                )
               )}
 
               {/* Quiz items */}
-              {engagement.quiz_items && engagement.quiz_items.length > 0 && (
-                <div className="space-y-2">
-                  {engagement.quiz_items.map((quiz, quizIndex) => (
+              {editedEngagement.quiz_items && (
+                <div className="space-y-3">
+                  {editedEngagement.quiz_items.map((quiz, quizIndex) => (
                     <div
                       key={quizIndex}
                       className={`
@@ -1271,29 +1485,55 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement }) => {
                       {/* Quiz header */}
                       <div
                         className="p-2 cursor-pointer flex items-start justify-between"
-                        onClick={() => setExpandedQuiz(expandedQuiz === `${quizIndex}` ? null : `${quizIndex}`)}
+                        onClick={() => !isEditing && setExpandedQuiz(expandedQuiz === `${quizIndex}` ? null : `${quizIndex}`)}
                       >
                         <div className="flex items-center gap-2">
                           {getQuestionTypeIcon(quiz.question_type)}
                           <div className={`text-[12px] ${expandedQuiz === `${quizIndex}` ? 'text-cyan-300' : 'text-gray-300'}`}>
-                            {quiz.question_type === 'multiple_choice'
-                              ? 'Multiple Choice'
-                              : quiz.question_type === 'short_answer'
-                                ? 'Short Answer'
-                                : 'Discussion'}
+                            {isEditing ? (
+                              <select
+                                value={quiz.question_type}
+                                onChange={(e) => handleUpdateQuizField(quizIndex, 'question_type', e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="bg-[#1E1E1E]/80 border border-gray-700/50 rounded-lg px-2 py-1 text-[12px] text-white"
+                              >
+                                <option value="multiple_choice">Multiple Choice</option>
+                                <option value="short_answer">Short Answer</option>
+                                <option value="discussion">Discussion</option>
+                              </select>
+                            ) : (
+                              quiz.question_type === 'multiple_choice'
+                                ? 'Multiple Choice'
+                                : quiz.question_type === 'short_answer'
+                                  ? 'Short Answer'
+                                  : 'Discussion'
+                            )}
                           </div>
                         </div>
-                        <motion.div
-                          animate={{ rotate: expandedQuiz === `${quizIndex}` ? 90 : 0 }}
-                          transition={{ duration: 0.2 }}
-                        >
-                          <ChevronRight size={12} className="text-gray-500" />
-                        </motion.div>
+
+                        {isEditing ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteQuiz(quizIndex);
+                            }}
+                            className="p-1 rounded-md text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        ) : (
+                          <motion.div
+                            animate={{ rotate: expandedQuiz === `${quizIndex}` ? 90 : 0 }}
+                            transition={{ duration: 0.2 }}
+                          >
+                            <ChevronRight size={12} className="text-gray-500" />
+                          </motion.div>
+                        )}
                       </div>
 
-                      {/* Expanded quiz content */}
+                      {/* Expanded quiz content - always show in edit mode */}
                       <AnimatePresence>
-                        {expandedQuiz === `${quizIndex}` && (
+                        {(expandedQuiz === `${quizIndex}` || isEditing) && (
                           <motion.div
                             initial={{ height: 0, opacity: 0 }}
                             animate={{ height: 'auto', opacity: 1 }}
@@ -1304,36 +1544,105 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement }) => {
                               {/* Question */}
                               <div className="bg-black/20 p-2 rounded border border-gray-800/50">
                                 <div className="text-[11px] text-gray-400/70 mb-1">Question:</div>
-                                <div className="text-[12px] text-gray-200">{quiz.question}</div>
+                                {isEditing ? (
+                                  <textarea
+                                    value={quiz.question}
+                                    onChange={(e) => handleUpdateQuizField(quizIndex, 'question', e.target.value)}
+                                    className="w-full bg-[#1E1E1E]/80 border border-gray-700/50 rounded-lg px-3 py-2 text-[13px] text-white min-h-[60px]"
+                                    placeholder="Enter question..."
+                                  />
+                                ) : (
+                                  <div className="text-[12px] text-gray-200">{quiz.question}</div>
+                                )}
                               </div>
 
                               {/* Options for multiple choice */}
-                              {quiz.question_type === 'multiple_choice' && quiz.options && quiz.options.length > 0 && (
+                              {quiz.question_type === 'multiple_choice' && (
                                 <div className="bg-black/20 p-2 rounded border border-gray-800/50">
                                   <div className="text-[11px] text-gray-400/70 mb-1">Options:</div>
-                                  <div className="space-y-1">
-                                    {quiz.options.map((option, optionIndex) => (
-                                      <div key={optionIndex} className="flex items-start gap-2">
-                                        <div className={`flex items-center justify-center w-4 h-4 rounded-full mt-0.5 text-[10px] 
-                                          ${option === quiz.correct_option
-                                            ? 'bg-green-500/20 text-green-400 border border-green-500/50'
-                                            : 'bg-gray-800/70 text-gray-400 border border-gray-700/50'}`}>
-                                          {option === quiz.correct_option ? '✓' : ''}
+                                  {isEditing ? (
+                                    <div className="space-y-2">
+                                      {(quiz.options || []).map((option, optionIndex) => (
+                                        <div key={optionIndex} className="flex items-center gap-2">
+                                          <input
+                                            type="radio"
+                                            checked={option === quiz.correct_option}
+                                            onChange={() => handleUpdateQuizField(quizIndex, 'correct_option', option)}
+                                            className="w-4 h-4 accent-cyan-500"
+                                          />
+                                          <input
+                                            type="text"
+                                            value={option}
+                                            onChange={(e) => {
+                                              const newOptions = [...(quiz.options || [])];
+                                              newOptions[optionIndex] = e.target.value;
+                                              handleUpdateOptions(quizIndex, newOptions);
+
+                                              // Update correct_option if this was the correct one
+                                              if (option === quiz.correct_option) {
+                                                handleUpdateQuizField(quizIndex, 'correct_option', e.target.value);
+                                              }
+                                            }}
+                                            className="flex-1 bg-[#1E1E1E]/80 border border-gray-700/50 rounded-lg px-2 py-1 text-[12px] text-white"
+                                          />
+                                          <button
+                                            onClick={() => {
+                                              const newOptions = [...(quiz.options || [])];
+                                              newOptions.splice(optionIndex, 1);
+                                              handleUpdateOptions(quizIndex, newOptions);
+
+                                              // If we removed the correct option, update it
+                                              if (option === quiz.correct_option) {
+                                                handleUpdateQuizField(quizIndex, 'correct_option', newOptions[0] || null);
+                                              }
+                                            }}
+                                            className="p-1 rounded-md text-gray-400 hover:text-red-400"
+                                          >
+                                            <X size={14} />
+                                          </button>
                                         </div>
-                                        <div className={`text-[12px] ${option === quiz.correct_option ? 'text-green-400' : 'text-gray-300'}`}>
-                                          {option}
+                                      ))}
+                                      <button
+                                        onClick={() => handleAddOption(quizIndex)}
+                                        className="w-full px-2 py-1 bg-gray-800/30 text-gray-400 hover:text-cyan-400 rounded-lg text-[11px]"
+                                      >
+                                        + Add Option
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-1">
+                                      {(quiz.options || []).map((option, optionIndex) => (
+                                        <div key={optionIndex} className="flex items-start gap-2">
+                                          <div className={`flex items-center justify-center w-4 h-4 rounded-full mt-0.5 text-[10px] 
+                                            ${option === quiz.correct_option
+                                              ? 'bg-green-500/20 text-green-400 border border-green-500/50'
+                                              : 'bg-gray-800/70 text-gray-400 border border-gray-700/50'}`}>
+                                            {option === quiz.correct_option ? '✓' : ''}
+                                          </div>
+                                          <div className={`text-[12px] ${option === quiz.correct_option ? 'text-green-400' : 'text-gray-300'}`}>
+                                            {option}
+                                          </div>
                                         </div>
-                                      </div>
-                                    ))}
-                                  </div>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
                               )}
 
                               {/* Expected answer for short answer */}
-                              {quiz.question_type === 'short_answer' && quiz.expected_answer && (
+                              {quiz.question_type === 'short_answer' && (
                                 <div className="bg-black/20 p-2 rounded border border-gray-800/50">
                                   <div className="text-[11px] text-gray-400/70 mb-1">Expected Answer:</div>
-                                  <div className="text-[12px] text-green-400">{quiz.expected_answer}</div>
+                                  {isEditing ? (
+                                    <textarea
+                                      value={quiz.expected_answer || ''}
+                                      onChange={(e) => handleUpdateQuizField(quizIndex, 'expected_answer', e.target.value)}
+                                      className="w-full bg-[#1E1E1E]/80 border border-gray-700/50 rounded-lg px-3 py-2 text-[13px] text-white min-h-[60px]"
+                                      placeholder="Enter expected answer..."
+                                    />
+                                  ) : (
+                                    <div className="text-[12px] text-green-400">{quiz.expected_answer}</div>
+                                  )}
                                 </div>
                               )}
 
@@ -1341,26 +1650,72 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement }) => {
                               {quiz.follow_up && (
                                 <div className="bg-black/20 p-2 rounded border border-gray-800/50">
                                   <div className="text-[11px] text-gray-400/70 mb-1">Follow-up:</div>
-                                  {quiz.follow_up.if_correct && (
-                                    <div className="mb-1">
-                                      <span className="text-[11px] text-green-400/70">If correct: </span>
-                                      <span className="text-[12px] text-gray-300">{quiz.follow_up.if_correct}</span>
+                                  {isEditing ? (
+                                    <div className="space-y-2">
+                                      <div>
+                                        <div className="text-[11px] text-green-400/70 mb-0.5">If correct:</div>
+                                        <textarea
+                                          value={quiz.follow_up.if_correct || ''}
+                                          onChange={(e) => {
+                                            const updatedFollowUp = {
+                                              ...quiz.follow_up,
+                                              if_correct: e.target.value
+                                            };
+                                            handleUpdateQuizField(quizIndex, 'follow_up', updatedFollowUp);
+                                          }}
+                                          className="w-full bg-[#1E1E1E]/80 border border-gray-700/50 rounded-lg px-3 py-2 text-[13px] text-white min-h-[60px]"
+                                          placeholder="Enter follow-up for correct answers..."
+                                        />
+                                      </div>
+                                      <div>
+                                        <div className="text-[11px] text-red-400/70 mb-0.5">If incorrect:</div>
+                                        <textarea
+                                          value={quiz.follow_up.if_incorrect || ''}
+                                          onChange={(e) => {
+                                            const updatedFollowUp = {
+                                              ...quiz.follow_up,
+                                              if_incorrect: e.target.value
+                                            };
+                                            handleUpdateQuizField(quizIndex, 'follow_up', updatedFollowUp);
+                                          }}
+                                          className="w-full bg-[#1E1E1E]/80 border border-gray-700/50 rounded-lg px-3 py-2 text-[13px] text-white min-h-[60px]"
+                                          placeholder="Enter follow-up for incorrect answers..."
+                                        />
+                                      </div>
                                     </div>
-                                  )}
-                                  {quiz.follow_up.if_incorrect && (
-                                    <div>
-                                      <span className="text-[11px] text-red-400/70">If incorrect: </span>
-                                      <span className="text-[12px] text-gray-300">{quiz.follow_up.if_incorrect}</span>
-                                    </div>
+                                  ) : (
+                                    <>
+                                      {quiz.follow_up.if_correct && (
+                                        <div className="mb-1">
+                                          <span className="text-[11px] text-green-400/70">If correct: </span>
+                                          <span className="text-[12px] text-gray-300">{quiz.follow_up.if_correct}</span>
+                                        </div>
+                                      )}
+                                      {quiz.follow_up.if_incorrect && (
+                                        <div>
+                                          <span className="text-[11px] text-red-400/70">If incorrect: </span>
+                                          <span className="text-[12px] text-gray-300">{quiz.follow_up.if_incorrect}</span>
+                                        </div>
+                                      )}
+                                    </>
                                   )}
                                 </div>
                               )}
 
                               {/* Explanation */}
-                              {quiz.explanation && (
+                              {(quiz.explanation || isEditing) && (
                                 <div className="bg-black/20 p-2 rounded border border-gray-800/50">
                                   <div className="text-[11px] text-gray-400/70 mb-1">Explanation:</div>
-                                  <div className="text-[12px] text-gray-300">{quiz.explanation}</div>
+                                  {isEditing ? (
+                                    <textarea
+                                      value={quiz.explanation || ''}
+                                      onChange={(e) => handleUpdateQuizField(quizIndex, 'explanation', e.target.value)}
+                                      className="w-full bg-[#1E1E1E]/80 border border-gray-700/50 rounded-lg px-3 py-2 text-[13px] text-white min-h-[60px]"
+                                      placeholder="Enter explanation..."
+                                    />
+                                  ) : (
+                                    <div className="text-[12px] text-gray-300">{quiz.explanation}</div>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -1369,12 +1724,51 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement }) => {
                       </AnimatePresence>
                     </div>
                   ))}
+
+                  {/* Add quiz item button in edit mode */}
+                  {isEditing && (
+                    <button
+                      onClick={handleAddQuizItem}
+                      className="w-full py-2 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 rounded-lg text-[12px] transition-colors duration-200"
+                    >
+                      + Add Question
+                    </button>
+                  )}
                 </div>
               )}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Delete confirmation modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 max-w-md">
+            <h3 className="text-white text-[14px] font-medium mb-2">Delete Engagement</h3>
+            <p className="text-gray-400 text-[13px] mb-4">
+              Are you sure you want to delete this engagement opportunity? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-3 py-1.5 bg-gray-800 text-gray-300 hover:bg-gray-700 rounded-lg text-[12px]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  onDelete(engagement.id);
+                }}
+                className="px-3 py-1.5 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg text-[12px]"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 };
@@ -2774,6 +3168,180 @@ export default function Playground({
   // Fix the type issue with params.agentType comparison - use strict equality and type check
   const isEditMode = agentType === 'edit' || params.agentType === 'edit';
 
+  // Add this function to handle engagement updates
+  const handleUpdateEngagement = (updatedEngagement: EngagementOpportunity) => {
+    // Update local state
+    const updatedOpportunities = engagementOpportunities.map(engagement =>
+      engagement.id === updatedEngagement.id ? updatedEngagement : engagement
+    );
+
+    setEngagementOpportunities(updatedOpportunities);
+
+    // Update backend
+    updateEngagementOpportunities(updatedOpportunities);
+  };
+
+  // Add this function to handle engagement deletion
+  const handleDeleteEngagement = (id: string) => {
+    // Update local state
+    const updatedOpportunities = engagementOpportunities.filter(engagement => engagement.id !== id);
+
+    setEngagementOpportunities(updatedOpportunities);
+
+    // Update backend
+    updateEngagementOpportunities(updatedOpportunities);
+  };
+
+  // Add this function to add a new engagement opportunity
+  const handleAddEngagement = () => {
+    // Generate a unique ID
+    const newId = `engagement-${Date.now()}`;
+
+    // Create a new engagement opportunity
+    const newEngagement: EngagementOpportunity = {
+      id: newId,
+      rationale: "Add your rationale here",
+      timestamp: "00:00:00",
+      quiz_items: [
+        {
+          question: "Add your question here",
+          question_type: "multiple_choice",
+          options: ["Option 1", "Option 2", "Option 3"],
+          correct_option: "Option 1",
+          explanation: "Add your explanation here",
+          follow_up: {
+            if_correct: "Add follow-up for correct answers",
+            if_incorrect: "Add follow-up for incorrect answers"
+          }
+        }
+      ],
+      section_id: "section-1", // Default section
+      engagement_type: "quiz",
+      concepts_addressed: ["New Concept"]
+    };
+
+    // Update local state
+    const updatedOpportunities = [...engagementOpportunities, newEngagement];
+    setEngagementOpportunities(updatedOpportunities);
+
+    // Update backend
+    updateEngagementOpportunities(updatedOpportunities);
+  };
+
+  // Updated function to properly update engagement opportunities in the backend
+  const updateEngagementOpportunities = (opportunities: EngagementOpportunity[]) => {
+    if (!params.brdgeId || !params.apiBaseUrl) return;
+
+    try {
+      // Create updated config object that FULLY REPLACES the existing config
+      const newConfig = {
+        ...agentConfig,
+        engagement_opportunities: opportunities
+      };
+
+      console.log('Sending updated opportunities to backend:', opportunities);
+      console.log('Number of opportunities after update:', opportunities.length);
+
+      // Ensure we're using correct headers and explicitly replacing the opportunities
+      fetch(
+        `${params.apiBaseUrl}/brdges/${params.brdgeId}/agent-config`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache' // Add this to prevent caching issues
+          },
+          body: JSON.stringify({
+            personality: newConfig.personality,
+            agentPersonality: newConfig.agentPersonality,
+            teaching_persona: newConfig.teaching_persona,
+            knowledgeBase: newConfig.knowledgeBase,
+            // This needs to entirely replace the existing array
+            engagement_opportunities: opportunities
+          }),
+        }
+      )
+        .then(async response => {
+          if (response.ok) {
+            console.log('Successfully updated engagement opportunities');
+            // Important: Update the full agentConfig to ensure local state is consistent
+            setAgentConfig(newConfig);
+
+            // Force re-fetch to verify our changes took effect
+            const verifyResponse = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/agent-config`);
+            if (verifyResponse.ok) {
+              const verifyData = await verifyResponse.json();
+              console.log('Verification - opportunities count after update:',
+                verifyData.engagement_opportunities?.length || 0);
+            }
+          } else {
+            const errorData = await response.text();
+            console.error('Failed to update engagement opportunities:', errorData);
+            // Restore the original state if update failed
+            if (agentConfig?.engagement_opportunities) {
+              setEngagementOpportunities(agentConfig.engagement_opportunities);
+            }
+          }
+        })
+        .catch(error => {
+          console.error('Error updating engagement opportunities:', error);
+          // Restore the original state if update failed
+          if (agentConfig?.engagement_opportunities) {
+            setEngagementOpportunities(agentConfig.engagement_opportunities);
+          }
+        });
+    } catch (error) {
+      console.error('Error preparing engagement update:', error);
+    }
+  };
+
+  // Add useEffect to get the progress bar width for proper marker positioning
+  useEffect(() => {
+    // Update progressBarWidth state when component mounts and on window resize
+    const updateProgressBarWidth = () => {
+      if (progressBarRef.current) {
+        setProgressBarWidth(progressBarRef.current.offsetWidth);
+      }
+    };
+
+    // Initial update
+    updateProgressBarWidth();
+
+    // Add resize listener
+    window.addEventListener('resize', updateProgressBarWidth);
+
+    // Clean up
+    return () => {
+      window.removeEventListener('resize', updateProgressBarWidth);
+    };
+  }, []);
+
+  // Add state for progress bar width
+  const [progressBarWidth, setProgressBarWidth] = useState(0);
+
+  // Add a CSS class for engagement highlighting
+  useEffect(() => {
+    // Add the CSS for the highlight-pulse animation
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes highlightPulse {
+        0% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.4); }
+        70% { box-shadow: 0 0 0 10px rgba(34, 211, 238, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }
+      }
+      .highlight-pulse {
+        animation: highlightPulse 1s ease-out;
+        border-color: rgba(34, 211, 238, 0.6) !important;
+        background-color: rgba(34, 211, 238, 0.1) !important;
+      }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
   return (
     <div className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
       {/* Hide header on mobile as before */}
@@ -2937,51 +3505,16 @@ export default function Playground({
                         </button>
 
                         {/* Progress Bar Container */}
-                        <div className="flex-1 relative">
-                          {/* Outer bar (full width) */}
-                          <div
-                            ref={progressBarRef}
-                            className="h-3 bg-gray-800/50 rounded-full cursor-pointer 
-                              transition-colors duration-300
-                              hover:bg-gray-700/60"
-                            onMouseDown={(e) => {
-                              setIsDragging(true);
-                              handleProgressBarInteraction(e);
-                            }}
-                            onMouseMove={(e) => {
-                              if (isDragging) handleProgressBarInteraction(e);
-                            }}
-                            onMouseUp={() => setIsDragging(false)}
-                            onMouseLeave={() => setIsDragging(false)}
-                          >
-                            {/* Filled progress */}
-                            <div
-                              className="h-full bg-cyan-500 rounded-full transition-all duration-150"
-                              style={{
-                                width: duration > 0
-                                  ? `${(currentTime / duration) * 100}%`
-                                  : '0%',
-                              }}
-                            />
-                            {/* Draggable Thumb - Modified for better hover behavior */}
-                            {duration > 0 && (
-                              <div
-                                className="absolute top-1/2 -translate-y-1/2 
-                                  w-3 h-3 bg-cyan-400 rounded-full
-                                  shadow-[0_0_5px_rgba(34,211,238,0.6)]
-                                  border-2 border-white/20
-                                  transition-all duration-200
-                                  opacity-0 hover:opacity-100
-                                  hover:scale-125"
-                                style={{
-                                  left: `${(currentTime / duration) * 100}%`,
-                                  opacity: isDragging ? 1 : undefined,
-                                  transform: isDragging ? 'translate(-50%, -50%) scale(1.25)' : 'translate(-50%, -50%)',
-                                }}
-                              />
-                            )}
-                          </div>
-                        </div>
+                        <PlaygroundProgressBar
+                          currentTime={currentTime}
+                          duration={duration}
+                          videoRef={videoRef}
+                          setCurrentTime={setCurrentTime}
+                          isPlaying={isPlaying}
+                          setIsPlaying={setIsPlaying}
+                          engagementOpportunities={engagementOpportunities || []}
+                          setActiveTab={setActiveTab}
+                        />
 
                         {/* Time Display */}
                         <div className="flex items-center gap-2 text-[11px] text-gray-400 font-medium tracking-wider">
@@ -4137,9 +4670,20 @@ export default function Playground({
                             <div className="h-full pt-0 overflow-y-auto space-y-4">
                               <div className="flex items-center justify-between mb-1">
                                 <h2 className={styles.section.title}>Engagement Opportunities</h2>
-                                <span className="text-xs text-gray-400">
-                                  {engagementOpportunities?.length || 0} items
-                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-gray-400">
+                                    {engagementOpportunities?.length || 0} items
+                                  </span>
+                                  <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={handleAddEngagement}
+                                    className="px-2 py-1 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 rounded-lg text-[11px] flex items-center gap-1"
+                                  >
+                                    <Plus size={12} />
+                                    Add New
+                                  </motion.button>
+                                </div>
                               </div>
 
                               {/* Filter controls */}
@@ -4166,14 +4710,14 @@ export default function Playground({
                                 </button>
                               </div>
 
-                              {/* Add some debug output to help diagnose issues */}
-                              {!engagementOpportunities || engagementOpportunities.length === 0 && (
+                              {/* Debug output for troubleshooting */}
+                              {(!engagementOpportunities || engagementOpportunities.length === 0) && (
                                 <div className="bg-gray-900/40 mb-4 p-2 rounded-lg text-xs text-gray-400">
                                   Debug: Agent config has engagement_opportunities? {agentConfig.engagement_opportunities ? 'Yes' : 'No'}
                                 </div>
                               )}
 
-                              {/* Engagement list */}
+                              {/* Engagement list with edit/delete functionality */}
                               <div className="space-y-3">
                                 {engagementOpportunities && engagementOpportunities.length > 0 ? (
                                   engagementOpportunities
@@ -4182,13 +4726,15 @@ export default function Playground({
                                       <EngagementCard
                                         key={engagement.id || index}
                                         engagement={engagement}
+                                        onEdit={handleUpdateEngagement}
+                                        onDelete={handleDeleteEngagement}
                                       />
                                     ))
                                 ) : (
                                   <div className="text-center p-6 bg-gray-900/30 rounded-lg border border-gray-800/50">
                                     <div className="text-gray-400 text-sm">No engagement opportunities found</div>
                                     <div className="text-gray-500 text-xs mt-1">
-                                      Engagement opportunities will appear here when available in the content
+                                      Create new engagement opportunities using the "Add New" button above
                                     </div>
                                   </div>
                                 )}
