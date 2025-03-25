@@ -2,8 +2,8 @@
 import { ChatMessageType } from "@/components/chat/ChatTile";
 import { TranscriptionTile } from "@/transcriptions/TranscriptionTile";
 import {
+  BarVisualizer,
   useConnectionState,
-  useDataChannel,
   useLocalParticipant,
   useVoiceAssistant,
   useChat,
@@ -123,14 +123,6 @@ interface Transcript {
   content: TranscriptContent;
   status: string;
   metadata: any;
-}
-
-interface DataChannelPayload {
-  transcript_position?: {
-    read: string[];
-    remaining: string[];
-  };
-  // Add other payload types as needed
 }
 
 // Update the useIsMobile hook to also detect orientation
@@ -2495,126 +2487,6 @@ export default function Playground({
     { id: 'share', label: 'Share' }
   ];
 
-  // Update the data channel usage
-  const { send: sendData } = useDataChannel("agent_data_channel", (msg: DataChannelMessage) => {
-    try {
-      const data = JSON.parse(new TextDecoder().decode(msg.payload));
-      console.log("Data Channel received:", data);
-    } catch (error) {
-      console.error("Error parsing data channel message:", error);
-    }
-  });
-
-  // Update the computeTranscriptPosition function to better handle the segments
-  const computeTranscriptPosition = useCallback((time: number) => {
-    if (!transcript?.content?.segments) {
-      console.log('No transcript segments available');
-      return { read: [], remaining: [] };
-    }
-
-    try {
-      // Filter segments into read and remaining based on current time
-      const read = transcript.content.segments
-        .filter(seg => seg.end <= time)
-        .map(seg => seg.text.trim())
-        .filter(text => text.length > 0); // Filter out empty segments
-
-      const remaining = transcript.content.segments
-        .filter(seg => seg.start > time)
-        .map(seg => seg.text.trim())
-        .filter(text => text.length > 0); // Filter out empty segments
-
-      console.log('Computed transcript position:', {
-        currentTime: time,
-        readCount: read.length,
-        remainingCount: remaining.length,
-        read: read.slice(0, 3), // Log first 3 for debugging
-        remaining: remaining.slice(0, 3) // Log first 3 for debugging
-      });
-
-      return { read, remaining };
-    } catch (error) {
-      console.error('Error computing transcript position:', error);
-      return { read: [], remaining: [] };
-    }
-  }, [transcript]);
-
-  // Update the effect that sends transcript position
-  useEffect(() => {
-    if (roomState === ConnectionState.Connected && transcript?.content?.segments) {
-      try {
-        const position = computeTranscriptPosition(currentTime);
-
-        // Only send if we have actual segments
-        if (position.read.length > 0 || position.remaining.length > 0) {
-          const payload: DataChannelPayload = {
-            transcript_position: position
-          };
-
-          console.log('Sending transcript position:', payload);
-          sendData(new TextEncoder().encode(JSON.stringify(payload)), { topic: "agent_data_channel" });
-        }
-      } catch (error) {
-        console.error('Error sending transcript position:', error);
-      }
-    }
-  }, [currentTime, roomState, sendData, computeTranscriptPosition, transcript]);
-
-  // Add this effect to log when transcript changes
-  useEffect(() => {
-    if (transcript?.content?.segments) {
-      console.log('Transcript loaded:', {
-        segmentCount: transcript.content.segments.length,
-        firstSegment: transcript.content.segments[0],
-        lastSegment: transcript.content.segments[transcript.content.segments.length - 1]
-      });
-    }
-  }, [transcript]);
-
-  // Add effect to send initial transcript position
-  useEffect(() => {
-    if (roomState === ConnectionState.Connected && transcript?.content?.segments) {
-      const entireTranscript = transcript.content.segments
-        .map(seg => seg.text.trim())
-        .filter(Boolean);
-
-      const payload: DataChannelPayload = {
-        transcript_position: {
-          read: [],
-          remaining: entireTranscript
-        }
-      };
-
-      console.log('Sending initial transcript position:', payload);
-      sendData(new TextEncoder().encode(JSON.stringify(payload)), { topic: "agent_data_channel" });
-    }
-  }, [roomState, transcript, sendData]);
-
-  // Update connect handler to use LiveKit connection
-  const handleConnect = useCallback(async () => {
-    if (roomState === ConnectionState.Connected) {
-      onConnect(false);
-    } else {
-      // The parent component (index.tsx) handles the token and url
-      // Just pass the connection request up
-      onConnect(true);
-    }
-  }, [roomState, onConnect]);
-
-  // Update the connect button to use the new handler
-  const connectButton = (
-    <button
-      onClick={handleConnect}
-      className={`p-1.5 rounded-lg transition-colors text-xs
-        ${roomState === ConnectionState.Connected
-          ? 'bg-red-500/20 text-red-400'
-          : 'bg-cyan-500/20 text-cyan-400'
-        }`}
-    >
-      {roomState === ConnectionState.Connected ? 'Disconnect' : 'Connect'}
-    </button>
-  );
-
   // Add this effect to handle video playback state
   useEffect(() => {
     if (videoRef.current) {
@@ -2862,13 +2734,13 @@ export default function Playground({
           brdge_id: params.brdgeId
         };
 
-        console.log('Sending agent config:', configPayload);
-        sendData(new TextEncoder().encode(JSON.stringify(configPayload)), { topic: "agent_data_channel" });
+        console.log('Agent config updated:', configPayload);
+        // Removed sendData call since we're removing data channel functionality
       } catch (error) {
-        console.error('Error sending agent config:', error);
+        console.error('Error updating agent config:', error);
       }
     }
-  }, [roomState, agentConfig, params.userId, params.brdgeId, sendData]);
+  }, [roomState, agentConfig, params.userId, params.brdgeId]);
 
   // Then update the main container and content area for mobile
   const [isInfoVisible, setIsInfoVisible] = useState(true);
@@ -3341,6 +3213,31 @@ export default function Playground({
       document.head.removeChild(style);
     };
   }, []);
+
+  // Update connect handler to use LiveKit connection
+  const handleConnect = useCallback(async () => {
+    if (roomState === ConnectionState.Connected) {
+      onConnect(false);
+    } else {
+      // The parent component (index.tsx) handles the token and url
+      // Just pass the connection request up
+      onConnect(true);
+    }
+  }, [roomState, onConnect]);
+
+  // Update the connect button to use the new handler
+  const connectButton = (
+    <button
+      onClick={handleConnect}
+      className={`p-1.5 rounded-lg transition-colors text-xs
+        ${roomState === ConnectionState.Connected
+          ? 'bg-red-500/20 text-red-400'
+          : 'bg-cyan-500/20 text-cyan-400'
+        }`}
+    >
+      {roomState === ConnectionState.Connected ? 'Disconnect' : 'Connect'}
+    </button>
+  );
 
   return (
     <div className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
