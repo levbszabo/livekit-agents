@@ -7,6 +7,7 @@ import {
   useLocalParticipant,
   useVoiceAssistant,
   useChat,
+  useDataChannel
 } from "@livekit/components-react";
 import { ConnectionState, LocalParticipant, Track, DataPacket_Kind } from "livekit-client";
 import { ReactNode, useCallback, useEffect, useMemo, useState, useRef } from "react";
@@ -3239,6 +3240,90 @@ export default function Playground({
     </button>
   );
 
+  // Add this hook to get the data channel functionality
+  const { send } = useDataChannel("video-timestamp");
+
+  // Add a ref to track the interval ID for cleanup
+  const timestampIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Add effect to handle sending timestamps when video plays/pauses
+  useEffect(() => {
+    if (!videoRef.current) return;
+
+    // Function to send the current timestamp
+    const sendTimestamp = () => {
+      if (videoRef.current && !videoRef.current.paused && !videoRef.current.ended && roomState === ConnectionState.Connected) {
+        const currentTime = videoRef.current.currentTime;
+
+        // Add debug logging
+        console.log("Sending timestamp:", currentTime);
+
+        // Prepare message as JSON with timestamp
+        const message = JSON.stringify({
+          type: "timestamp",
+          time: currentTime
+        });
+
+        // Convert to Uint8Array for sending over data channel
+        const payload = new TextEncoder().encode(message);
+
+        try {
+          // Send to all participants on 'video-timestamp' topic, reliable delivery
+          send(payload, { topic: "video-timestamp", reliable: true });
+          console.log("Timestamp sent successfully");
+        } catch (err) {
+          console.error("Failed to send timestamp:", err);
+        }
+      }
+    };
+
+    // Handler: start sending timestamps on play
+    const handlePlay = () => {
+      // Clear any existing interval first
+      if (timestampIntervalRef.current) {
+        clearInterval(timestampIntervalRef.current);
+      }
+
+      // Send initial timestamp immediately
+      sendTimestamp();
+
+      // Send timestamp every 1 second
+      timestampIntervalRef.current = setInterval(sendTimestamp, 1000);
+    };
+
+    // Handler: stop sending on pause or end
+    const handleStop = () => {
+      if (timestampIntervalRef.current) {
+        clearInterval(timestampIntervalRef.current);
+        timestampIntervalRef.current = null;
+      }
+    };
+
+    // Attach event listeners
+    const video = videoRef.current;
+    video.addEventListener("play", handlePlay);
+    video.addEventListener("pause", handleStop);
+    video.addEventListener("ended", handleStop);
+
+    // Cleanup on unmount
+    return () => {
+      if (video) {
+        video.removeEventListener("play", handlePlay);
+        video.removeEventListener("pause", handleStop);
+        video.removeEventListener("ended", handleStop);
+      }
+
+      if (timestampIntervalRef.current) {
+        clearInterval(timestampIntervalRef.current);
+      }
+    };
+  }, [videoRef, send, roomState]);
+
+  // Add an effect to log room state changes
+  useEffect(() => {
+    console.log("Room connection state:", roomState);
+  }, [roomState]);
+
   return (
     <div className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
       {/* Hide header on mobile as before */}
@@ -3308,6 +3393,8 @@ export default function Playground({
                   onTimeUpdate={() => {
                     if (videoRef.current) {
                       setCurrentTime(videoRef.current.currentTime);
+                      // Optionally log the time updates here
+                      console.log("Video time updated:", videoRef.current.currentTime);
                     }
                   }}
                   isPlaying={isPlaying}
