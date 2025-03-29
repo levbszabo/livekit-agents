@@ -9,7 +9,7 @@ import {
   useChat,
   useDataChannel
 } from "@livekit/components-react";
-import { ConnectionState, LocalParticipant, Track, DataPacket_Kind } from "livekit-client";
+import { ConnectionState, LocalParticipant, Track, DataPacket_Kind, RpcInvocationData } from "livekit-client";
 import { ReactNode, useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { API_BASE_URL } from '@/config';
 import { api } from '@/api';
@@ -3249,22 +3249,15 @@ export default function Playground({
   // Add a ref to track the last sent timestamp
   const lastSentTimestampRef = useRef<number | null>(null);
 
-  // Add effect to handle sending timestamps when video plays/pauses
-  useEffect(() => {
-    if (!videoRef.current) return;
-
-    console.log("Setting up timestamp sending with room state:", roomState);
-
-    // Check if send function is available
-    if (!send) {
-      console.error("Data channel send function is not available");
+  // 1. First, create stable callback references with useCallback
+  const sendTimestamp = useCallback(() => {
+    // Add robust connection check
+    if (!videoRef.current || !send || roomState !== ConnectionState.Connected) {
+      console.log("Cannot send timestamp: connection not ready");
       return;
     }
 
-    // Function to send the current timestamp
-    const sendTimestamp = () => {
-      if (!videoRef.current) return;
-
+    if (videoRef.current && !videoRef.current.paused && !videoRef.current.ended) {
       const currentTime = videoRef.current.currentTime;
 
       // Only send if there's been a meaningful change in timestamp
@@ -3297,48 +3290,63 @@ export default function Playground({
       } else {
         console.log("Skipped sending - no significant change in timestamp");
       }
-    };
+    }
+  }, [videoRef, send, roomState]);
 
-    // Handler: start sending timestamps on play
-    const handlePlay = () => {
-      console.log("Video play event triggered");
+  // 2. Create stable event handler callbacks
+  const handlePlay = useCallback(() => {
+    console.log("Video play event triggered");
 
-      // Clear any existing interval first
-      if (timestampIntervalRef.current) {
-        clearInterval(timestampIntervalRef.current);
-        console.log("Cleared existing timestamp interval");
-      }
+    // Clear any existing interval first
+    if (timestampIntervalRef.current) {
+      clearInterval(timestampIntervalRef.current);
+      console.log("Cleared existing timestamp interval");
+    }
 
-      // Send initial timestamp immediately
-      sendTimestamp();
+    // Send initial timestamp immediately
+    sendTimestamp();
 
-      // Send timestamp every 1 second
-      timestampIntervalRef.current = setInterval(sendTimestamp, 1000);
-      console.log("Started new timestamp interval");
-    };
+    // Send timestamp every 1 second
+    timestampIntervalRef.current = setInterval(() => sendTimestamp(), 1000);
+    console.log("Started new timestamp interval");
+  }, [sendTimestamp]);
 
-    // Handler: stop sending on pause or end
-    const handleStop = () => {
-      if (timestampIntervalRef.current) {
-        clearInterval(timestampIntervalRef.current);
-        timestampIntervalRef.current = null;
-      }
-    };
+  const handleStop = useCallback(() => {
+    if (timestampIntervalRef.current) {
+      clearInterval(timestampIntervalRef.current);
+      timestampIntervalRef.current = null;
+    }
+  }, []);
 
-    // Add handler for seek events
-    const handleSeeked = () => {
-      console.log("Video seeked event triggered");
-      sendTimestamp();
-    };
+  const handleSeeked = useCallback(() => {
+    console.log("Video seeked event triggered");
+    sendTimestamp();
+  }, [sendTimestamp]);
 
-    // Attach event listeners
+  // 3. Update the effect to re-attach event listeners when connection changes
+  useEffect(() => {
+    if (!videoRef.current) {
+      console.log("Video ref not available yet");
+      return;
+    }
+
+    console.log("Setting up video event listeners with room state:", roomState);
+
     const video = videoRef.current;
+
+    // Remove any existing listeners first (in case they have stale closures)
+    video.removeEventListener("play", handlePlay);
+    video.removeEventListener("pause", handleStop);
+    video.removeEventListener("ended", handleStop);
+    video.removeEventListener("seeked", handleSeeked);
+
+    // Add listeners with fresh closures
     video.addEventListener("play", handlePlay);
     video.addEventListener("pause", handleStop);
     video.addEventListener("ended", handleStop);
     video.addEventListener("seeked", handleSeeked);
 
-    // Cleanup on unmount
+    // Cleanup function
     return () => {
       if (video) {
         video.removeEventListener("play", handlePlay);
@@ -3349,9 +3357,10 @@ export default function Playground({
 
       if (timestampIntervalRef.current) {
         clearInterval(timestampIntervalRef.current);
+        timestampIntervalRef.current = null;
       }
     };
-  }, [videoRef, send, roomState]);
+  }, [videoRef, handlePlay, handleStop, handleSeeked, roomState, send]); // Important: include all dependencies
 
   // Add an effect to log room state changes
   useEffect(() => {
@@ -3457,6 +3466,30 @@ export default function Playground({
       }
     };
   }, [localParticipant, roomState, videoRef]);
+
+  // Add roomState as a dependency to the useEffect
+  useEffect(() => {
+    // Only set up if video exists and we're connected
+    if (!videoRef.current || roomState !== ConnectionState.Connected) return;
+
+    const video = videoRef.current;
+    // Remove any existing listeners first (in case of re-attachment)
+    video.removeEventListener("play", handlePlay);
+    video.removeEventListener("pause", handleStop);
+    video.removeEventListener("ended", handleStop);
+    video.removeEventListener("seeked", handleSeeked);
+
+    // Re-attach listeners
+    video.addEventListener("play", handlePlay);
+    video.addEventListener("pause", handleStop);
+    video.addEventListener("ended", handleStop);
+    video.addEventListener("seeked", handleSeeked);
+
+    // Cleanup
+    return () => {
+      // ... existing cleanup code ...
+    };
+  }, [videoRef, send, roomState]); // Add roomState as dependency
 
   return (
     <div className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
