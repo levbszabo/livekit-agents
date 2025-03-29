@@ -3250,38 +3250,59 @@ export default function Playground({
   useEffect(() => {
     if (!videoRef.current) return;
 
+    console.log("Setting up timestamp sending with room state:", roomState);
+
+    // Check if send function is available
+    if (!send) {
+      console.error("Data channel send function is not available");
+      return;
+    }
+
     // Function to send the current timestamp
     const sendTimestamp = () => {
-      if (videoRef.current && !videoRef.current.paused && !videoRef.current.ended && roomState === ConnectionState.Connected) {
+      if (videoRef.current) {
         const currentTime = videoRef.current.currentTime;
-
-        // Add debug logging
-        console.log("Sending timestamp:", currentTime);
-
-        // Prepare message as JSON with timestamp
-        const message = JSON.stringify({
-          type: "timestamp",
-          time: currentTime
+        console.log("Checking send conditions:", {
+          playing: !videoRef.current.paused,
+          notEnded: !videoRef.current.ended,
+          roomConnected: roomState === ConnectionState.Connected,
+          currentTime
         });
 
-        // Convert to Uint8Array for sending over data channel
-        const payload = new TextEncoder().encode(message);
+        if (!videoRef.current.paused && !videoRef.current.ended && roomState === ConnectionState.Connected) {
+          // Add debug logging
+          console.log("Sending timestamp:", currentTime);
 
-        try {
-          // Send to all participants on 'video-timestamp' topic, reliable delivery
-          send(payload, { topic: "video-timestamp", reliable: true });
-          console.log("Timestamp sent successfully");
-        } catch (err) {
-          console.error("Failed to send timestamp:", err);
+          // Prepare message as JSON with timestamp
+          const message = JSON.stringify({
+            type: "timestamp",
+            time: currentTime
+          });
+
+          // Convert to Uint8Array for sending over data channel
+          const payload = new TextEncoder().encode(message);
+
+          try {
+            // Send to all participants on 'video-timestamp' topic, reliable delivery
+            send(payload, { topic: "video-timestamp", reliable: true });
+            console.log("Timestamp sent successfully");
+          } catch (err) {
+            console.error("Failed to send timestamp:", err);
+          }
+        } else {
+          console.log("Skipped sending timestamp - conditions not met");
         }
       }
     };
 
     // Handler: start sending timestamps on play
     const handlePlay = () => {
+      console.log("Video play event triggered");
+
       // Clear any existing interval first
       if (timestampIntervalRef.current) {
         clearInterval(timestampIntervalRef.current);
+        console.log("Cleared existing timestamp interval");
       }
 
       // Send initial timestamp immediately
@@ -3289,6 +3310,7 @@ export default function Playground({
 
       // Send timestamp every 1 second
       timestampIntervalRef.current = setInterval(sendTimestamp, 1000);
+      console.log("Started new timestamp interval");
     };
 
     // Handler: stop sending on pause or end
