@@ -3246,6 +3246,9 @@ export default function Playground({
   // Add a ref to track the interval ID for cleanup
   const timestampIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Add a ref to track the last sent timestamp
+  const lastSentTimestampRef = useRef<number | null>(null);
+
   // Add effect to handle sending timestamps when video plays/pauses
   useEffect(() => {
     if (!videoRef.current) return;
@@ -3260,37 +3263,38 @@ export default function Playground({
 
     // Function to send the current timestamp
     const sendTimestamp = () => {
-      if (videoRef.current) {
+      if (videoRef.current && !videoRef.current.paused && !videoRef.current.ended) {
         const currentTime = videoRef.current.currentTime;
-        console.log("Checking send conditions:", {
-          playing: !videoRef.current.paused,
-          notEnded: !videoRef.current.ended,
-          roomConnected: roomState === ConnectionState.Connected,
-          currentTime
-        });
 
-        if (!videoRef.current.paused && !videoRef.current.ended && roomState === ConnectionState.Connected) {
-          // Add debug logging
+        // Only send if there's been a meaningful change in timestamp
+        if (lastSentTimestampRef.current === null ||
+          Math.abs(currentTime - lastSentTimestampRef.current) >= 0.1) {
+
           console.log("Sending timestamp:", currentTime);
 
-          // Prepare message as JSON with timestamp
+          // Prepare message
           const message = JSON.stringify({
             type: "timestamp",
             time: currentTime
           });
 
-          // Convert to Uint8Array for sending over data channel
           const payload = new TextEncoder().encode(message);
 
+          // Try to send, but don't worry if it fails due to connection
           try {
-            // Send to all participants on 'video-timestamp' topic, reliable delivery
-            send(payload, { topic: "video-timestamp", reliable: true });
-            console.log("Timestamp sent successfully");
+            if (send && roomState === ConnectionState.Connected) {
+              send(payload, { topic: "video-timestamp", reliable: true });
+              // Update last sent timestamp only on successful send
+              lastSentTimestampRef.current = currentTime;
+              console.log("Timestamp sent successfully");
+            } else {
+              console.log("Prepared timestamp but connection not ready");
+            }
           } catch (err) {
             console.error("Failed to send timestamp:", err);
           }
         } else {
-          console.log("Skipped sending timestamp - conditions not met");
+          console.log("Skipped sending - no significant change in timestamp");
         }
       }
     };
