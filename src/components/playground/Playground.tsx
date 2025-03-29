@@ -19,7 +19,7 @@ import {
   PanelGroup,
   PanelResizeHandle
 } from 'react-resizable-panels';
-import { Plus, FileText, X, Edit2, Save, ChevronDown, ChevronUp, Play, Pause, Volume2, VolumeX, Maximize2, Mic, MicOff, Radio, ChevronRight, Info, Link, Lock, Globe, Copy, Check, ExternalLink, Trash2 } from 'lucide-react';
+import { Plus, FileText, X, Edit2, Save, ChevronDown, ChevronUp, Play, Pause, Volume2, VolumeX, Maximize2, Mic, MicOff, Radio, ChevronRight, Info, Link, Lock, Globe, Copy, Check, ExternalLink, Trash2, Square } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import styled, { keyframes } from 'styled-components';
 import TimelineMarkers from '../player/TimelineMarkers';
@@ -3361,6 +3361,103 @@ export default function Playground({
   // Add this hook to access voice assistant state and audio track
   const { state: assistantState, audioTrack: assistantAudioTrack } = useVoiceAssistant();
 
+  // Add this state to track when the button was last pressed
+  const [interruptPressed, setInterruptPressed] = useState(false);
+
+  // Add this state to track animation
+  const [animateInterrupt, setAnimateInterrupt] = useState(false);
+
+  // Modify the handleInterruptAgent function
+  const handleInterruptAgent = useCallback(() => {
+    if (roomState !== ConnectionState.Connected || !send) {
+      console.warn("Cannot interrupt agent: room not connected or send function unavailable");
+      return;
+    }
+
+    try {
+      const interruptMessage = {
+        type: "interrupt",
+        timestamp: Date.now()
+      };
+
+      const payload = new TextEncoder().encode(JSON.stringify(interruptMessage));
+
+      send(payload, {
+        topic: "agent-control",
+        reliable: true
+      });
+
+      // Enhanced visual feedback
+      setInterruptPressed(true);
+      setAnimateInterrupt(true);
+
+      // Reset states after animations complete
+      setTimeout(() => setInterruptPressed(false), 400);
+      setTimeout(() => setAnimateInterrupt(false), 600);
+
+      console.log("Sent interrupt command to agent");
+    } catch (error) {
+      console.error("Failed to send interrupt command:", error);
+    }
+  }, [roomState, send]);
+
+  // Add this effect after the component mounts
+  useEffect(() => {
+    if (!localParticipant || roomState !== ConnectionState.Connected) {
+      return;
+    }
+
+    console.log("Registering player-control RPC method");
+
+    // Register an RPC method for controlling the video player
+    localParticipant.registerRpcMethod(
+      'controlVideoPlayer',
+      async (data: RpcInvocationData) => {
+        try {
+          console.log(`Received player control from agent: ${data.payload}`);
+
+          // Parse the control command
+          const command = JSON.parse(data.payload);
+
+          if (command.action === 'pause' && videoRef.current) {
+            // Pause the video
+            videoRef.current.pause();
+            setIsPlaying(false);
+            console.log("Video paused via RPC");
+
+            // You could add a notification here
+            // setShowEngagementNotice(true);
+
+            return JSON.stringify({ success: true, action: 'pause' });
+          }
+          else if (command.action === 'play' && videoRef.current) {
+            // Resume playing
+            videoRef.current.play();
+            setIsPlaying(true);
+            console.log("Video resumed via RPC");
+
+            return JSON.stringify({ success: true, action: 'play' });
+          }
+
+          return JSON.stringify({ success: false, error: 'Invalid command' });
+        } catch (error) {
+          console.error('Error handling player control RPC:', error);
+          return JSON.stringify({ success: false, error: String(error) });
+        }
+      }
+    );
+
+    // Clean up the RPC method when component unmounts
+    return () => {
+      try {
+        localParticipant.unregisterRpcMethod('controlVideoPlayer');
+        console.log("Unregistered player-control RPC method");
+      } catch (error) {
+        console.error("Error unregistering RPC method:", error);
+      }
+    };
+  }, [localParticipant, roomState, videoRef]);
+
   return (
     <div className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
       {/* Hide header on mobile as before */}
@@ -3740,7 +3837,6 @@ export default function Playground({
                                   <BarVisualizer
                                     trackRef={assistantAudioTrack}
                                     barCount={10}
-                                    state={assistantState}
                                     options={{
                                       minHeight: 15,
                                       maxHeight: 85
@@ -3753,6 +3849,26 @@ export default function Playground({
                                     }}
                                   />
                                 </div>
+
+                                {/* Add Interrupt Button */}
+                                <button
+                                  onClick={handleInterruptAgent}
+                                  className={`
+                                    ml-2 p-1.5 rounded-md 
+                                    ${interruptPressed
+                                      ? 'bg-cyan-600 text-cyan-100 shadow-[0_0_8px_rgba(8,145,178,0.6)]'
+                                      : 'bg-cyan-900/60 hover:bg-cyan-800/70 text-cyan-300 hover:text-cyan-200'
+                                    }
+                                    ${animateInterrupt ? 'scale-105' : 'scale-100'}
+                                    transition-all duration-200
+                                    flex items-center gap-1.5 text-xs
+                                    border ${interruptPressed ? 'border-cyan-400' : 'border-cyan-700/50'}
+                                  `}
+                                  aria-label="Interrupt agent"
+                                >
+                                  <Square size={12} className={`fill-current ${animateInterrupt ? 'animate-pulse' : ''}`} />
+                                  <span>Stop</span>
+                                </button>
                               </>
                             )}
                           </div>
