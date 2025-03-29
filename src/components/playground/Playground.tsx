@@ -3263,39 +3263,39 @@ export default function Playground({
 
     // Function to send the current timestamp
     const sendTimestamp = () => {
-      if (videoRef.current && !videoRef.current.paused && !videoRef.current.ended) {
-        const currentTime = videoRef.current.currentTime;
+      if (!videoRef.current) return;
 
-        // Only send if there's been a meaningful change in timestamp
-        if (lastSentTimestampRef.current === null ||
-          Math.abs(currentTime - lastSentTimestampRef.current) >= 0.1) {
+      const currentTime = videoRef.current.currentTime;
 
-          console.log("Sending timestamp:", currentTime);
+      // Only send if there's been a meaningful change in timestamp
+      if (lastSentTimestampRef.current === null ||
+        Math.abs(currentTime - lastSentTimestampRef.current) >= 0.1) {
 
-          // Prepare message
-          const message = JSON.stringify({
-            type: "timestamp",
-            time: currentTime
-          });
+        console.log("Sending timestamp:", currentTime);
 
-          const payload = new TextEncoder().encode(message);
+        // Prepare message
+        const message = JSON.stringify({
+          type: "timestamp",
+          time: currentTime
+        });
 
-          // Try to send, but don't worry if it fails due to connection
-          try {
-            if (send && roomState === ConnectionState.Connected) {
-              send(payload, { topic: "video-timestamp", reliable: true });
-              // Update last sent timestamp only on successful send
-              lastSentTimestampRef.current = currentTime;
-              console.log("Timestamp sent successfully");
-            } else {
-              console.log("Prepared timestamp but connection not ready");
-            }
-          } catch (err) {
-            console.error("Failed to send timestamp:", err);
+        const payload = new TextEncoder().encode(message);
+
+        // Try to send, but don't worry if it fails due to connection
+        try {
+          if (send && roomState === ConnectionState.Connected) {
+            send(payload, { topic: "video-timestamp", reliable: true });
+            // Update last sent timestamp only on successful send
+            lastSentTimestampRef.current = currentTime;
+            console.log("Timestamp sent successfully");
+          } else {
+            console.log("Prepared timestamp but connection not ready");
           }
-        } else {
-          console.log("Skipped sending - no significant change in timestamp");
+        } catch (err) {
+          console.error("Failed to send timestamp:", err);
         }
+      } else {
+        console.log("Skipped sending - no significant change in timestamp");
       }
     };
 
@@ -3325,11 +3325,18 @@ export default function Playground({
       }
     };
 
+    // Add handler for seek events
+    const handleSeeked = () => {
+      console.log("Video seeked event triggered");
+      sendTimestamp();
+    };
+
     // Attach event listeners
     const video = videoRef.current;
     video.addEventListener("play", handlePlay);
     video.addEventListener("pause", handleStop);
     video.addEventListener("ended", handleStop);
+    video.addEventListener("seeked", handleSeeked);
 
     // Cleanup on unmount
     return () => {
@@ -3337,6 +3344,7 @@ export default function Playground({
         video.removeEventListener("play", handlePlay);
         video.removeEventListener("pause", handleStop);
         video.removeEventListener("ended", handleStop);
+        video.removeEventListener("seeked", handleSeeked);
       }
 
       if (timestampIntervalRef.current) {
