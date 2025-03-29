@@ -3358,6 +3358,9 @@ export default function Playground({
     console.log("Room connection state:", roomState);
   }, [roomState]);
 
+  // Add this hook to access voice assistant state and audio track
+  const { state: assistantState, audioTrack: assistantAudioTrack } = useVoiceAssistant();
+
   return (
     <div className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
       {/* Hide header on mobile as before */}
@@ -3729,7 +3732,29 @@ export default function Playground({
                           {/* Brand icon - Hide text on mobile */}
                           <div className="flex items-center gap-2">
                             <BrdgeLogo src="/new-img.png" alt="Brdge AI Logo" />
-                            {!isMobile && <span className="text-sm text-gray-200 font-medium">AI Chat</span>}
+                            {!isMobile && (
+                              <>
+                                <span className="text-sm text-gray-200 font-medium">AI Chat</span>
+                                {/* Add BarVisualizer here */}
+                                <div className="h-5 w-20 ml-1">
+                                  <BarVisualizer
+                                    trackRef={assistantAudioTrack}
+                                    barCount={10}
+                                    state={assistantState}
+                                    options={{
+                                      minHeight: 15,
+                                      maxHeight: 85
+                                    }}
+                                    style={{
+                                      borderRadius: '4px',
+                                      overflow: 'hidden',
+                                      gap: '2px',
+                                      padding: '2px',
+                                    }}
+                                  />
+                                </div>
+                              </>
+                            )}
                           </div>
 
                           {/* Info tooltip and Mic controls */}
