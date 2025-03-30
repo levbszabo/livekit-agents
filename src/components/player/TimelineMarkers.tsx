@@ -17,6 +17,7 @@ interface TimelineMarkersProps {
     onMarkerClick: (engagementId: string) => void;
     containerWidth: number;
     selectedEngagementId?: string;
+    onTriggerEngagement?: (engagementId: string) => void;
 }
 
 // Helper function to convert timestamp (00:00:00) to seconds
@@ -40,7 +41,8 @@ const TimelineMarkers: React.FC<TimelineMarkersProps> = ({
     currentTime,
     onMarkerClick,
     containerWidth,
-    selectedEngagementId
+    selectedEngagementId,
+    onTriggerEngagement
 }) => {
     const [hoveredMarkerId, setHoveredMarkerId] = useState<string | null>(null);
 
@@ -118,6 +120,16 @@ const TimelineMarkers: React.FC<TimelineMarkersProps> = ({
         };
     };
 
+    // Add a handler for triggering engagement directly on marker click
+    const handleMarkerClick = (e: React.MouseEvent, engagement: EngagementOpportunity) => {
+        e.stopPropagation(); // Prevent event bubbling
+
+        // If we have the trigger function, call it immediately
+        if (onTriggerEngagement) {
+            onTriggerEngagement(engagement.id);
+        }
+    };
+
     return (
         <div className="absolute inset-0 pointer-events-none z-10">
             {Object.entries(groupedMarkers).map(([timestamp, engagements]) => {
@@ -157,6 +169,7 @@ const TimelineMarkers: React.FC<TimelineMarkersProps> = ({
                                 transition={{ duration: 0.2, type: "spring", stiffness: 200 }}
                                 onMouseEnter={() => setHoveredMarkerId(engagement.id)}
                                 onMouseLeave={() => setHoveredMarkerId(null)}
+                                onClick={(e) => handleMarkerClick(e, engagement)} // Direct click handler - trigger immediately
                             >
                                 {/* Unified circle design for all marker types */}
                                 <div

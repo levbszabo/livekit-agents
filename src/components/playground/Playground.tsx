@@ -23,6 +23,7 @@ import { Plus, FileText, X, Edit2, Save, ChevronDown, ChevronUp, Play, Pause, Vo
 import { motion, AnimatePresence } from 'framer-motion';
 import styled, { keyframes } from 'styled-components';
 import PlaygroundProgressBar from '../player/PlaygroundProgressBar';
+import TimelineMarkers from '../player/TimelineMarkers';
 
 export interface PlaygroundProps {
   logo?: ReactNode;
@@ -148,161 +149,33 @@ const useIsMobile = () => {
   return { isMobile, isLandscape };
 };
 
+// Update the styles object to include better font styling
 const styles = {
-  heading: `font-satoshi text-[20px] font-medium tracking-[-0.02em] text-white/90`,
-  subheading: `font-satoshi text-[16px] font-normal tracking-[-0.01em] text-white/80`,
-  sectionTitle: `font-satoshi text-[13px] font-medium tracking-[-0.01em] text-white/90`,
-  label: `font-satoshi text-[11px] font-normal tracking-wide text-gray-400/70`,
-  input: {
-    base: `
-      font-satoshi w-full
-      bg-[#1E1E1E]/50 backdrop-blur-sm
-      border border-gray-800/50 rounded-lg
-      px-3 py-2.5 text-[14px] leading-relaxed
-      text-white
-      transition-all duration-300
-      focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30
-      focus:shadow-[0_0_15px_rgba(34,211,238,0.1)]
-      hover:border-cyan-500/20
-      placeholder:text-gray-600/50
-    `,
-    textarea: `
-      min-h-[120px] resize-none
-      bg-transparent
-      border border-gray-800/50 rounded-lg
-      transition-all duration-300
-      focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30
-      focus:shadow-[0_0_15px_rgba(34,211,238,0.1)]
-      hover:border-cyan-500/20
-      scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-700/30
-      hover:scrollbar-thumb-cyan-500/20
-      text-shadow-[0_0_10px_rgba(34,211,238,0.3)]
-    `
-  },
-  button: {
-    primary: `
-      group
-      flex items-center gap-2
-      px-4 py-2 rounded-lg text-[13px]
-      bg-gradient-to-r from-cyan-500/10 to-cyan-400/5
-      text-cyan-400
-      border border-cyan-500/20
-      transition-all duration-300
-      hover:border-cyan-400/40
-      hover:shadow-[0_0_15px_rgba(34,211,238,0.15)]
-      hover:bg-gradient-to-r hover:from-cyan-500/20 hover:to-cyan-400/10
-    `,
-    icon: `
-      p-1.5 rounded-md
-      transition-all duration-300
-      hover:bg-cyan-500/10
-      hover:shadow-[0_0_10px_rgba(34,211,238,0.15)]
-      group-hover:text-cyan-400
-    `
+  section: {
+    title: "font-serif text-[14px] font-medium text-gray-200 mb-2",
   },
   tab: {
-    base: `
-      relative px-2.5 py-1.5 
-      font-satoshi text-[12px] font-medium tracking-[-0.01em]
-      transition-all duration-300
-    `,
-    active: `
-    text-cyan-400
-      after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px]
-      after:bg-gradient-to-r after:from-cyan-500/80 after:to-cyan-400/20
-      after:shadow-[0_0_8px_rgba(34,211,238,0.3)]
-    `,
-    inactive: `text-gray-400/70 hover:text-gray-300`
+    base: "relative font-medium transition-all duration-300",
+    active: "text-cyan-300 font-sans whitespace-nowrap",
+    inactive: "text-gray-400 hover:text-gray-300 font-sans whitespace-nowrap",
   },
-  voiceClone: {
-    title: `font-satoshi text-[13px] font-medium tracking-[-0.01em] text-white/90 mb-4`,
-    subtitle: `font-satoshi text-[12px] font-medium tracking-[-0.01em] text-gray-300/90 mb-3`,
-    instruction: `font-satoshi text-[12px] leading-relaxed tracking-wide text-gray-400/80`,
-    sampleText: `
-      font-satoshi text-[12px] leading-relaxed tracking-wide
-      bg-black/20 rounded-lg p-3
-      border border-gray-800
-      text-gray-300/80
-    `
+  input: {
+    base: "w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-sm text-gray-100 transition-all duration-300 focus:border-cyan-500/40 focus:ring-1 focus:ring-cyan-500/20 font-satoshi",
+    textarea: "min-h-[120px] resize-y",
+  },
+  header: {
+    main: "font-sans text-[15px] font-medium text-cyan-300",
+    sub: "font-sans text-[13px] font-medium text-cyan-400/90"
   },
   knowledgeBase: {
-    bubble: `
-      relative z-10
-      bg-[#1E1E1E]/50 backdrop-blur-sm
-      border border-gray-800/50 rounded-lg p-2.5
-    transition-all duration-300
-      hover:border-cyan-500/30
-      hover:shadow-[0_0_15px_rgba(34,211,238,0.07)]
-      before:absolute before:inset-0 before:z-[-1]
-      before:bg-gradient-to-r before:from-cyan-500/[0.02] before:to-transparent
-      before:opacity-0 before:transition-opacity before:duration-300
-      hover:before:opacity-100
-      cursor-pointer
-  `,
-    input: `
-      flex-1 bg-transparent z-20
-      font-satoshi text-[13px] text-gray-300
-      border border-gray-700/50 rounded-md px-2 py-1
-      focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30
-      hover:border-cyan-500/20
-    transition-all duration-300
-    `,
-    content: `
-      w-full bg-black/20 z-20
-      font-satoshi text-[13px] text-gray-300
-      border border-gray-800/50 rounded-lg
-      p-2 min-h-[45px]
-      focus:ring-1 focus:ring-cyan-500/50
-      focus:border-cyan-500/30
-      hover:border-cyan-500/20
-      resize-none
-      transition-all duration-300
-    `
+    bubble: "bg-gray-900/30 backdrop-blur-sm p-3 rounded-lg border border-gray-800/40 hover:border-cyan-500/20 transition-all duration-300",
+    content: "w-full bg-black/30 border border-gray-700/40 rounded-lg px-3 py-2 text-[13px] text-gray-300"
   },
-  card: {
-    base: `
-      bg-[#1E1E1E] 
-      border border-gray-800
-      rounded-lg p-2.5
-      transition-all duration-300
-      hover:border-cyan-500/30
-      hover:shadow-[0_0_20px_rgba(34,211,238,0.1)]
-      backdrop-blur-sm
-    `,
-    active: `
-      border-cyan-500/30
-      shadow-[0_0_20px_rgba(34,211,238,0.1)]
-      bg-gradient-to-b from-cyan-500/10 to-transparent
-    `
-  },
-  section: {
-    wrapper: `
-      relative p-2
-      before:absolute before:inset-0
-      before:border before:border-gray-800/50 before:rounded-lg
-      before:transition-all before:duration-300
-      hover:before:border-cyan-500/20
-      hover:before:shadow-[0_0_20px_rgba(34,211,238,0.05)]
-      after:absolute after:inset-0
-      after:bg-gradient-to-b after:from-cyan-500/[0.02] after:to-transparent
-      after:opacity-0 after:transition-opacity after:duration-300
-      hover:after:opacity-100
-      rounded-lg
-      mb-2
-    `,
-    title: `
-      font-satoshi text-[14px] font-medium tracking-[-0.01em] 
-      text-white/90 mb-2
-      flex items-center gap-2
-      before:content-[''] before:w-1 before:h-1 before:rounded-full
-      before:bg-cyan-400/50 before:shadow-[0_0_5px_rgba(34,211,238,0.5)]
-    `
-  },
-  divider: `
-    h-px w-full
-    bg-gradient-to-r from-transparent via-gray-800/50 to-transparent
-    my-6
-  `
+  parchment: {
+    panel: "bg-gradient-to-b from-gray-900/70 to-gray-900/60 backdrop-md relative",
+    section: "bg-gradient-to-b from-gray-900/60 to-gray-900/40 border border-gray-700/40 hover:border-gray-600/50 transition-all duration-300 rounded-lg overflow-hidden",
+    input: "bg-black/30 border border-gray-700/50 focus:border-gray-500/70 hover:border-gray-600/60 text-gray-200"
+  }
 };
 
 const resizeHandleStyles = {
@@ -2480,10 +2353,10 @@ export default function Playground({
   const tabs = params.agentType === 'view' ? [
     { id: 'chat', label: 'Chat' }
   ] : [
+    { id: 'chat', label: 'Chat' },
+    { id: 'engagement', label: 'Engagement' },
     { id: 'teaching-persona', label: 'Persona' },
     { id: 'voice-clone', label: 'Voice' },
-    { id: 'engagement', label: 'Engagement' }, // Add this new tab
-    { id: 'chat', label: 'Chat' },
     { id: 'share', label: 'Share' }
   ];
 
@@ -3241,6 +3114,7 @@ export default function Playground({
 
   // Add this hook to get the data channel functionality
   const { send } = useDataChannel("video-timestamp");
+  const { send: sendEngagement } = useDataChannel("start-engagement");
 
   // Add a ref to track the interval ID for cleanup
   const timestampIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -3490,6 +3364,43 @@ export default function Playground({
     };
   }, [videoRef, send, roomState]); // Add roomState as dependency
 
+  // Replace the parchmentClass variable definition:
+  const sectionClass = `
+    relative
+    bg-gray-900/60
+    border border-gray-700/50
+    hover:border-cyan-500/30
+    transition-all duration-300
+    rounded-lg
+    overflow-hidden
+    group
+    p-4 my-4
+  `;
+
+  // Add this function to handle triggering engagements
+  const handleTriggerEngagement = (engagementId: string) => {
+    // Find the engagement opportunity by ID
+    const engagement = agentConfig?.engagement_opportunities?.find(e => e.id === engagementId);
+
+    if (engagement) {
+      console.log(`Directly triggering engagement: ${engagementId}`);
+
+      // Send the engagement data to the agent
+      sendEngagement(JSON.stringify({
+        type: "start-engagement",
+        engagementId: engagementId,
+        timestamp: currentTime,
+        engagementData: engagement
+      }));
+
+      // Pause the video when triggering an engagement
+      if (videoRef.current) {
+        videoRef.current.pause();
+        setIsPlaying(false);
+      }
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
       {/* Hide header on mobile as before */}
@@ -3730,13 +3641,14 @@ export default function Playground({
             className={`
               ${isMobile && isLandscape
                 ? 'w-[10%] h-[100dvh] border-l border-gray-800 touch-none'
-                : 'absolute right-0 top-0 bottom-0 w-[360px] border-l border-gray-800'}
-              bg-gray-900/50 backdrop-blur-md
+                : 'absolute right-0 top-0 bottom-0 w-[360px] border-l border-gray-700'}
+              bg-gray-900/70 backdrop-blur-md
               z-30
               transition-transform duration-300 ease-in-out
               before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[1px]
               before:bg-gradient-to-b before:from-transparent before:via-cyan-500/30 before:to-transparent
               before:shadow-[0_0_10px_rgba(34,211,238,0.2)]
+              after:absolute after:inset-0 after:bg-[url('/textures/parchment.png')] after:bg-cover after:opacity-15 after:mix-multiply after:pointer-events-none
               ${isMobile ? 'overflow-hidden' : ''}
             `}
             initial={false}
@@ -3778,7 +3690,7 @@ export default function Playground({
               <div className="h-full flex flex-col">
                 {/* Only show tabs on desktop */}
                 {!isMobile && (
-                  <div className="flex items-center px-1 border-b border-gray-800/50 relative">
+                  <div className="flex items-center px-1 border-b border-gray-700/40 relative">
                     {/* Add glowing border effect */}
                     <div className="absolute bottom-0 left-0 right-0">
                       <div className="absolute bottom-0 left-0 right-0 h-[1px]
@@ -3793,7 +3705,7 @@ export default function Playground({
                         className={`
                         ${styles.tab.base}
                         ${activeTab === tab.id ? styles.tab.active : styles.tab.inactive}
-                        text-sm px-2 py-1
+                        text-sm px-2 py-2
                       `}
                       >
                         {tab.label}
@@ -3858,7 +3770,7 @@ export default function Playground({
                   `}>
                     <div className="h-full flex flex-col">
                       {/* Sticky header - Simplified for mobile */}
-                      <div className="sticky top-0 z-10 bg-[#121212]/95 backdrop-blur-sm border-b border-gray-800">
+                      <div className="sticky top-0 z-10 bg-[#1a1a1a]/95 backdrop-blur-sm border-b border-gray-800 rounded-t-xl">
                         <div className={`flex items-center justify-between ${isMobile ? 'p-1' : 'p-2'}`}>
                           {/* Brand icon - Hide text on mobile */}
                           <div className="flex items-center gap-2">
@@ -4016,9 +3928,9 @@ export default function Playground({
                   {!isMobile && params.agentType !== 'view' && (
                     <>
                       {activeTab === 'teaching-persona' && (
-                        <div className="h-full pt-0 overflow-y-auto space-y-4">
-                          <div className="flex items-center justify-between mb-1">
-                            <h2 className={styles.section.title}>Teaching Persona</h2>
+                        <div className="space-y-6 px-2">
+                          <div className="flex items-center justify-between mb-3">
+                            <h2 className="text-[15px] font-medium text-cyan-300">Teaching Persona</h2>
                             <motion.button
                               whileHover={{ scale: 1.02 }}
                               whileTap={{ scale: 0.98 }}
@@ -4027,8 +3939,9 @@ export default function Playground({
                                 group flex items-center gap-1.5
                                 px-3 py-1 rounded-lg
                                 ${saveSuccess ? 'from-green-500/20 to-green-400/10 border-green-500/30' : 'from-cyan-500/10 to-transparent border-cyan-500/20'}
-                                text-cyan-400 border
+                                text-cyan-300 border
                                 transition-all duration-300
+                                hover:shadow-[0_0_15px_rgba(34,211,238,0.15)]
                               `}
                             >
                               <Save size={12} />
@@ -4036,34 +3949,44 @@ export default function Playground({
                             </motion.button>
                           </div>
 
-                          {/* Basic Information Section */}
-                          <section className="relative mb-3 p-2 rounded-lg group">
-                            <div className="absolute inset-0 border border-gray-800/50 rounded-lg transition-all duration-300 group-hover:border-cyan-500/20"></div>
+                          {/* Basic Information Section - Update styling for better spacing */}
+                          <section className={sectionClass}>
+                            {/* Border effect */}
+                            <div className="absolute inset-0 border border-gray-700/40 rounded-lg transition-all duration-300 group-hover:border-cyan-500/20"></div>
+
+                            {/* Section header */}
                             <div className="flex items-center mb-2 relative z-10">
-                              <div className="w-1.5 h-1.5 rounded-full bg-cyan-400/70 shadow-[0_0_5px_rgba(34,211,238,0.5)] mr-1.5"></div>
-                              <h2 className="font-satoshi text-[14px] font-medium tracking-[-0.01em] text-cyan-400">Instructor Profile</h2>
+                              <div className="w-1.5 h-1.5 rounded-full bg-amber-700/40 shadow-[0_0_5px_rgba(180,140,60,0.3)] mr-1.5"></div>
+                              <h2 className="font-serif text-[13px] font-medium tracking-[-0.01em] text-cyan-200/90">Instructor Profile</h2>
+                              <div className="h-[1px] flex-1 ml-3 bg-gradient-to-r from-amber-800/20 via-amber-700/10 to-transparent"></div>
                             </div>
 
+                            {/* Section content with consistent spacing */}
                             <div className="space-y-3 relative z-10">
                               {/* Name Field */}
                               <div className="relative z-10 group/field transition-all duration-300">
-                                <label className="block mb-1 text-[11px] font-medium text-cyan-400/80">Name</label>
+                                <label className="block mb-1 text-[10px] font-medium text-gray-300/80">Name</label>
                                 <input
                                   type="text"
                                   value={teachingPersona?.instructor_profile?.name || ''}
                                   onChange={(e) => updateTeachingPersona('instructor_profile.name', e.target.value)}
-                                  className={styles.input.base}
+                                  className="w-full bg-gray-800/40 border border-gray-700/50 rounded-lg
+                                  px-3 py-2 text-[12px] text-gray-100
+                                  transition-all duration-300
+                                  focus:ring-1 focus:ring-cyan-500/40 
+                                  focus:border-cyan-500/30
+                                  hover:border-cyan-600/20"
                                   placeholder="Enter instructor name..."
                                 />
                               </div>
 
                               {/* Display extracted expertise level for context */}
-                              <div className="p-3 bg-gray-900/30 rounded-lg border border-gray-800/50">
+                              <div className="p-2.5 bg-gray-900/30 rounded-lg border border-gray-800/50">
                                 <div className="flex items-center">
-                                  <Info size={14} className="text-cyan-400/50 mr-2" />
-                                  <span className="text-[12px] text-cyan-300/80">Extracted Expertise Level</span>
+                                  <Info size={12} className="text-gray-400/50 mr-2" />
+                                  <span className="text-[10px] text-gray-300/80">Extracted Expertise Level</span>
                                 </div>
-                                <p className="mt-1 text-[13px] text-gray-300">
+                                <p className="mt-1 text-[11px] text-gray-300">
                                   {teachingPersona?.instructor_profile?.apparent_expertise_level || 'No expertise level detected'}
                                 </p>
                               </div>
@@ -4071,22 +3994,31 @@ export default function Playground({
                           </section>
 
                           {/* Communication Style Section */}
-                          <section className="relative mb-3 p-2 rounded-lg group">
-                            <div className="absolute inset-0 border border-gray-800/50 rounded-lg transition-all duration-300 group-hover:border-cyan-500/20"></div>
+                          <section className={sectionClass}>
+                            {/* Border effect */}
+                            <div className="absolute inset-0 border border-gray-700/40 rounded-lg transition-all duration-300 group-hover:border-cyan-500/20"></div>
+
+                            {/* Section header */}
                             <div className="flex items-center mb-2 relative z-10">
-                              <div className="w-1.5 h-1.5 rounded-full bg-cyan-400/70 shadow-[0_0_5px_rgba(34,211,238,0.5)] mr-1.5"></div>
-                              <h2 className="font-satoshi text-[14px] font-medium tracking-[-0.01em] text-cyan-400">Communication Style</h2>
+                              <div className="w-1.5 h-1.5 rounded-full bg-gray-300/70 shadow-[0_0_5px_rgba(180,180,180,0.5)] mr-1.5"></div>
+                              <h2 className={styles.header.sub}>Communication Style</h2>
                             </div>
 
+                            {/* Section content with consistent spacing */}
                             <div className="space-y-3 relative z-10">
                               {/* Communication Style Field */}
                               <div className="relative z-10 group/field transition-all duration-300">
-                                <label className="block mb-1 text-[11px] font-medium text-cyan-400/80">Overall Style</label>
+                                <label className="block mb-1 text-[10px] font-medium text-cyan-400/80">Overall Style</label>
                                 <input
                                   type="text"
                                   value={teachingPersona?.communication_patterns?.vocabulary_level || ''}
                                   onChange={(e) => updateTeachingPersona('communication_patterns.vocabulary_level', e.target.value)}
-                                  className={styles.input.base}
+                                  className="w-full bg-gray-800/40 border border-gray-700/50 rounded-lg
+                                  px-3 py-2 text-[12px] text-gray-100
+                                  transition-all duration-300
+                                  focus:ring-1 focus:ring-cyan-500/40 
+                                  focus:border-cyan-500/30
+                                  hover:border-cyan-600/20"
                                   placeholder="Professional, casual, technical, etc."
                                 />
 
@@ -4098,12 +4030,12 @@ export default function Playground({
                                       type="button"
                                       onClick={() => updateTeachingPersona('communication_patterns.vocabulary_level', style)}
                                       className={`
-                                        px-2 py-0.5 rounded-full text-[10px]
+                                        px-2 py-0.5 rounded-full text-[9px]
                                         transition-all duration-300
                                         border 
                                         ${teachingPersona?.communication_patterns?.vocabulary_level === style
                                           ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
-                                          : 'bg-gray-800/20 text-gray-400 border-gray-800/50 hover:text-gray-300 hover:border-gray-700'
+                                          : 'bg-gray-800/30 text-gray-400 border-gray-800/50 hover:text-gray-300 hover:border-gray-700'
                                         }
                                       `}
                                     >
@@ -4115,7 +4047,7 @@ export default function Playground({
 
                               {/* Recurring Phrases */}
                               <div className="relative z-10 group/field transition-all duration-300">
-                                <label className="block mb-1 text-[11px] font-medium text-cyan-400/80">Characteristic Phrases</label>
+                                <label className="block mb-1 text-[10px] font-medium text-cyan-400/80">Characteristic Phrases</label>
                                 <textarea
                                   value={phrasesText}
                                   onChange={(e) => {
@@ -4135,117 +4067,60 @@ export default function Playground({
 
                                     updateTeachingPersona('communication_patterns.recurring_phrases', phrases);
                                   }}
-                                  className={`${styles.input.base} ${styles.input.textarea} min-h-[80px]`}
+                                  className="w-full bg-gray-800/40 border border-gray-700/50 rounded-lg
+                                  px-3 py-2 text-[12px] text-gray-100 min-h-[70px]
+                                  transition-all duration-300
+                                  focus:ring-1 focus:ring-cyan-500/40 
+                                  focus:border-cyan-500/30
+                                  hover:border-cyan-600/20 resize-y"
                                   placeholder="Enter phrases the instructor frequently uses (one per line)..."
                                 />
-                                <div className="mt-0.5 text-[10px] text-gray-500/70 opacity-70 px-1">
+                                <div className="mt-0.5 text-[9px] text-gray-500/80 px-1 italic">
                                   These phrases will be used by the AI to sound more like the actual instructor
                                 </div>
                               </div>
 
-                              {/* Speaking Pace with Slider */}
-                              <div className="relative z-10 group/field transition-all duration-300">
-                                <label className="block mb-1 text-[11px] font-medium text-cyan-400/80">Speaking Pace</label>
-                                <div className="space-y-2">
-                                  <input
-                                    type="range"
-                                    min="1"
-                                    max="5"
-                                    step="1"
-                                    value={speakingPaceValue}
-                                    onChange={(e) => updateSpeakingPace(parseInt(e.target.value))}
-                                    className="w-full accent-cyan-500"
-                                  />
-                                  <div className="flex justify-between text-[10px] text-gray-500">
-                                    <span>Slow</span>
-                                    <span>Moderate</span>
-                                    <span>Fast</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </section>
-
-                          {/* Response Templates Section */}
-                          <section className="relative mb-3 p-2 rounded-lg group">
-                            <div className="absolute inset-0 border border-gray-800/50 rounded-lg transition-all duration-300 group-hover:border-cyan-500/20"></div>
-                            <div className="flex items-center mb-2 relative z-10">
-                              <div className="w-1.5 h-1.5 rounded-full bg-cyan-400/70 shadow-[0_0_5px_rgba(34,211,238,0.5)] mr-1.5"></div>
-                              <h2 className="font-satoshi text-[14px] font-medium tracking-[-0.01em] text-cyan-400">Response Templates</h2>
-                            </div>
-
-                            <div className="space-y-3 relative z-10">
-                              {/* Greeting */}
-                              <div className="relative z-10 group/field transition-all duration-300">
-                                <label className="block mb-1 text-[11px] font-medium text-cyan-400/80">Greeting</label>
-                                <input
-                                  type="text"
-                                  value={teachingPersona?.persona_simulation_guidance?.response_templates?.greeting || ''}
-                                  onChange={(e) => updateTeachingPersona('persona_simulation_guidance.response_templates.greeting', e.target.value)}
-                                  className={styles.input.base}
-                                  placeholder="How the AI greets students..."
-                                />
-                              </div>
-
-                              {/* Knowledge Check */}
-                              <div className="relative z-10 group/field transition-all duration-300">
-                                <label className="block mb-1 text-[11px] font-medium text-cyan-400/80">Knowledge Check</label>
-                                <input
-                                  type="text"
-                                  value={teachingPersona?.persona_simulation_guidance?.response_templates?.knowledge_check || ''}
-                                  onChange={(e) => updateTeachingPersona('persona_simulation_guidance.response_templates.knowledge_check', e.target.value)}
-                                  className={styles.input.base}
-                                  placeholder="How the AI checks understanding..."
-                                />
-                              </div>
-
-                              {/* Addressing Misconceptions */}
-                              <div className="relative z-10 group/field transition-all duration-300">
-                                <label className="block mb-1 text-[11px] font-medium text-cyan-400/80">Addressing Misconceptions</label>
-                                <input
-                                  type="text"
-                                  value={teachingPersona?.persona_simulation_guidance?.response_templates?.addressing_misconceptions || ''}
-                                  onChange={(e) => updateTeachingPersona('persona_simulation_guidance.response_templates.addressing_misconceptions', e.target.value)}
-                                  className={styles.input.base}
-                                  placeholder="How the AI corrects misunderstandings..."
-                                />
-                              </div>
+                              {/* REMOVED: Speaking Pace with Slider - as requested */}
                             </div>
                           </section>
 
                           {/* Display-Only Teaching Insights Section */}
-                          <section className="relative mb-3 p-2 rounded-lg group">
-                            <div className="absolute inset-0 border border-gray-800/50 rounded-lg transition-all duration-300 group-hover:border-cyan-500/20"></div>
+                          <section className={sectionClass}>
+                            {/* Border effect */}
+                            <div className="absolute inset-0 border border-gray-700/40 rounded-lg transition-all duration-300 group-hover:border-cyan-500/20"></div>
+
+                            {/* Section header */}
                             <div className="flex items-center mb-2 relative z-10">
-                              <div className="w-1.5 h-1.5 rounded-full bg-cyan-400/70 shadow-[0_0_5px_rgba(34,211,238,0.5)] mr-1.5"></div>
-                              <h2 className="font-satoshi text-[14px] font-medium tracking-[-0.01em] text-cyan-400">Teaching Insights</h2>
-                              <span className="ml-2 text-[10px] px-2 py-0.5 bg-cyan-500/10 rounded-full text-cyan-400/80">Auto-Extracted</span>
+                              <div className="w-1.5 h-1.5 rounded-full bg-gray-300/70 shadow-[0_0_5px_rgba(180,180,180,0.5)] mr-1.5"></div>
+                              <h2 className={styles.header.sub}>Teaching Insights</h2>
+                              <span className="ml-2 text-[9px] px-2 py-0.5 bg-cyan-500/10 rounded-full text-cyan-400/80">Auto-Extracted</span>
                             </div>
 
+                            {/* Section content with consistent spacing */}
                             <div className="grid grid-cols-1 gap-2 relative z-10">
                               {/* Speech Characteristics Card */}
-                              <div className="p-3 bg-gray-900/30 rounded-lg border border-gray-800/50">
+                              <div className="p-2.5 bg-gray-900/30 rounded-lg border border-gray-800/50">
                                 <div className="flex justify-between items-center">
-                                  <h3 className="text-[13px] font-medium text-cyan-300/90">Speech Style</h3>
+                                  <h3 className="text-[12px] font-medium text-cyan-300/90">Speech Style</h3>
                                 </div>
-                                <p className="mt-1 text-[12px] text-gray-400/90">
+                                <p className="mt-1 text-[11px] text-gray-400/90">
                                   {teachingPersona?.speech_characteristics?.accent?.type || 'No accent detected'}
                                 </p>
-                                <p className="mt-1 text-[12px] text-gray-400/90">
+                                <p className="mt-1 text-[11px] text-gray-400/90">
                                   Cadence: {teachingPersona?.speech_characteristics?.accent?.cadence || 'Not detected'}
                                 </p>
                               </div>
 
                               {/* Pedagogical Approach Card */}
-                              <div className="p-3 bg-gray-900/30 rounded-lg border border-gray-800/50">
+                              <div className="p-2.5 bg-gray-900/30 rounded-lg border border-gray-800/50">
                                 <div className="flex justify-between items-center">
-                                  <h3 className="text-[13px] font-medium text-cyan-300/90">Teaching Approach</h3>
+                                  <h3 className="text-[12px] font-medium text-cyan-300/90">Teaching Approach</h3>
                                 </div>
                                 <div className="mt-1 space-y-1">
                                   {teachingPersona?.pedagogical_approach?.explanation_techniques?.map((technique: any, idx: number) => (
                                     <div key={idx} className="flex items-start">
-                                      <span className="text-cyan-400/80 mt-1 text-[10px] mr-1">•</span>
-                                      <p className="text-[12px] text-gray-400/90">
+                                      <span className="text-cyan-400/80 mt-1 text-[9px] mr-1">•</span>
+                                      <p className="text-[11px] text-gray-400/90">
                                         {technique.technique}: {technique.example}
                                       </p>
                                     </div>
@@ -4254,19 +4129,19 @@ export default function Playground({
                               </div>
 
                               {/* Emotional Patterns Card */}
-                              <div className="p-3 bg-gray-900/30 rounded-lg border border-gray-800/50">
+                              <div className="p-2.5 bg-gray-900/30 rounded-lg border border-gray-800/50">
                                 <div className="flex justify-between items-center">
-                                  <h3 className="text-[13px] font-medium text-cyan-300/90">Emotional Patterns</h3>
+                                  <h3 className="text-[12px] font-medium text-cyan-300/90">Emotional Patterns</h3>
                                 </div>
-                                <p className="mt-1 text-[12px] text-gray-400/90">
+                                <p className="mt-1 text-[11px] text-gray-400/90">
                                   Humor Style: {teachingPersona?.emotional_teaching_patterns?.humor_style?.type || 'None detected'}
                                 </p>
                                 {teachingPersona?.emotional_teaching_patterns?.enthusiasm_triggers?.map((trigger: any, idx: number) => (
                                   <div key={idx} className="mt-1">
-                                    <p className="text-[12px] text-cyan-400/80">
+                                    <p className="text-[11px] text-cyan-400/80">
                                       {trigger.topic}:
                                     </p>
-                                    <p className="text-[12px] text-gray-400/90">
+                                    <p className="text-[11px] text-gray-400/90">
                                       {trigger.vocal_cues}
                                     </p>
                                   </div>
@@ -4284,7 +4159,7 @@ export default function Playground({
                         `}>
                           <div className="mb-3 border-b border-gray-800/30 pb-3">
                             <div className="flex items-center justify-between mb-1">
-                              <h2 className={styles.section.title}>Voice Configuration</h2>
+                              <h2 className={styles.header.main}>Voice Configuration</h2>
                               <div className="h-[1px] flex-1 mx-4 bg-gradient-to-r from-transparent via-gray-700/50 to-transparent" />
                             </div>
 
@@ -4437,7 +4312,7 @@ export default function Playground({
 
                             {/* Create New Voice / Custom Voices section */}
                             <div className="flex items-center justify-between mb-4">
-                              <h3 className={styles.section.title}>Custom Voices</h3>
+                              <h3 className={styles.header.sub}>Custom Voices</h3>
                               <motion.button
                                 whileHover={{ scale: 1.02 }}
                                 whileTap={{ scale: 0.98 }}
@@ -4454,7 +4329,7 @@ export default function Playground({
                                 `}
                               >
                                 <Plus size={12} className="group-hover:rotate-90 transition-transform duration-300" />
-                                <span className="text-[11px]">Create New Voice</span>
+                                <span className="text-[11px] font-satoshi">Create New Voice</span>
                               </motion.button>
                             </div>
 
@@ -4702,13 +4577,13 @@ export default function Playground({
                           transition-opacity duration-300
                         `}>
                           <div className="flex items-center justify-between mb-1">
-                            <h2 className={styles.section.title}>Sharing Configuration</h2>
+                            <h2 className={styles.header.main}>Sharing Configuration</h2>
                           </div>
 
                           {/* ...existing share tab content... */}
                           <div className="mb-6 border-b border-gray-800/30 pb-3">
                             {/* Public/Private Toggle Section */}
-                            <section className="relative p-2 rounded-lg group mb-4">
+                            <section className={sectionClass}>
                               {/* Background and border effects */}
                               <div className="absolute inset-0 border border-gray-800/50 rounded-lg transition-all duration-300 group-hover:border-cyan-500/20 group-hover:shadow-[0_0_15px_rgba(34,211,238,0.05)]"></div>
                               <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/[0.02] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 rounded-lg"></div>
@@ -4716,7 +4591,7 @@ export default function Playground({
                               {/* Section Header */}
                               <div className="flex items-center mb-2 relative z-10">
                                 <div className="w-1.5 h-1.5 rounded-full bg-cyan-400/70 shadow-[0_0_5px_rgba(34,211,238,0.5)] mr-1.5"></div>
-                                <h2 className="font-satoshi text-[14px] font-medium tracking-[-0.01em] text-cyan-400">Public Access</h2>
+                                <h2 className={styles.header.sub}>Public Access</h2>
                                 <div className="h-[1px] flex-1 ml-2 mr-1 bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent"></div>
                               </div>
 
@@ -4767,7 +4642,7 @@ export default function Playground({
                             </section>
 
                             {/* Share Link Section */}
-                            <section className="relative p-2 rounded-lg group mb-4">
+                            <section className={sectionClass}>
                               {/* Background and border effects */}
                               <div className="absolute inset-0 border border-gray-800/50 rounded-lg transition-all duration-300 group-hover:border-cyan-500/20 group-hover:shadow-[0_0_15px_rgba(34,211,238,0.05)]"></div>
                               <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/[0.02] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 rounded-lg"></div>
@@ -4775,7 +4650,7 @@ export default function Playground({
                               {/* Section Header */}
                               <div className="flex items-center mb-2 relative z-10">
                                 <div className="w-1.5 h-1.5 rounded-full bg-cyan-400/70 shadow-[0_0_5px_rgba(34,211,238,0.5)] mr-1.5"></div>
-                                <h2 className="font-satoshi text-[14px] font-medium tracking-[-0.01em] text-cyan-400">Share Link</h2>
+                                <h2 className={styles.header.sub}>Share Link</h2>
                                 <div className="h-[1px] flex-1 ml-2 mr-1 bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent"></div>
                               </div>
 
@@ -4861,27 +4736,22 @@ export default function Playground({
                       {!isMobile && isEditMode && (
                         <>
                           {activeTab === 'engagement' && (
-                            <div className="h-full pt-0 overflow-y-auto space-y-4">
-                              <div className="flex items-center justify-between mb-1">
-                                <h2 className={styles.section.title}>Engagement Opportunities</h2>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs text-gray-400">
-                                    {engagementOpportunities?.length || 0} items
-                                  </span>
-                                  <motion.button
-                                    whileHover={{ scale: 1.02 }}
-                                    whileTap={{ scale: 0.98 }}
-                                    onClick={handleAddEngagement}
-                                    className="px-2 py-1 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 rounded-lg text-[11px] flex items-center gap-1"
-                                  >
-                                    <Plus size={12} />
-                                    Add New
-                                  </motion.button>
-                                </div>
+                            <div className="space-y-6 px-2">
+                              <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-[15px] font-medium text-cyan-300 tracking-wide">Engagement Opportunities</h2>
+                                <motion.button
+                                  whileHover={{ scale: 1.02 }}
+                                  whileTap={{ scale: 0.98 }}
+                                  onClick={handleAddEngagement}
+                                  className="px-2 py-1 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 rounded-lg text-[11px] flex items-center gap-1 font-satoshi"
+                                >
+                                  <Plus size={12} />
+                                  Add New
+                                </motion.button>
                               </div>
 
-                              {/* Filter controls */}
-                              <div className="flex flex-wrap gap-2 mb-4">
+                              {/* Filter controls with improved spacing */}
+                              <div className="flex flex-wrap gap-2 mb-5 px-1">
                                 <button
                                   className={`px-3 py-1 text-xs rounded-full transition-all duration-300 ${!selectedEngagement ? 'bg-cyan-500/20 text-cyan-400' : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800/70'}`}
                                   onClick={() => setSelectedEngagement(null)}
@@ -4911,8 +4781,8 @@ export default function Playground({
                                 </div>
                               )}
 
-                              {/* Engagement list with edit/delete functionality */}
-                              <div className="space-y-3">
+                              {/* Engagement list with improved container spacing */}
+                              <div className="space-y-4 px-1">
                                 {engagementOpportunities && engagementOpportunities.length > 0 ? (
                                   engagementOpportunities
                                     .filter(engagement => !selectedEngagement || engagement.engagement_type === selectedEngagement)

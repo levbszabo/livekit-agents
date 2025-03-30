@@ -1,48 +1,75 @@
+import React from 'react';
+
 type ChatMessageProps = {
-  message: string;
-  accentColor: string;
   name: string;
+  message: string;
   isSelf: boolean;
   hideName?: boolean;
+  accentColor: string;
+  LightScanEffect?: any;
 };
 
-export const ChatMessage = ({
+export const ChatMessage: React.FC<ChatMessageProps> = ({
   name,
   message,
-  accentColor,
   isSelf,
-  hideName,
-}: ChatMessageProps) => {
+  hideName = false,
+  accentColor,
+  LightScanEffect
+}) => {
   return (
     <div
       className={`
-        flex flex-col 
-        ${hideName ? "" : "mt-3"}
-        animate-[fadeIn_0.3s_ease-out]
+        group relative 
+        ${isSelf ? 'ml-auto' : 'mr-auto'} 
+        max-w-[80%]
+        ${isSelf
+          ? 'bg-[#162730]/90'
+          : 'bg-[#2A1F14]/90'
+        }
+        rounded-md
+        backdrop-blur-sm
+        ${isSelf
+          ? 'border-l border-cyan-600/30'
+          : 'border-l border-amber-700/30'
+        }
         transition-all duration-300
+        hover:border-opacity-50
       `}
     >
-      {!hideName && (
-        <div
-          className={`
-            text-${isSelf ? "gray-700" : accentColor + "-800"} 
-            uppercase text-[11px] font-bold tracking-wider mb-1
-            transition-colors duration-300
-          `}
-        >
-          {name}
+      {/* Message content */}
+      <div className="p-2 relative">
+        {/* Sender name */}
+        {!hideName && (
+          <div className={`
+            text-[10px] font-medium mb-0.5
+            ${isSelf ? 'text-cyan-400/80' : 'text-amber-400/80'}
+          `}>
+            {name}
+          </div>
+        )}
+
+        {/* Message text */}
+        <div className="text-[11px] text-gray-300 leading-relaxed font-light">
+          {message}
         </div>
-      )}
-      <div
-        className={`
-          pr-4 
-          text-${isSelf ? "gray-300" : accentColor + "-500"}
-          text-[14px] leading-[1.4] font-medium tracking-tight
-          transition-colors duration-300
-        `}
-      >
-        {message}
+
+        {/* Subtle scan effect on hover */}
+        {LightScanEffect && (
+          <div className="absolute inset-0 overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
+            <LightScanEffect color={isSelf ? 'rgba(34,211,238,0.07)' : 'rgba(245,158,11,0.07)'} />
+          </div>
+        )}
       </div>
+
+      {/* Subtle accent line on top */}
+      <div className={`
+        absolute top-0 left-0 right-0 h-[1px]
+        ${isSelf
+          ? 'bg-gradient-to-r from-cyan-500/10 via-cyan-400/5 to-transparent'
+          : 'bg-gradient-to-r from-amber-500/10 via-amber-400/5 to-transparent'
+        }
+      `}></div>
     </div>
   );
 };
