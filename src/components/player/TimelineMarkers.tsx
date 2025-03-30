@@ -6,11 +6,9 @@ import { EngagementOpportunity } from '../playground/Playground';
 const MARKER_SIZE = 16;
 const MARKER_HOVER_SCALE = 1.5;
 
-// Enhanced color constants with better visibility and contrast against cyan progress bar
-const QUIZ_MARKER_COLOR = 'bg-white border-2 border-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.9)]';
-const QUIZ_MARKER_COLOR_INACTIVE = 'bg-gray-800 border-2 border-cyan-400/80 shadow-[0_0_6px_rgba(34,211,238,0.4)]';
-const DISCUSSION_MARKER_COLOR = 'border-b-white shadow-[0_0_12px_rgba(165,96,247,0.9)]';
-const DISCUSSION_MARKER_COLOR_INACTIVE = 'border-b-purple-400 border-l-2 border-r-2 border-l-purple-400 border-r-purple-400 shadow-[0_0_6px_rgba(165,96,247,0.4)]';
+// Unified color scheme for all markers
+const MARKER_COLOR_ACTIVE = 'bg-white border-2 border-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.9)]';
+const MARKER_COLOR_INACTIVE = 'bg-gray-800 border-2 border-cyan-400/80 shadow-[0_0_6px_rgba(34,211,238,0.4)]';
 
 interface TimelineMarkersProps {
     engagementOpportunities: EngagementOpportunity[];
@@ -139,15 +137,12 @@ const TimelineMarkers: React.FC<TimelineMarkersProps> = ({
                     const isSelected = engagement.id === selectedEngagementId;
                     const isHovered = engagement.id === hoveredMarkerId;
 
-                    // Choose marker shape and color based on engagement type
-                    const isQuiz = engagement.engagement_type === 'quiz';
-
                     // Get tooltip position to avoid cutoff
                     const tooltipPosition = getTooltipPosition(position);
 
                     return (
                         <React.Fragment key={engagement.id}>
-                            {/* The actual marker */}
+                            {/* The actual marker - now always a circle */}
                             <motion.div
                                 className="absolute top-1/2 pointer-events-auto"
                                 style={{
@@ -160,78 +155,40 @@ const TimelineMarkers: React.FC<TimelineMarkersProps> = ({
                                     y: isHovered || isSelected ? -10 : 0 // Move up slightly more when hovered
                                 }}
                                 transition={{ duration: 0.2, type: "spring", stiffness: 200 }}
-                                onClick={() => onMarkerClick(engagement.id)}
                                 onMouseEnter={() => setHoveredMarkerId(engagement.id)}
                                 onMouseLeave={() => setHoveredMarkerId(null)}
                             >
-                                {isQuiz ? (
-                                    // Circle for quiz - improved visual design with glow effect
-                                    <div
-                                        className={`rounded-full cursor-pointer transition-all duration-200 flex items-center justify-center
-                                        ${isActive || isSelected ? QUIZ_MARKER_COLOR : QUIZ_MARKER_COLOR_INACTIVE}`}
-                                        style={{
-                                            width: `${MARKER_SIZE}px`,
-                                            height: `${MARKER_SIZE}px`,
-                                        }}
-                                    >
-                                        {(isHovered || isSelected) ? (
-                                            <div className="w-2.5 h-2.5 bg-cyan-400 rounded-full animate-pulse"></div>
-                                        ) : (isActive ? (
-                                            <div className="w-2 h-2 bg-cyan-400 rounded-full"></div>
-                                        ) : null)}
-                                    </div>
-                                ) : (
-                                    // Triangle for discussion - improved visual design with glow effect
-                                    <div
-                                        className={`cursor-pointer transition-all duration-200 relative
-                                        ${isActive || isSelected ? DISCUSSION_MARKER_COLOR : DISCUSSION_MARKER_COLOR_INACTIVE}`}
-                                        style={{
-                                            width: '0',
-                                            height: '0',
-                                            borderLeftWidth: `${MARKER_SIZE / 2}px`,
-                                            borderRightWidth: `${MARKER_SIZE / 2}px`,
-                                            borderBottomWidth: `${MARKER_SIZE}px`,
-                                            borderLeftColor: 'transparent',
-                                            borderRightColor: 'transparent',
-                                        }}
-                                    >
-                                        {(isHovered || isSelected || isActive) && (
-                                            <div
-                                                className="absolute"
-                                                style={{
-                                                    width: '4px',
-                                                    height: '4px',
-                                                    backgroundColor: isActive || isSelected ? 'white' : 'rgba(168, 85, 247, 0.8)',
-                                                    borderRadius: '50%',
-                                                    top: '60%',
-                                                    left: '50%',
-                                                    transform: 'translate(-50%, -50%)',
-                                                }}
-                                            />
-                                        )}
-                                    </div>
-                                )}
+                                {/* Unified circle design for all marker types */}
+                                <div
+                                    className={`rounded-full cursor-pointer transition-all duration-200 flex items-center justify-center
+                                    ${isActive || isSelected ? MARKER_COLOR_ACTIVE : MARKER_COLOR_INACTIVE}`}
+                                    style={{
+                                        width: `${MARKER_SIZE}px`,
+                                        height: `${MARKER_SIZE}px`,
+                                    }}
+                                >
+                                    {(isHovered || isSelected) ? (
+                                        <div className="w-2.5 h-2.5 bg-cyan-400 rounded-full animate-pulse"></div>
+                                    ) : (isActive ? (
+                                        <div className="w-2 h-2 bg-cyan-400 rounded-full"></div>
+                                    ) : null)}
+                                </div>
                             </motion.div>
 
-                            {/* Improved Tooltip with better positioning */}
+                            {/* Simplified Tooltip */}
                             <AnimatePresence>
                                 {isHovered && (
                                     <motion.div
-                                        className="absolute bg-gray-900/95 backdrop-blur-sm text-[9px] px-2 py-1.5 
+                                        className="absolute bg-gray-900/95 backdrop-blur-sm text-[10px] px-2.5 py-1.5 
                                         rounded-md border border-gray-700 shadow-lg z-30"
                                         style={{
                                             top: tooltipPosition.top,
-                                            minWidth: '120px',
-                                            maxWidth: '160px',
-                                            width: 'auto',
                                             left: tooltipPosition.left,
                                             transform: tooltipPosition.transform,
-                                            textAlign: 'left',
-                                            overflow: 'visible',
-                                            whiteSpace: 'normal',
-                                            pointerEvents: 'none' // This ensures it doesn't interfere with mouse events
+                                            textAlign: 'center',
+                                            pointerEvents: 'none'
                                         }}
-                                        initial={{ opacity: 0, y: -10, scale: 0.95 }} // Animate from top to bottom
+                                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
                                         animate={{ opacity: 1, y: 0, scale: 1 }}
                                         exit={{ opacity: 0, y: -10, scale: 0.95 }}
                                         transition={{ duration: 0.2 }}
@@ -241,38 +198,12 @@ const TimelineMarkers: React.FC<TimelineMarkersProps> = ({
                                             border-l-[4px] border-r-[4px] border-b-[4px] 
                                             border-l-transparent border-r-transparent border-b-gray-900/95 z-10"></div>
 
-                                        <div className="font-medium text-[10px] flex items-center gap-1.5">
-                                            {isQuiz ? (
-                                                <>
-                                                    <span className="w-3 h-3 rounded-full bg-cyan-500/80 border border-cyan-400 flex-shrink-0"></span>
-                                                    <span className="text-cyan-300">Quiz {timestamp}</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <span className="w-3 h-3 flex-shrink-0 flex items-center justify-center">
-                                                        <div className="w-0 h-0 border-l-[3px] border-r-[3px] border-b-[5px]
-                                                                      border-l-transparent border-r-transparent border-b-purple-400"></div>
-                                                    </span>
-                                                    <span className="text-purple-300">Discussion {timestamp}</span>
-                                                </>
-                                            )}
+                                        <div className="font-medium flex items-center justify-center gap-2">
+                                            <span className="w-2 h-2 rounded-full bg-cyan-400 flex-shrink-0"></span>
+                                            <span className="text-white">
+                                                {engagement.engagement_type === 'quiz' ? 'Quiz' : 'Discussion'} {timestamp}
+                                            </span>
                                         </div>
-
-                                        {/* Only show first two concepts if there are any */}
-                                        {engagement.concepts_addressed && engagement.concepts_addressed.length > 0 && (
-                                            <div className="text-gray-200 border-t border-gray-700/50 mt-1 pt-1">
-                                                <div className="flex flex-wrap gap-1">
-                                                    {engagement.concepts_addressed.slice(0, 2).map((concept, i) => (
-                                                        <span key={i} className="px-1.5 py-0.5 bg-gray-800/90 rounded-sm text-[8px]">
-                                                            {concept}
-                                                        </span>
-                                                    ))}
-                                                    {engagement.concepts_addressed.length > 2 && (
-                                                        <span className="text-[8px] text-gray-400">+{engagement.concepts_addressed.length - 2} more</span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
                                     </motion.div>
                                 )}
                             </AnimatePresence>

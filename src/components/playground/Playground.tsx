@@ -22,7 +22,6 @@ import {
 import { Plus, FileText, X, Edit2, Save, ChevronDown, ChevronUp, Play, Pause, Volume2, VolumeX, Maximize2, Mic, MicOff, Radio, ChevronRight, Info, Link, Lock, Globe, Copy, Check, ExternalLink, Trash2, Square } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import styled, { keyframes } from 'styled-components';
-import TimelineMarkers from '../player/TimelineMarkers';
 import PlaygroundProgressBar from '../player/PlaygroundProgressBar';
 
 export interface PlaygroundProps {
@@ -3253,7 +3252,6 @@ export default function Playground({
   const sendTimestamp = useCallback(() => {
     // Add robust connection check
     if (!videoRef.current || !send || roomState !== ConnectionState.Connected) {
-      console.log("Cannot send timestamp: connection not ready");
       return;
     }
 
@@ -3261,8 +3259,9 @@ export default function Playground({
       const currentTime = videoRef.current.currentTime;
 
       // Only send if there's been a meaningful change in timestamp
+      // Reduced threshold to ensure more timestamps get sent
       if (lastSentTimestampRef.current === null ||
-        Math.abs(currentTime - lastSentTimestampRef.current) >= 0.1) {
+        Math.abs(currentTime - lastSentTimestampRef.current) >= 0.7) {
 
         console.log("Sending timestamp:", currentTime);
 
@@ -3281,14 +3280,10 @@ export default function Playground({
             // Update last sent timestamp only on successful send
             lastSentTimestampRef.current = currentTime;
             console.log("Timestamp sent successfully");
-          } else {
-            console.log("Prepared timestamp but connection not ready");
           }
         } catch (err) {
           console.error("Failed to send timestamp:", err);
         }
-      } else {
-        console.log("Skipped sending - no significant change in timestamp");
       }
     }
   }, [videoRef, send, roomState]);
@@ -3306,9 +3301,10 @@ export default function Playground({
     // Send initial timestamp immediately
     sendTimestamp();
 
-    // Send timestamp every 1 second
-    timestampIntervalRef.current = setInterval(() => sendTimestamp(), 1000);
-    console.log("Started new timestamp interval");
+    // Set a backup interval with lower frequency since we now have timeupdate events
+    // This serves as a fallback in case timeupdate events aren't firing consistently
+    timestampIntervalRef.current = setInterval(() => sendTimestamp(), 3000);
+    console.log("Started backup timestamp interval");
   }, [sendTimestamp]);
 
   const handleStop = useCallback(() => {
@@ -3339,12 +3335,14 @@ export default function Playground({
     video.removeEventListener("pause", handleStop);
     video.removeEventListener("ended", handleStop);
     video.removeEventListener("seeked", handleSeeked);
+    video.removeEventListener("timeupdate", sendTimestamp);  // Add this line
 
     // Add listeners with fresh closures
     video.addEventListener("play", handlePlay);
     video.addEventListener("pause", handleStop);
     video.addEventListener("ended", handleStop);
     video.addEventListener("seeked", handleSeeked);
+    video.addEventListener("timeupdate", sendTimestamp);  // Add this line
 
     // Cleanup function
     return () => {
@@ -3353,6 +3351,7 @@ export default function Playground({
         video.removeEventListener("pause", handleStop);
         video.removeEventListener("ended", handleStop);
         video.removeEventListener("seeked", handleSeeked);
+        video.removeEventListener("timeupdate", sendTimestamp);  // Add this line
       }
 
       if (timestampIntervalRef.current) {
@@ -3360,7 +3359,7 @@ export default function Playground({
         timestampIntervalRef.current = null;
       }
     };
-  }, [videoRef, handlePlay, handleStop, handleSeeked, roomState, send]); // Important: include all dependencies
+  }, [videoRef, handlePlay, handleStop, handleSeeked, sendTimestamp, roomState, send]); // Important: include all dependencies, including sendTimestamp
 
   // Add an effect to log room state changes
   useEffect(() => {
