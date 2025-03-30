@@ -23,7 +23,6 @@ import { Plus, FileText, X, Edit2, Save, ChevronDown, ChevronUp, Play, Pause, Vo
 import { motion, AnimatePresence } from 'framer-motion';
 import styled, { keyframes } from 'styled-components';
 import PlaygroundProgressBar from '../player/PlaygroundProgressBar';
-import TimelineMarkers from '../player/TimelineMarkers';
 
 export interface PlaygroundProps {
   logo?: ReactNode;
@@ -540,6 +539,7 @@ const VideoPlayer = ({
   onTimeUpdate,
   isPlaying,
   setIsPlaying,
+  onVideoReady, // Add this prop
 }: {
   videoRef: React.RefObject<HTMLVideoElement>;
   videoUrl: string | null;
@@ -549,11 +549,12 @@ const VideoPlayer = ({
   onTimeUpdate: () => void;
   isPlaying: boolean;
   setIsPlaying: (playing: boolean) => void;
+  onVideoReady: (isReady: boolean) => void; // Add type for the prop
 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [hasInteracted, setHasInteracted] = useState(false);
-  const [isVideoReady, setIsVideoReady] = useState(false);
+  const [isVideoReady, setIsVideoReady] = useState(false); // Internal state
   const { isMobile } = useIsMobile();
 
   // Handle initial load and duration updates
@@ -573,6 +574,7 @@ const VideoPlayer = ({
   const handleCanPlay = () => {
     setIsVideoReady(true);
     setIsLoading(false); // Move loading state here
+    onVideoReady(true); // <<< Call the callback here
 
     // Auto-play on mobile if muted
     if (isMobile && videoRef.current?.muted && !hasInteracted) {
@@ -588,6 +590,8 @@ const VideoPlayer = ({
     }
     setIsPlaying(false);
     setIsLoading(false);
+    setIsVideoReady(false); // Set internal state
+    onVideoReady(false); // <<< Call the callback here
   };
 
   // Handle play attempt with mobile considerations
@@ -636,13 +640,20 @@ const VideoPlayer = ({
       setIsLoading(true);
       setPlaybackError(null);
       setHasInteracted(false);
+      onVideoReady(false); // <<< Call the callback here
       if (videoRef.current) {
         videoRef.current.load();
       }
+    } else {
+      // If URL becomes null, video is not ready
+      setIsVideoReady(false);
+      setIsLoading(true); // Or false, depending on desired UI
+      setPlaybackError(null);
+      onVideoReady(false); // <<< Call the callback here
     }
-  }, [videoUrl]);
+  }, [videoUrl, onVideoReady]); // Add onVideoReady to dependency array
 
-  // Add this effect to handle video URL changes and loading
+  // Add this effect to handle video URL changes and loading (no change needed here)
   useEffect(() => {
     if (!videoUrl) {
       setIsLoading(true);
@@ -655,6 +666,14 @@ const VideoPlayer = ({
       videoRef.current.load(); // Force reload with new URL
     }
   }, [videoUrl]);
+
+  // Add a cleanup effect for when the component unmounts
+  useEffect(() => {
+    return () => {
+      // Signal video is not ready on unmount
+      onVideoReady(false);
+    };
+  }, [onVideoReady]); // Add onVideoReady dependency
 
   return (
     <div className="relative w-full h-full bg-black" onClick={handleVideoClick}>
@@ -2132,7 +2151,7 @@ export default function Playground({
 
   // Add this inside the Playground component, with other state variables
   const [activeTab, setActiveTab] = useState<ConfigTab>(
-    params.agentType === 'view' ? 'chat' : 'teaching-persona'
+    params.agentType === 'view' ? 'chat' : 'chat'
   );
 
   // Add an effect to update activeTab when params.agentType changes
@@ -2157,6 +2176,8 @@ export default function Playground({
   const [isMuted, setIsMuted] = useState(false);
   const [duration, setDuration] = useState(0);
   const progressBarRef = useRef<HTMLDivElement>(null);
+  // Add this state variable
+  const [isVideoReadyForListeners, setIsVideoReadyForListeners] = useState(false);
 
   // Add these helper functions before the return statement
   const formatTime = (seconds: number) => {
@@ -3114,7 +3135,6 @@ export default function Playground({
 
   // Add this hook to get the data channel functionality
   const { send } = useDataChannel("video-timestamp");
-  const { send: sendEngagement } = useDataChannel("start-engagement");
 
   // Add a ref to track the interval ID for cleanup
   const timestampIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -3122,63 +3142,73 @@ export default function Playground({
   // Add a ref to track the last sent timestamp
   const lastSentTimestampRef = useRef<number | null>(null);
 
-  // 1. First, create stable callback references with useCallback
+  // Store the latest send function in a ref
+  const sendRef = useRef(send);
+  useEffect(() => {
+    sendRef.current = send;
+  }, [send]); // Update the ref whenever the send function instance changes
+
+  // 1. Modify sendTimestamp to use the ref
   const sendTimestamp = useCallback(() => {
-    // Add robust connection check
-    if (!videoRef.current || !send) {
+    // --- Add detailed logging at the start ---
+    const currentVideo = videoRef.current;
+    const currentSend = sendRef.current;
+    const currentState = roomState; // Capture current state
+    console.log(`sendTimestamp called. Video: ${currentVideo ? 'Exists' : 'Missing'}, Send: ${currentSend ? 'Exists' : 'Missing'}, State: ${currentState}`);
+    // --- End detailed logging ---
+
+    // Check 1: Video and Send function must exist
+    if (!currentVideo || !currentSend) {
+      console.log("sendTimestamp aborted: Video or Send Ref missing.");
       return;
     }
 
-    if (videoRef.current && !videoRef.current.paused && !videoRef.current.ended) {
-      const currentTime = videoRef.current.currentTime;
-
-      // Only send if there's been a meaningful change in timestamp
-      // Reduced threshold to ensure more timestamps get sent
-      if (lastSentTimestampRef.current === null ||
-        Math.abs(currentTime - lastSentTimestampRef.current) >= 0.7) {
-
-        console.log("Sending timestamp:", currentTime);
-
-        // Prepare message
-        const message = JSON.stringify({
-          type: "timestamp",
-          time: currentTime
-        });
-
-        const payload = new TextEncoder().encode(message);
-
-        // Try to send, but don't worry if it fails due to connection
-        try {
-          if (send) {
-            send(payload, { topic: "video-timestamp", reliable: true });
-            // Update last sent timestamp only on successful send
-            lastSentTimestampRef.current = currentTime;
-            console.log("Timestamp sent successfully");
-          }
-        } catch (err) {
-          console.error("Failed to send timestamp:", err);
-        }
-      }
+    // Check 2: Room must be connected
+    if (currentState !== ConnectionState.Connected) {
+      console.log(`sendTimestamp aborted: Room not connected (State: ${currentState}).`);
+      return;
     }
-  }, [videoRef, send, roomState]);
+
+    // Now we know video and send exist, and room is connected
+    const currentTime = currentVideo.currentTime;
+
+    // Check 3: Threshold check
+    const thresholdMet = lastSentTimestampRef.current === null || Math.abs(currentTime - lastSentTimestampRef.current) >= 0.7;
+
+    if (thresholdMet) {
+      console.log(`Threshold met. Attempting to send timestamp: ${currentTime}`); // <-- Log before sending
+      const message = JSON.stringify({
+        type: "timestamp",
+        time: currentTime
+      });
+      const payload = new TextEncoder().encode(message);
+
+      try {
+        // Use the send function from the ref
+        currentSend(payload, { topic: "video-timestamp", reliable: false });
+        lastSentTimestampRef.current = currentTime; // Update only on successful send attempt
+        console.log(`Timestamp ${currentTime} sent successfully via ref.`);
+      } catch (err) {
+        console.error(`Failed to send timestamp ${currentTime} via ref:`, err);
+        // If sending fails, maybe don't update lastSentTimestampRef? Or reset it?
+        // lastSentTimestampRef.current = null; // Optional: Allow resending immediately after an error
+      }
+    } else {
+      // Log if the threshold is the reason for not sending
+      // console.log(`Threshold NOT met. Current: ${currentTime}, Last: ${lastSentTimestampRef.current}. Skipping send.`);
+    }
+  }, [videoRef, roomState]); // Keep roomState here as it's checked directly
 
   // 2. Create stable event handler callbacks
   const handlePlay = useCallback(() => {
     console.log("Video play event triggered");
-
-    // Clear any existing interval first
-    if (timestampIntervalRef.current) {
-      clearInterval(timestampIntervalRef.current);
-      console.log("Cleared existing timestamp interval");
-    }
-
-    // Send initial timestamp immediately
-    sendTimestamp();
-
-    // Set a backup interval with lower frequency since we now have timeupdate events
-    // This serves as a fallback in case timeupdate events aren't firing consistently
-    timestampIntervalRef.current = setInterval(() => sendTimestamp(), 3000);
-    console.log("Started backup timestamp interval");
+    // --- Temporarily remove the interval to isolate timeupdate ---
+    // if (timestampIntervalRef.current) {
+    //   clearInterval(timestampIntervalRef.current);
+    // }
+    sendTimestamp(); // Send initial timestamp
+    // timestampIntervalRef.current = setInterval(() => sendTimestamp(), 3000);
+    // --- End temporary removal ---
   }, [sendTimestamp]);
 
   const handleStop = useCallback(() => {
@@ -3193,47 +3223,64 @@ export default function Playground({
     sendTimestamp();
   }, [sendTimestamp]);
 
-  // 3. Update the effect to re-attach event listeners when connection changes
+  // 3. Update the effect to re-attach event listeners
   useEffect(() => {
-    if (!videoRef.current) {
-      console.log("Video ref not available yet");
-      return;
+    const video = videoRef.current; // Get the current value
+
+    // --- Update this explicit check ---
+    if (!video || roomState !== ConnectionState.Connected || !isVideoReadyForListeners) {
+      console.log(`Effect check failed: Video element ${video ? 'exists' : 'missing'}, Room state: ${roomState}, Video ready: ${isVideoReadyForListeners}. Listeners not attached/cleaned.`);
+      // Optional cleanup if needed
+      return; // Exit early if conditions aren't met
     }
+    // --- End of explicit check ---
 
-    console.log("Setting up video event listeners with room state:", roomState);
+    console.log("Effect running: Attaching video event listeners. Room state:", roomState, "Video ready:", isVideoReadyForListeners);
 
-    const video = videoRef.current;
+    // Define handlers locally or ensure they are stable via useCallback
+    const onPlay = () => handlePlay();
+    const onPause = () => handleStop();
+    const onEnded = () => handleStop();
+    const onSeeked = () => handleSeeked();
+    const onTimeUpdate = () => sendTimestamp(); // This uses sendRef.current internally
 
-    // Remove any existing listeners first (in case they have stale closures)
-    video.removeEventListener("play", handlePlay);
-    video.removeEventListener("pause", handleStop);
-    video.removeEventListener("ended", handleStop);
-    video.removeEventListener("seeked", handleSeeked);
-    video.removeEventListener("timeupdate", sendTimestamp);  // Add this line
+    // Remove previous listeners
+    video.removeEventListener("play", onPlay);
+    video.removeEventListener("pause", onPause);
+    video.removeEventListener("ended", onEnded);
+    video.removeEventListener("seeked", onSeeked);
+    video.removeEventListener("timeupdate", onTimeUpdate);
 
-    // Add listeners with fresh closures
-    video.addEventListener("play", handlePlay);
-    video.addEventListener("pause", handleStop);
-    video.addEventListener("ended", handleStop);
-    video.addEventListener("seeked", handleSeeked);
-    video.addEventListener("timeupdate", sendTimestamp);  // Add this line
+    // Add new listeners
+    video.addEventListener("play", onPlay);
+    video.addEventListener("pause", onPause);
+    video.addEventListener("ended", onEnded);
+    video.addEventListener("seeked", onSeeked);
+    video.addEventListener("timeupdate", onTimeUpdate);
+
+    console.log("Effect complete: Video event listeners attached.");
 
     // Cleanup function
     return () => {
+      console.log("Effect cleanup: Removing video event listeners for video:", video);
       if (video) {
-        video.removeEventListener("play", handlePlay);
-        video.removeEventListener("pause", handleStop);
-        video.removeEventListener("ended", handleStop);
-        video.removeEventListener("seeked", handleSeeked);
-        video.removeEventListener("timeupdate", sendTimestamp);  // Add this line
+        video.removeEventListener("play", onPlay);
+        video.removeEventListener("pause", onPause);
+        video.removeEventListener("ended", onEnded);
+        video.removeEventListener("seeked", onSeeked);
+        video.removeEventListener("timeupdate", onTimeUpdate);
+      } else {
+        console.log("Effect cleanup: Video ref was null during setup, nothing to remove.");
       }
 
       if (timestampIntervalRef.current) {
         clearInterval(timestampIntervalRef.current);
         timestampIntervalRef.current = null;
+        console.log("Effect cleanup: Cleared timestamp interval.");
       }
     };
-  }, [videoRef, handlePlay, handleStop, handleSeeked, sendTimestamp, roomState, send]); // Important: include all dependencies, including sendTimestamp
+    // Dependencies: Re-run when roomState changes, video readiness changes, or stable callbacks change.
+  }, [roomState, isVideoReadyForListeners, handlePlay, handleStop, handleSeeked, sendTimestamp]); // Added isVideoReadyForListeners
 
   // Add an effect to log room state changes
   useEffect(() => {
@@ -3377,30 +3424,6 @@ export default function Playground({
     p-4 my-4
   `;
 
-  // Add this function to handle triggering engagements
-  const handleTriggerEngagement = (engagementId: string) => {
-    // Find the engagement opportunity by ID
-    const engagement = agentConfig?.engagement_opportunities?.find(e => e.id === engagementId);
-
-    if (engagement) {
-      console.log(`Directly triggering engagement: ${engagementId}`);
-
-      // Send the engagement data to the agent
-      sendEngagement(JSON.stringify({
-        type: "start-engagement",
-        engagementId: engagementId,
-        timestamp: currentTime,
-        engagementData: engagement
-      }));
-
-      // Pause the video when triggering an engagement
-      if (videoRef.current) {
-        videoRef.current.pause();
-        setIsPlaying(false);
-      }
-    }
-  };
-
   return (
     <div className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
       {/* Hide header on mobile as before */}
@@ -3471,11 +3494,12 @@ export default function Playground({
                     if (videoRef.current) {
                       setCurrentTime(videoRef.current.currentTime);
                       // Optionally log the time updates here
-                      console.log("Video time updated:", videoRef.current.currentTime);
+                      // console.log("Video time updated:", videoRef.current.currentTime);
                     }
                   }}
                   isPlaying={isPlaying}
                   setIsPlaying={setIsPlaying}
+                  onVideoReady={setIsVideoReadyForListeners} // Pass the state setter function
                 />
               </div>
             </Panel>
