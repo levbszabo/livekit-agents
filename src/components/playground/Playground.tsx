@@ -3251,7 +3251,7 @@ export default function Playground({
   // 1. First, create stable callback references with useCallback
   const sendTimestamp = useCallback(() => {
     // Add robust connection check
-    if (!videoRef.current || !send || roomState !== ConnectionState.Connected) {
+    if (!videoRef.current || !send) {
       return;
     }
 
@@ -3275,7 +3275,7 @@ export default function Playground({
 
         // Try to send, but don't worry if it fails due to connection
         try {
-          if (send && roomState === ConnectionState.Connected) {
+          if (send) {
             send(payload, { topic: "video-timestamp", reliable: true });
             // Update last sent timestamp only on successful send
             lastSentTimestampRef.current = currentTime;
