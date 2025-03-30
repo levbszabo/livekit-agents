@@ -202,8 +202,8 @@ const styles = {
   },
   tab: {
     base: `
-      relative px-4 py-2 
-      font-satoshi text-[13px] font-medium tracking-[-0.01em]
+      relative px-2.5 py-1.5 
+      font-satoshi text-[12px] font-medium tracking-[-0.01em]
       transition-all duration-300
     `,
     active: `
@@ -2480,8 +2480,8 @@ export default function Playground({
   const tabs = params.agentType === 'view' ? [
     { id: 'chat', label: 'Chat' }
   ] : [
-    { id: 'teaching-persona', label: 'Teaching Persona' },
-    { id: 'voice-clone', label: 'Voice Clone' },
+    { id: 'teaching-persona', label: 'Persona' },
+    { id: 'voice-clone', label: 'Voice' },
     { id: 'engagement', label: 'Engagement' }, // Add this new tab
     { id: 'chat', label: 'Chat' },
     { id: 'share', label: 'Share' }
@@ -3778,7 +3778,7 @@ export default function Playground({
               <div className="h-full flex flex-col">
                 {/* Only show tabs on desktop */}
                 {!isMobile && (
-                  <div className="flex items-center px-2 border-b border-gray-800/50 relative">
+                  <div className="flex items-center px-1 border-b border-gray-800/50 relative">
                     {/* Add glowing border effect */}
                     <div className="absolute bottom-0 left-0 right-0">
                       <div className="absolute bottom-0 left-0 right-0 h-[1px]
@@ -3793,6 +3793,7 @@ export default function Playground({
                         className={`
                         ${styles.tab.base}
                         ${activeTab === tab.id ? styles.tab.active : styles.tab.inactive}
+                        text-sm px-2 py-1
                       `}
                       >
                         {tab.label}
@@ -3823,6 +3824,7 @@ export default function Playground({
                   ${isMobile ? 'overflow-hidden p-1' : 'overflow-y-auto p-3'} 
                   space-y-4
                   relative
+                  h-[calc(100vh-120px)] // Add this to ensure sufficient height
                 `}>
                   {/* Info Tooltip */}
                   <div className={`
@@ -3863,7 +3865,6 @@ export default function Playground({
                             <BrdgeLogo src="/new-img.png" alt="Brdge AI Logo" />
                             {!isMobile && (
                               <>
-                                <span className="text-sm text-gray-200 font-medium">AI Chat</span>
                                 {/* Add BarVisualizer here */}
                                 <div className="h-5 w-20 ml-1">
                                   <BarVisualizer
@@ -3906,6 +3907,36 @@ export default function Playground({
                           </div>
 
                           {/* Info tooltip and Mic controls */}
+
+
+                          {/* Mic toggle button - Simplified for mobile */}
+                          <button
+                            onClick={() => {
+                              if (roomState === ConnectionState.Connected && localParticipant) {
+                                localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
+                              }
+                            }}
+                            disabled={roomState !== ConnectionState.Connected}
+                            className={`
+                                ${isMobile ? 'p-1' : 'p-1.5'}
+                                rounded-lg transition-all duration-300
+                                flex items-center gap-1.5
+                                bg-cyan-500/20 text-cyan-400
+                                hover:bg-cyan-500/30 hover:shadow-[0_0_10px_rgba(34,211,238,0.15)]
+                                disabled:opacity-50 disabled:cursor-not-allowed
+                                ${isInfoVisible ? 'animate-glow' : ''}
+                              `}
+                          >
+                            {localParticipant?.isMicrophoneEnabled ?
+                              <Mic size={isMobile ? 10 : 14} /> :
+                              <MicOff size={isMobile ? 10 : 14} />
+                            }
+                            {!isMobile && (
+                              <span className="text-[11px] font-medium">
+                                {localParticipant?.isMicrophoneEnabled ? 'Mic: On' : 'Mic: Off'}
+                              </span>
+                            )}
+                          </button>
                           <div className="flex items-center gap-2">
                             <div className="relative group">
                               <button
@@ -3929,35 +3960,6 @@ export default function Playground({
                                 </div>
                               </div>
                             </div>
-
-                            {/* Mic toggle button - Simplified for mobile */}
-                            <button
-                              onClick={() => {
-                                if (roomState === ConnectionState.Connected && localParticipant) {
-                                  localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
-                                }
-                              }}
-                              disabled={roomState !== ConnectionState.Connected}
-                              className={`
-                                ${isMobile ? 'p-1' : 'p-1.5'}
-                                rounded-lg transition-all duration-300
-                                flex items-center gap-1.5
-                                bg-cyan-500/20 text-cyan-400
-                                hover:bg-cyan-500/30 hover:shadow-[0_0_10px_rgba(34,211,238,0.15)]
-                                disabled:opacity-50 disabled:cursor-not-allowed
-                                ${isInfoVisible ? 'animate-glow' : ''}
-                              `}
-                            >
-                              {localParticipant?.isMicrophoneEnabled ?
-                                <Mic size={isMobile ? 10 : 14} /> :
-                                <MicOff size={isMobile ? 10 : 14} />
-                              }
-                              {!isMobile && (
-                                <span className="text-[11px] font-medium">
-                                  {localParticipant?.isMicrophoneEnabled ? 'Mic: On' : 'Mic: Off'}
-                                </span>
-                              )}
-                            </button>
                           </div>
                         </div>
                       </div>
@@ -4695,7 +4697,7 @@ export default function Playground({
                       )}
                       {activeTab === 'share' && (
                         <div className={`
-                          h-full pt-0 overflow-y-auto
+                          h-full pt-0 overflow-y-auto max-h-[calc(100vh-160px)]
                           ${activeTab === 'share' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}
                           transition-opacity duration-300
                         `}>
@@ -4703,6 +4705,7 @@ export default function Playground({
                             <h2 className={styles.section.title}>Sharing Configuration</h2>
                           </div>
 
+                          {/* ...existing share tab content... */}
                           <div className="mb-6 border-b border-gray-800/30 pb-3">
                             {/* Public/Private Toggle Section */}
                             <section className="relative p-2 rounded-lg group mb-4">
