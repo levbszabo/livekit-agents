@@ -1,7 +1,7 @@
 import { ChatMessage } from "@/components/chat/ChatMessage";
 import { ChatMessageInput } from "@/components/chat/ChatMessageInput";
 import { ChatMessage as ComponentsChatMessage } from "@livekit/components-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useMemo } from "react";
 import { Send } from 'lucide-react';
 import styled, { keyframes } from 'styled-components';
 
@@ -31,6 +31,7 @@ export type ChatMessageType = {
   message: string;
   isSelf: boolean;
   timestamp: number;
+  originalTimestamp?: number;
 };
 
 type ChatTileProps = {
@@ -42,11 +43,42 @@ type ChatTileProps = {
 
 export const ChatTile = ({ messages, accentColor, onSend, className = '' }: ChatTileProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Process messages to combine consecutive ones from the same non-self sender
+  const processedMessages = useMemo(() => {
+    if (!messages || messages.length === 0) {
+      return [];
+    }
+
+    const combined: ChatMessageType[] = [];
+    messages.forEach((msg) => {
+      const prevMsg = combined.length > 0 ? combined[combined.length - 1] : null;
+
+      // Combine if:
+      // - There is a previous message
+      // - The current message is not from 'self'
+      // - The sender name matches the previous message
+      // - The 'isSelf' status matches the previous message (ensures we don't combine self and other)
+      if (prevMsg && !msg.isSelf && prevMsg.name === msg.name && prevMsg.isSelf === msg.isSelf) {
+        // Append message content with a newline
+        prevMsg.message += `\n${msg.message}`;
+        // Update timestamp to the latest message in the combined block
+        prevMsg.timestamp = msg.timestamp;
+      } else {
+        // Otherwise, add this message as a new entry (create a copy to avoid mutation)
+        combined.push({ ...msg, originalTimestamp: msg.timestamp });
+      }
+    });
+    return combined;
+  }, [messages]); // Re-run only when the original messages array changes
+
+
   useEffect(() => {
     if (containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
-  }, [containerRef, messages]);
+    // Depend on processedMessages length to scroll when combined list changes
+  }, [containerRef, processedMessages.length]);
 
   return (
     <div className={`flex flex-col w-full h-full ${className}`}>
@@ -59,14 +91,18 @@ export const ChatTile = ({ messages, accentColor, onSend, className = '' }: Chat
         "
       >
         <div className="flex flex-col min-h-full justify-end py-3 space-y-1.5">
-          {messages.map((message, index, allMsg) => {
-            const hideName = index >= 1 && allMsg[index - 1].name === message.name;
+          {/* Map over the processed (combined) messages */}
+          {processedMessages.map((message, index, allProcessedMsg) => {
+            // Name hiding logic remains similar but uses the processed list
+            const hideName = index >= 1 && allProcessedMsg[index - 1].name === message.name;
+            // Use a key stable across combines for the same message block
+            const key = `${message.name}-${message.originalTimestamp}-${message.isSelf}`;
             return (
               <ChatMessage
-                key={index}
+                key={key} // Use the stable key
                 hideName={hideName}
                 name={message.name}
-                message={message.message}
+                message={message.message} // Pass the potentially combined message
                 isSelf={message.isSelf}
                 accentColor={accentColor}
                 LightScanEffect={LightScanEffect}

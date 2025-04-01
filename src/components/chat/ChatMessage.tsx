@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 type ChatMessageProps = {
   name: string;
@@ -17,11 +17,14 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   accentColor,
   LightScanEffect
 }) => {
+  // No internal state for animation - we'll use CSS instead
+  // This will ensure the animation only happens for new content
+
   return (
     <div
       className={`
-        group relative 
-        ${isSelf ? 'ml-auto' : 'mr-auto'} 
+        group relative
+        ${isSelf ? 'ml-auto' : 'mr-auto'}
         max-w-[80%]
         ${isSelf
           ? 'bg-[#162730]/90'
@@ -49,8 +52,19 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           </div>
         )}
 
-        {/* Message text */}
-        <div className="text-[11px] text-gray-300 leading-relaxed font-light">
+        {/* Message text - with CSS typewriter animation */}
+        <div
+          className="text-[11px] text-gray-300 leading-relaxed font-light whitespace-pre-wrap min-h-[1em] typewriter-text"
+          style={{
+            // Using an animated border with the same color as background creates the typewriter effect
+            // Border width scales with the text content length
+            borderRight: '1px solid transparent',
+            width: 'fit-content',
+            animation: 'typing 2.5s steps(40, end), blink-caret .75s step-end infinite',
+            whiteSpace: 'pre-wrap',
+            overflow: 'hidden',
+          }}
+        >
           {message}
         </div>
 
