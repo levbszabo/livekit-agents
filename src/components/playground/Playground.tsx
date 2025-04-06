@@ -32,7 +32,7 @@ export interface PlaygroundProps {
 }
 
 // Update the header height constant at the top of the file
-const headerHeight = 16; // Changed from 28 to 16
+const headerHeight = 0; // Changed from 16 to 0
 
 interface BrdgeMetadata {
   id: string;
@@ -151,36 +151,37 @@ const useIsMobile = () => {
 // Update the styles object to include better font styling
 const styles = {
   section: {
-    title: "font-serif text-[14px] font-medium text-gray-200 mb-2",
+    title: "font-serif text-[14px] font-medium text-[#0A1933] mb-2",
   },
   tab: {
     base: "relative font-medium transition-all duration-300",
-    active: "text-cyan-300 font-sans whitespace-nowrap",
-    inactive: "text-gray-400 hover:text-gray-300 font-sans whitespace-nowrap",
+    active: "text-[#9C7C38] font-sans whitespace-nowrap",
+    inactive: "text-[#1E2A42] hover:text-[#0A1933] font-sans whitespace-nowrap",
   },
   input: {
-    base: "w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-sm text-gray-100 transition-all duration-300 focus:border-cyan-500/40 focus:ring-1 focus:ring-cyan-500/20 font-satoshi",
+    base: "w-full bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg px-3 py-2 text-sm text-[#0A1933] transition-all duration-300 focus:border-[#9C7C38]/40 focus:ring-1 focus:ring-[#9C7C38]/20 font-satoshi",
     textarea: "min-h-[120px] resize-y",
   },
   header: {
-    main: "font-sans text-[15px] font-medium text-cyan-300",
-    sub: "font-sans text-[13px] font-medium text-cyan-400/90"
+    main: "font-sans text-[15px] font-medium text-[#0A1933]",
+    sub: "font-sans text-[13px] font-medium text-[#0A1933]"
   },
   knowledgeBase: {
-    bubble: "bg-gray-900/30 backdrop-blur-sm p-3 rounded-lg border border-gray-800/40 hover:border-cyan-500/20 transition-all duration-300",
-    content: "w-full bg-black/30 border border-gray-700/40 rounded-lg px-3 py-2 text-[13px] text-gray-300"
+    bubble: "bg-[#FAF7ED]/90 backdrop-blur-sm p-3 rounded-lg border border-[#9C7C38]/20 hover:border-[#9C7C38]/40 transition-all duration-300",
+    content: "w-full bg-[#F5EFE0]/90 border border-[#9C7C38]/20 rounded-lg px-3 py-2 text-[13px] text-[#0A1933]"
   },
   parchment: {
-    panel: "bg-gradient-to-b from-gray-900/70 to-gray-900/60 backdrop-md relative",
-    section: "bg-gradient-to-b from-gray-900/60 to-gray-900/40 border border-gray-700/40 hover:border-gray-600/50 transition-all duration-300 rounded-lg overflow-hidden",
-    input: "bg-black/30 border border-gray-700/50 focus:border-gray-500/70 hover:border-gray-600/60 text-gray-200"
+    panel: "bg-gradient-to-b from-[#F5EFE0]/90 to-[#F5EFE0]/80 backdrop-md relative",
+    section: "bg-gradient-to-b from-[#FAF7ED]/90 to-[#F5EFE0]/80 border border-[#9C7C38]/20 hover:border-[#9C7C38]/30 transition-all duration-300 rounded-lg overflow-hidden",
+    input: "bg-[#FAF7ED]/80 border border-[#9C7C38]/30 focus:border-[#9C7C38]/50 hover:border-[#9C7C38]/40 text-[#0A1933]"
   }
 };
 
+// Update resizeHandleStyles for parchment theme
 const resizeHandleStyles = {
   vertical: `
     w-1.5 mx-1 my-2 rounded-full
-    bg-gray-800 hover:bg-gray-700
+    bg-[#E8E0CC] hover:bg-[#9C7C38]/30
     transition-colors duration-150
     cursor-col-resize
     flex items-center justify-center
@@ -188,7 +189,7 @@ const resizeHandleStyles = {
   `,
   horizontal: `
     h-1.5 my-1 mx-2 rounded-full
-    bg-gray-800 hover:bg-gray-700
+    bg-[#E8E0CC] hover:bg-[#9C7C38]/30
     transition-colors duration-150
     cursor-row-resize
     flex items-center justify-center
@@ -331,9 +332,9 @@ const KnowledgeBubble: React.FC<KnowledgeBubbleProps> = ({ entry, onEdit, onRemo
                 animate={{ rotate: isExpanded ? 90 : 0 }}
                 transition={{ duration: 0.2 }}
               >
-                <ChevronRight size={12} className="text-gray-400 group-hover:text-cyan-400" />
+                <ChevronRight size={12} className="text-gray-400 group-hover:text-[#9C7C38]" />
               </motion.div>
-              <span className="font-satoshi text-[12px] text-gray-300 group-hover:text-cyan-400/90 transition-colors duration-300">
+              <span className="font-satoshi text-[12px] text-gray-300 group-hover:text-[#9C7C38]/90 transition-colors duration-300">
                 {entry.name || 'New Entry'}
               </span>
             </div>
@@ -374,9 +375,9 @@ const KnowledgeBubble: React.FC<KnowledgeBubbleProps> = ({ entry, onEdit, onRemo
                     min-h-[100px]
                     resize-none
                     transition-all duration-300
-                    focus:ring-1 focus:ring-cyan-500/50 
-                    focus:border-cyan-500/30
-                    hover:border-cyan-500/20
+                    focus:ring-1 focus:ring-[#9C7C38]/50 
+                    focus:border-[#9C7C38]/30
+                    hover:border-[#9C7C38]/20
                     placeholder:text-gray-600/50
                   `}
                   placeholder="Enter knowledge content..."
@@ -481,7 +482,7 @@ const TranscriptTimeline = ({ transcript, currentTime, onTimeClick }: {
         className={`
           flex-1 overflow-x-auto whitespace-nowrap
           scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-700/30
-          hover:scrollbar-thumb-cyan-500/20
+          hover:scrollbar-thumb-[#9C7C38]/20
           cursor-grab ${isDragging ? 'cursor-grabbing' : ''}
           relative
         `}
@@ -503,12 +504,12 @@ const TranscriptTimeline = ({ transcript, currentTime, onTimeClick }: {
                   inline-block px-2 py-1 rounded
                   transition-all duration-150 text-[13px] leading-relaxed
                   ${currentTime >= segment.start && currentTime <= segment.end
-                    ? 'bg-cyan-500/20 text-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.2)]'
-                    : 'text-gray-400 hover:text-gray-300 hover:bg-cyan-500/10'
+                    ? 'bg-[#9C7C38]/20 text-[#9C7C38] shadow-[0_0_10px_rgba(156,124,56,0.2)]'
+                    : 'text-gray-400 hover:text-gray-300 hover:bg-[#9C7C38]/10'
                   }
                   cursor-pointer
                   hover:scale-105
-                  hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]
+                  hover:shadow-[0_0_15px_rgba(156,124,56,0.1)]
                 `}
               >
                 {segment.text}
@@ -716,7 +717,7 @@ const VideoPlayer = ({
       ) : (
         // Show loading state if no video URL yet
         <div className="absolute inset-0 flex items-center justify-center bg-black">
-          <div className="w-8 h-8 border-2 border-cyan-500/30 border-t-cyan-400 animate-spin rounded-full" />
+          <div className="w-8 h-8 border-2 border-[#9C7C38]/30 border-t-[#9C7C38] animate-spin rounded-full" />
         </div>
       )}
 
@@ -815,23 +816,23 @@ const MobileVideoControls = ({
   );
 };
 
-// Add the glow animation keyframes
+// Update animations
 const glowAnimation = keyframes`
   0% {
-    filter: drop-shadow(0 0 2px #00f7ff);
+    filter: drop-shadow(0 0 2px #9C7C38);
   }
   50% {
-    filter: drop-shadow(0 0 4px #00f7ff);
+    filter: drop-shadow(0 0 4px #9C7C38);
   }
   100% {
-    filter: drop-shadow(0 0 2px #00f7ff);
+    filter: drop-shadow(0 0 2px #9C7C38);
   }
 `;
 
 const BrdgeLogo = styled.img`
-  width: 24px;
-  height: 24px;
-  margin-right: 8px;
+  width: 36px;
+  height: 36px;
+  margin-right: 4px;
   animation: ${glowAnimation} 2s ease-in-out infinite;
 `;
 
@@ -943,7 +944,7 @@ const VoiceSelector = ({
 
   return (
     <div className="relative">
-      <label className="block text-cyan-400/70 text-[12px] font-medium mb-2">Active Voice</label>
+      <label className="block text-[#0A1933]/70 text-[12px] font-medium mb-2">Active Voice</label>
       <div className="relative">
         <select
           value={selectedVoice ? `${selectedVoice}|${selectedVoiceBrdgeId || ''}` : defaultVoiceId}
@@ -957,14 +958,14 @@ const VoiceSelector = ({
           disabled={isLoading}
           className={`
             w-full px-3 py-2.5 rounded-lg
-            font-satoshi text-[14px] text-white
-            bg-[#1E1E1E]/80 backdrop-blur-sm
-            border border-gray-800/50
+            font-satoshi text-[14px] text-[#0A1933]
+            bg-[#FAF7ED]/80 backdrop-blur-sm
+            border border-[#9C7C38]/30
             appearance-none
             transition-all duration-300
-            focus:ring-1 focus:ring-cyan-500/50 
-            focus:border-cyan-500/30
-            hover:border-cyan-500/20
+            focus:ring-1 focus:ring-[#9C7C38]/40 
+            focus:border-[#9C7C38]/50
+            hover:border-[#9C7C38]/40
             disabled:opacity-60 disabled:cursor-not-allowed
           `}
         >
@@ -1001,7 +1002,7 @@ const VoiceSelector = ({
             </>
           )}
         </select>
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-cyan-400/50">
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#9C7C38]/50">
           <ChevronDown size={16} />
         </div>
       </div>
@@ -1199,8 +1200,8 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
         relative rounded-lg overflow-hidden
         transition-all duration-300
         ${isExpanded
-          ? 'bg-gradient-to-b from-cyan-900/20 to-gray-900/40 border border-cyan-500/20 shadow-[0_0_15px_rgba(34,211,238,0.07)]'
-          : 'bg-gray-900/30 border border-gray-800/50 hover:border-gray-700/50'}
+          ? 'bg-gradient-to-b from-[#9C7C38]/10 to-[#F5EFE0]/80 border border-[#9C7C38]/30 shadow-[0_0_15px_rgba(156,124,56,0.07)]'
+          : 'bg-[#F5EFE0]/60 border border-[#9C7C38]/20 hover:border-[#9C7C38]/40'}
       `}
     >
       {/* Header section */}
@@ -1211,12 +1212,12 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
             {getEngagementTypeIcon(engagement.engagement_type)}
-            <span className={`text-[13px] font-medium ${isExpanded ? 'text-cyan-400' : 'text-gray-300'}`}>
+            <span className={`text-[13px] font-medium ${isExpanded ? 'text-[#9C7C38]' : 'text-[#0A1933]'}`}>
               {engagement.engagement_type === 'quiz' ? 'Quiz' : 'Discussion'}
               {engagement.quiz_items?.length > 1 ? ` (${engagement.quiz_items.length} questions)` : ''}
             </span>
             {engagement.timestamp && (
-              <div className="px-1.5 py-0.5 bg-gray-800/70 rounded text-[10px] text-gray-400 flex items-center gap-1">
+              <div className="px-1.5 py-0.5 bg-[#F5EFE0]/80 rounded text-[10px] text-[#1E2A42] flex items-center gap-1">
                 <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M12 8V12L15 15M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z"
                     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -1233,14 +1234,14 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
                 <motion.button
                   whileTap={{ scale: 0.95 }}
                   onClick={handleSaveEdit}
-                  className="p-1.5 rounded-md text-cyan-400 hover:bg-cyan-500/10 transition-all duration-200"
+                  className="p-1.5 rounded-md text-[#9C7C38] hover:bg-[#9C7C38]/10 transition-all duration-200"
                 >
                   <Save size={14} />
                 </motion.button>
                 <motion.button
                   whileTap={{ scale: 0.95 }}
                   onClick={handleCancelEdit}
-                  className="p-1.5 rounded-md text-gray-400 hover:bg-gray-800/70 transition-all duration-200"
+                  className="p-1.5 rounded-md text-[#1E2A42] hover:bg-[#F5EFE0] transition-all duration-200"
                 >
                   <X size={14} />
                 </motion.button>
@@ -1250,7 +1251,7 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
                 <motion.button
                   whileTap={{ scale: 0.95 }}
                   onClick={handleStartEdit}
-                  className="p-1.5 rounded-md text-gray-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all duration-200"
+                  className="p-1.5 rounded-md text-[#1E2A42] hover:text-[#9C7C38] hover:bg-[#9C7C38]/10 transition-all duration-200"
                 >
                   <Edit2 size={14} />
                 </motion.button>
@@ -1260,7 +1261,7 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
                     e.stopPropagation();
                     setShowDeleteConfirm(true);
                   }}
-                  className="p-1.5 rounded-md text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200"
+                  className="p-1.5 rounded-md text-[#1E2A42] hover:text-red-400 hover:bg-red-500/10 transition-all duration-200"
                 >
                   <Trash2 size={14} />
                 </motion.button>
@@ -1274,39 +1275,39 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
                 if (!isEditing) handleToggleExpand();
               }}
             >
-              <ChevronRight size={14} className={`${isExpanded ? 'text-cyan-400' : 'text-gray-500'}`} />
+              <ChevronRight size={14} className={`${isExpanded ? 'text-[#9C7C38]' : 'text-[#1E2A42]'}`} />
             </motion.div>
           </div>
         </div>
 
         {/* Concepts */}
         {isEditing ? (
-          <div className="mt-2 bg-black/20 p-2 rounded border border-gray-800/50">
-            <div className="text-[11px] text-gray-400/70 mb-1">Engagement Type:</div>
+          <div className="mt-2 bg-[#F5EFE0]/80 p-2 rounded border border-[#9C7C38]/20">
+            <div className="text-[11px] text-[#0A1933]/70 mb-1">Engagement Type:</div>
             <select
               value={editedEngagement.engagement_type}
               onChange={(e) => handleUpdateField('engagement_type', e.target.value)}
-              className="w-full bg-[#1E1E1E]/80 border border-gray-700/50 rounded-lg px-3 py-2 text-[13px] text-white"
+              className="w-full bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg px-3 py-2 text-[13px] text-[#0A1933]"
             >
               <option value="quiz">Quiz</option>
               <option value="discussion">Discussion</option>
             </select>
 
-            <div className="text-[11px] text-gray-400/70 mt-2 mb-1">Timestamp (format: 00:MM:SS):</div>
+            <div className="text-[11px] text-[#0A1933]/70 mt-2 mb-1">Timestamp (format: 00:MM:SS):</div>
             <input
               type="text"
               value={editedEngagement.timestamp}
               onChange={(e) => handleUpdateField('timestamp', e.target.value)}
-              className="w-full bg-[#1E1E1E]/80 border border-gray-700/50 rounded-lg px-3 py-2 text-[13px] text-white"
+              className="w-full bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg px-3 py-2 text-[13px] text-[#0A1933]"
               placeholder="00:00:00"
             />
 
-            <div className="text-[11px] text-gray-400/70 mt-2 mb-1">Concepts (comma separated):</div>
+            <div className="text-[11px] text-[#0A1933]/70 mt-2 mb-1">Concepts (comma separated):</div>
             <input
               type="text"
               value={editedEngagement.concepts_addressed.join(', ')}
               onChange={(e) => handleUpdateConcepts(e.target.value.split(',').map(c => c.trim()))}
-              className="w-full bg-[#1E1E1E]/80 border border-gray-700/50 rounded-lg px-3 py-2 text-[13px] text-white"
+              className="w-full bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg px-3 py-2 text-[13px] text-[#0A1933]"
               placeholder="Concept 1, Concept 2"
             />
           </div>
@@ -1314,7 +1315,7 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
           engagement.concepts_addressed && engagement.concepts_addressed.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">
               {engagement.concepts_addressed.map((concept, idx) => (
-                <div key={idx} className="px-1.5 py-0.5 bg-gray-800/50 rounded-sm text-[9px] text-gray-400">
+                <div key={idx} className="px-1.5 py-0.5 bg-[#F5EFE0]/80 rounded-sm text-[9px] text-[#1E2A42]">
                   {concept}
                 </div>
               ))}
@@ -1335,20 +1336,20 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
             <div className="px-3 pb-3 space-y-3">
               {/* Rationale */}
               {isEditing ? (
-                <div className="bg-black/20 p-2 rounded border border-gray-800/50">
-                  <div className="text-[11px] text-gray-400/70 mb-1">Rationale:</div>
+                <div className="bg-[#F5EFE0]/80 p-2 rounded border border-[#9C7C38]/20">
+                  <div className="text-[11px] text-[#0A1933]/70 mb-1">Rationale:</div>
                   <textarea
                     value={editedEngagement.rationale}
                     onChange={(e) => handleUpdateField('rationale', e.target.value)}
-                    className="w-full bg-[#1E1E1E]/80 border border-gray-700/50 rounded-lg px-3 py-2 text-[13px] text-white min-h-[80px]"
+                    className="w-full bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg px-3 py-2 text-[13px] text-[#0A1933] min-h-[80px]"
                     placeholder="Enter rationale..."
                   />
                 </div>
               ) : (
                 engagement.rationale && (
-                  <div className="bg-black/20 p-2 rounded border border-gray-800/50">
-                    <div className="text-[11px] text-gray-400/70 mb-1">Rationale:</div>
-                    <div className="text-[12px] text-gray-300">{engagement.rationale}</div>
+                  <div className="bg-[#F5EFE0]/80 p-2 rounded border border-[#9C7C38]/20">
+                    <div className="text-[11px] text-[#0A1933]/70 mb-1">Rationale:</div>
+                    <div className="text-[12px] text-[#0A1933]">{engagement.rationale}</div>
                   </div>
                 )
               )}
@@ -1362,8 +1363,8 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
                       className={`
                         rounded border transition-all duration-300
                         ${expandedQuiz === `${quizIndex}`
-                          ? 'bg-cyan-950/20 border-cyan-500/30 shadow-[0_0_10px_rgba(34,211,238,0.05)]'
-                          : 'bg-gray-900/20 border-gray-800/50 hover:border-gray-700/70'}
+                          ? 'bg-[#9C7C38]/10 border-[#9C7C38]/30 shadow-[0_0_10px_rgba(156,124,56,0.05)]'
+                          : 'bg-[#F5EFE0]/80 border-[#9C7C38]/20 hover:border-[#9C7C38]/40'}
                       `}
                     >
                       {/* Quiz header */}
@@ -1373,13 +1374,13 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
                       >
                         <div className="flex items-center gap-2">
                           {getQuestionTypeIcon(quiz.question_type)}
-                          <div className={`text-[12px] ${expandedQuiz === `${quizIndex}` ? 'text-cyan-300' : 'text-gray-300'}`}>
+                          <div className={`text-[12px] ${expandedQuiz === `${quizIndex}` ? 'text-[#9C7C38]' : 'text-[#0A1933]'}`}>
                             {isEditing ? (
                               <select
                                 value={quiz.question_type}
                                 onChange={(e) => handleUpdateQuizField(quizIndex, 'question_type', e.target.value)}
                                 onClick={(e) => e.stopPropagation()}
-                                className="bg-[#1E1E1E]/80 border border-gray-700/50 rounded-lg px-2 py-1 text-[12px] text-white"
+                                className="bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg px-2 py-1 text-[12px] text-[#0A1933]"
                               >
                                 <option value="multiple_choice">Multiple Choice</option>
                                 <option value="short_answer">Short Answer</option>
@@ -1401,7 +1402,7 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
                               e.stopPropagation();
                               handleDeleteQuiz(quizIndex);
                             }}
-                            className="p-1 rounded-md text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200"
+                            className="p-1 rounded-md text-[#1E2A42] hover:text-red-400 hover:bg-red-500/10 transition-all duration-200"
                           >
                             <Trash2 size={12} />
                           </button>
@@ -1410,7 +1411,7 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
                             animate={{ rotate: expandedQuiz === `${quizIndex}` ? 90 : 0 }}
                             transition={{ duration: 0.2 }}
                           >
-                            <ChevronRight size={12} className="text-gray-500" />
+                            <ChevronRight size={12} className="text-[#1E2A42]" />
                           </motion.div>
                         )}
                       </div>
@@ -1426,24 +1427,24 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
                           >
                             <div className="px-2 pb-2 space-y-2">
                               {/* Question */}
-                              <div className="bg-black/20 p-2 rounded border border-gray-800/50">
-                                <div className="text-[11px] text-gray-400/70 mb-1">Question:</div>
+                              <div className="bg-[#F5EFE0]/80 p-2 rounded border border-[#9C7C38]/20">
+                                <div className="text-[11px] text-[#0A1933]/70 mb-1">Question:</div>
                                 {isEditing ? (
                                   <textarea
                                     value={quiz.question}
                                     onChange={(e) => handleUpdateQuizField(quizIndex, 'question', e.target.value)}
-                                    className="w-full bg-[#1E1E1E]/80 border border-gray-700/50 rounded-lg px-3 py-2 text-[13px] text-white min-h-[60px]"
+                                    className="w-full bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg px-3 py-2 text-[13px] text-[#0A1933] min-h-[60px]"
                                     placeholder="Enter question..."
                                   />
                                 ) : (
-                                  <div className="text-[12px] text-gray-200">{quiz.question}</div>
+                                  <div className="text-[12px] text-[#0A1933]">{quiz.question}</div>
                                 )}
                               </div>
 
                               {/* Options for multiple choice */}
                               {quiz.question_type === 'multiple_choice' && (
-                                <div className="bg-black/20 p-2 rounded border border-gray-800/50">
-                                  <div className="text-[11px] text-gray-400/70 mb-1">Options:</div>
+                                <div className="bg-[#F5EFE0]/80 p-2 rounded border border-[#9C7C38]/20">
+                                  <div className="text-[11px] text-[#0A1933]/70 mb-1">Options:</div>
                                   {isEditing ? (
                                     <div className="space-y-2">
                                       {(quiz.options || []).map((option, optionIndex) => (
@@ -1452,7 +1453,7 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
                                             type="radio"
                                             checked={option === quiz.correct_option}
                                             onChange={() => handleUpdateQuizField(quizIndex, 'correct_option', option)}
-                                            className="w-4 h-4 accent-cyan-500"
+                                            className="w-4 h-4 accent-[#9C7C38]"
                                           />
                                           <input
                                             type="text"
@@ -1467,7 +1468,7 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
                                                 handleUpdateQuizField(quizIndex, 'correct_option', e.target.value);
                                               }
                                             }}
-                                            className="flex-1 bg-[#1E1E1E]/80 border border-gray-700/50 rounded-lg px-2 py-1 text-[12px] text-white"
+                                            className="flex-1 bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg px-2 py-1 text-[12px] text-[#0A1933]"
                                           />
                                           <button
                                             onClick={() => {
@@ -1480,7 +1481,7 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
                                                 handleUpdateQuizField(quizIndex, 'correct_option', newOptions[0] || null);
                                               }
                                             }}
-                                            className="p-1 rounded-md text-gray-400 hover:text-red-400"
+                                            className="p-1 rounded-md text-[#1E2A42] hover:text-red-400"
                                           >
                                             <X size={14} />
                                           </button>
@@ -1488,7 +1489,7 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
                                       ))}
                                       <button
                                         onClick={() => handleAddOption(quizIndex)}
-                                        className="w-full px-2 py-1 bg-gray-800/30 text-gray-400 hover:text-cyan-400 rounded-lg text-[11px]"
+                                        className="w-full px-2 py-1 bg-[#F5EFE0] text-[#1E2A42] hover:text-[#9C7C38] rounded-lg text-[11px]"
                                       >
                                         + Add Option
                                       </button>
@@ -1499,11 +1500,11 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
                                         <div key={optionIndex} className="flex items-start gap-2">
                                           <div className={`flex items-center justify-center w-4 h-4 rounded-full mt-0.5 text-[10px] 
                                             ${option === quiz.correct_option
-                                              ? 'bg-green-500/20 text-green-400 border border-green-500/50'
-                                              : 'bg-gray-800/70 text-gray-400 border border-gray-700/50'}`}>
+                                              ? 'bg-green-500/20 text-green-600 border border-green-500/50'
+                                              : 'bg-[#F5EFE0] text-[#1E2A42] border border-[#9C7C38]/30'}`}>
                                             {option === quiz.correct_option ? '✓' : ''}
                                           </div>
-                                          <div className={`text-[12px] ${option === quiz.correct_option ? 'text-green-400' : 'text-gray-300'}`}>
+                                          <div className={`text-[12px] ${option === quiz.correct_option ? 'text-green-700' : 'text-[#0A1933]'}`}>
                                             {option}
                                           </div>
                                         </div>
@@ -1515,17 +1516,17 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
 
                               {/* Expected answer for short answer */}
                               {quiz.question_type === 'short_answer' && (
-                                <div className="bg-black/20 p-2 rounded border border-gray-800/50">
-                                  <div className="text-[11px] text-gray-400/70 mb-1">Expected Answer:</div>
+                                <div className="bg-[#F5EFE0]/80 p-2 rounded border border-[#9C7C38]/20">
+                                  <div className="text-[11px] text-[#0A1933]/70 mb-1">Expected Answer:</div>
                                   {isEditing ? (
                                     <textarea
                                       value={quiz.expected_answer || ''}
                                       onChange={(e) => handleUpdateQuizField(quizIndex, 'expected_answer', e.target.value)}
-                                      className="w-full bg-[#1E1E1E]/80 border border-gray-700/50 rounded-lg px-3 py-2 text-[13px] text-white min-h-[60px]"
+                                      className="w-full bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg px-3 py-2 text-[13px] text-[#0A1933] min-h-[60px]"
                                       placeholder="Enter expected answer..."
                                     />
                                   ) : (
-                                    <div className="text-[12px] text-green-400">{quiz.expected_answer}</div>
+                                    <div className="text-[12px] text-green-700">{quiz.expected_answer}</div>
                                   )}
                                 </div>
                               )}
@@ -1537,7 +1538,7 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
                                   {isEditing ? (
                                     <div className="space-y-2">
                                       <div>
-                                        <div className="text-[11px] text-green-400/70 mb-0.5">If correct:</div>
+                                        <div className="text-[11px] text-green-700/70 mb-0.5">If correct:</div>
                                         <textarea
                                           value={quiz.follow_up.if_correct || ''}
                                           onChange={(e) => {
@@ -1552,7 +1553,7 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
                                         />
                                       </div>
                                       <div>
-                                        <div className="text-[11px] text-red-400/70 mb-0.5">If incorrect:</div>
+                                        <div className="text-[11px] text-red-700/70 mb-0.5">If incorrect:</div>
                                         <textarea
                                           value={quiz.follow_up.if_incorrect || ''}
                                           onChange={(e) => {
@@ -1571,14 +1572,14 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
                                     <>
                                       {quiz.follow_up.if_correct && (
                                         <div className="mb-1">
-                                          <span className="text-[11px] text-green-400/70">If correct: </span>
-                                          <span className="text-[12px] text-gray-300">{quiz.follow_up.if_correct}</span>
+                                          <span className="text-[11px] text-green-700">If correct: </span>
+                                          <span className="text-[12px] text-[#0A1933]">{quiz.follow_up.if_correct}</span>
                                         </div>
                                       )}
                                       {quiz.follow_up.if_incorrect && (
                                         <div>
-                                          <span className="text-[11px] text-red-400/70">If incorrect: </span>
-                                          <span className="text-[12px] text-gray-300">{quiz.follow_up.if_incorrect}</span>
+                                          <span className="text-[11px] text-red-700">If incorrect: </span>
+                                          <span className="text-[12px] text-[#0A1933]">{quiz.follow_up.if_incorrect}</span>
                                         </div>
                                       )}
                                     </>
@@ -1588,17 +1589,17 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
 
                               {/* Explanation */}
                               {(quiz.explanation || isEditing) && (
-                                <div className="bg-black/20 p-2 rounded border border-gray-800/50">
-                                  <div className="text-[11px] text-gray-400/70 mb-1">Explanation:</div>
+                                <div className="bg-[#F5EFE0]/80 p-2 rounded border border-[#9C7C38]/20">
+                                  <div className="text-[11px] text-[#0A1933]/70 mb-1">Explanation:</div>
                                   {isEditing ? (
                                     <textarea
                                       value={quiz.explanation || ''}
                                       onChange={(e) => handleUpdateQuizField(quizIndex, 'explanation', e.target.value)}
-                                      className="w-full bg-[#1E1E1E]/80 border border-gray-700/50 rounded-lg px-3 py-2 text-[13px] text-white min-h-[60px]"
+                                      className="w-full bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg px-3 py-2 text-[13px] text-[#0A1933] min-h-[60px]"
                                       placeholder="Enter explanation..."
                                     />
                                   ) : (
-                                    <div className="text-[12px] text-gray-300">{quiz.explanation}</div>
+                                    <div className="text-[12px] text-[#0A1933]">{quiz.explanation}</div>
                                   )}
                                 </div>
                               )}
@@ -1613,7 +1614,7 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
                   {isEditing && (
                     <button
                       onClick={handleAddQuizItem}
-                      className="w-full py-2 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 rounded-lg text-[12px] transition-colors duration-200"
+                      className="w-full py-2 bg-[#9C7C38]/10 text-[#9C7C38] hover:bg-[#9C7C38]/20 rounded-lg text-[12px] transition-colors duration-200"
                     >
                       + Add Question
                     </button>
@@ -1628,15 +1629,15 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
       {/* Delete confirmation modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 max-w-md">
-            <h3 className="text-white text-[14px] font-medium mb-2">Delete Engagement</h3>
-            <p className="text-gray-400 text-[13px] mb-4">
+          <div className="bg-[#F5EFE0] border border-[#9C7C38]/30 rounded-lg p-4 max-w-md">
+            <h3 className="text-[#0A1933] text-[14px] font-medium mb-2">Delete Engagement</h3>
+            <p className="text-[#1E2A42] text-[13px] mb-4">
               Are you sure you want to delete this engagement opportunity? This action cannot be undone.
             </p>
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="px-3 py-1.5 bg-gray-800 text-gray-300 hover:bg-gray-700 rounded-lg text-[12px]"
+                className="px-3 py-1.5 bg-[#F5EFE0]/80 text-[#1E2A42] hover:bg-[#F5EFE0] rounded-lg text-[12px]"
               >
                 Cancel
               </button>
@@ -1645,7 +1646,7 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
                   setShowDeleteConfirm(false);
                   onDelete(engagement.id);
                 }}
-                className="px-3 py-1.5 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg text-[12px]"
+                className="px-3 py-1.5 bg-red-500/20 text-red-600 hover:bg-red-500/30 rounded-lg text-[12px]"
               >
                 Delete
               </button>
@@ -3091,14 +3092,14 @@ export default function Playground({
     const style = document.createElement('style');
     style.textContent = `
       @keyframes highlightPulse {
-        0% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.4); }
-        70% { box-shadow: 0 0 0 10px rgba(34, 211, 238, 0); }
-        100% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }
+        0% { box-shadow: 0 0 0 0 rgba(156, 124, 56, 0.4); }
+        70% { box-shadow: 0 0 0 10px rgba(156, 124, 56, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(156, 124, 56, 0); }
       }
       .highlight-pulse {
         animation: highlightPulse 1s ease-out;
-        border-color: rgba(34, 211, 238, 0.6) !important;
-        background-color: rgba(34, 211, 238, 0.1) !important;
+        border-color: rgba(156, 124, 56, 0.6) !important;
+        background-color: rgba(156, 124, 56, 0.1) !important;
       }
     `;
     document.head.appendChild(style);
@@ -3126,7 +3127,7 @@ export default function Playground({
       className={`p-1.5 rounded-lg transition-colors text-xs
         ${roomState === ConnectionState.Connected
           ? 'bg-red-500/20 text-red-400'
-          : 'bg-cyan-500/20 text-cyan-400'
+          : 'bg-[#9C7C38]/20 text-[#9C7C38]'
         }`}
     >
       {roomState === ConnectionState.Connected ? 'Disconnect' : 'Connect'}
@@ -3414,9 +3415,9 @@ export default function Playground({
   // Replace the parchmentClass variable definition:
   const sectionClass = `
     relative
-    bg-gray-900/60
-    border border-gray-700/50
-    hover:border-cyan-500/30
+    bg-[#FAF7ED]/80
+    border border-[#9C7C38]/30
+    hover:border-[#9C7C38]/50
     transition-all duration-300
     rounded-lg
     overflow-hidden
@@ -3425,43 +3426,34 @@ export default function Playground({
   `;
 
   return (
-    <div className="h-screen flex flex-col bg-[#121212] relative overflow-hidden">
+    <div className="h-screen flex flex-col bg-[#F5EFE0] relative overflow-hidden">
       {/* Hide header on mobile as before */}
       {!isMobile && (
-        <div className="h-[20px] flex items-center px-4 relative">
+        <div className="h-[0px] flex items-center px-4 relative">
           {logo}
           {/* Multi-layered border effect */}
           <div className="absolute bottom-0 left-0 right-0">
             {/* Primary glowing line */}
             <div className="absolute bottom-0 left-0 right-0 h-[1px] 
-            bg-gradient-to-r from-transparent via-cyan-500/80 to-transparent 
-            shadow-[0_0_10px_rgba(34,211,238,0.4)]
+            bg-gradient-to-r from-transparent via-[#9C7C38]/80 to-transparent 
+            shadow-[0_0_10px_rgba(156,124,56,0.4)]
             animate-pulse"
             />
 
             {/* Secondary accent lines */}
             <div className="absolute bottom-[1px] left-1/4 right-1/4 h-[1px] 
-            bg-gradient-to-r from-transparent via-cyan-400/40 to-transparent
-            shadow-[0_0_8px_rgba(34,211,238,0.3)]"
+            bg-gradient-to-r from-transparent via-[#9C7C38]/40 to-transparent
+            shadow-[0_0_8px_rgba(156,124,56,0.3)]"
             />
-
-            {/* Animated scanning effect */}
-            <div className="absolute bottom-0 left-0 right-0 h-[1px] overflow-hidden">
-              <div className="absolute inset-0 
-              bg-gradient-to-r from-transparent via-cyan-300/60 to-transparent
-              animate-[scan_4s_ease-in-out_infinite]
-              w-1/2 translate-x-full"
-              />
-            </div>
 
             {/* Edge accents */}
             <div className="absolute bottom-0 left-0 w-8 h-[2px]
-            bg-gradient-to-r from-cyan-400/80 to-transparent
-            shadow-[0_0_10px_rgba(34,211,238,0.4)]"
+            bg-gradient-to-r from-[#9C7C38]/80 to-transparent
+            shadow-[0_0_10px_rgba(156,124,56,0.4)]"
             />
             <div className="absolute bottom-0 right-0 w-8 h-[2px]
-            bg-gradient-to-l from-cyan-400/80 to-transparent
-            shadow-[0_0_10px_rgba(34,211,238,0.4)]"
+            bg-gradient-to-l from-[#9C7C38]/80 to-transparent
+            shadow-[0_0_10px_rgba(156,124,56,0.4)]"
             />
           </div>
         </div>
@@ -3553,14 +3545,14 @@ export default function Playground({
                 <PanelResizeHandle className={resizeHandleStyles.horizontal}>
                   <div className="relative w-full h-2 group">
                     <div className="absolute left-1/2 -translate-x-1/2 w-8 h-0.5 
-                      bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent 
-                      group-hover:via-cyan-400
-                      shadow-[0_0_8px_rgba(34,211,238,0.3)]
+                      bg-gradient-to-r from-transparent via-[#9C7C38]/40 to-transparent 
+                      group-hover:via-[#9C7C38]/60
+                      shadow-[0_0_8px_rgba(156,124,56,0.3)]
                       transition-all duration-300"
                     />
                     <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-[1px] overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                       <div className="absolute inset-0 w-1/3
-                        bg-gradient-to-r from-transparent via-cyan-300/40 to-transparent
+                        bg-gradient-to-r from-transparent via-[#9C7C38]/40 to-transparent
                         animate-[scan_3s_ease-in-out_infinite]"
                       />
                     </div>
@@ -3664,15 +3656,15 @@ export default function Playground({
           <motion.div
             className={`
               ${isMobile && isLandscape
-                ? 'w-[10%] h-[100dvh] border-l border-gray-800 touch-none'
-                : 'absolute right-0 top-0 bottom-0 w-[360px] border-l border-gray-700'}
-              bg-gray-900/70 backdrop-blur-md
+                ? 'w-[10%] h-[100dvh] border-l border-[#9C7C38]/30 touch-none'
+                : 'absolute right-0 top-0 bottom-0 w-[360px] border-l border-[#9C7C38]/30'}
+              bg-[#C99868]/20 backdrop-blur-sm
               z-30
               transition-transform duration-300 ease-in-out
               before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[1px]
-              before:bg-gradient-to-b before:from-transparent before:via-cyan-500/30 before:to-transparent
-              before:shadow-[0_0_10px_rgba(34,211,238,0.2)]
-              after:absolute after:inset-0 after:bg-[url('/textures/parchment.png')] after:bg-cover after:opacity-15 after:mix-multiply after:pointer-events-none
+              before:bg-gradient-to-b before:from-transparent before:via-[#9C7C38]/30 before:to-transparent
+              before:shadow-[0_0_10px_rgba(156,124,56,0.2)]
+              after:absolute after:inset-0 after:bg-[url('/textures/parchment.png')] after:bg-cover after:opacity-20 after:mix-blend-burn after:pointer-events-none
               ${isMobile ? 'overflow-hidden' : ''}
             `}
             initial={false}
@@ -3685,21 +3677,23 @@ export default function Playground({
               <button
                 onClick={() => setIsRightPanelCollapsed(!isRightPanelCollapsed)}
                 className="absolute -left-8 top-1/2 transform -translate-y-1/2
-                w-8 h-16 bg-gray-900/80 backdrop-blur-sm
+                w-8 h-16 bg-[#F5EFE0]/90 backdrop-blur-sm
                 rounded-l-lg flex items-center justify-center
-                text-gray-400 transition-all duration-300
-                border-y border-l border-gray-800/50
-                hover:border-cyan-500/30 hover:text-cyan-400
-                hover:shadow-[0_0_15px_rgba(0,255,255,0.1)]
+                text-[#9C7C38] transition-all duration-300
+                border-y border-l border-[#9C7C38]/30
+                outline outline-1 outline-offset-[-3px] outline-[#9C7C38]/20
+                hover:border-[#9C7C38]/40 hover:text-[#9C7C38]
+                hover:shadow-[0_0_10px_rgba(156,124,56,0.1)]
                 group
               "
               >
                 <motion.div
                   animate={{ rotate: isRightPanelCollapsed ? 180 : 0 }}
-                  transition={{ duration: 0.2 }}
+                  transition={{ duration: 0.3 }}
+                  className="relative z-10"
                 >
-                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
                   </svg>
                 </motion.div>
               </button>
@@ -3738,8 +3732,8 @@ export default function Playground({
                             layoutId="activeTab"
                             className="
                             absolute bottom-0 left-0 right-0 h-[2px]
-                            bg-gradient-to-r from-cyan-500 via-cyan-400 to-cyan-500/50
-                            shadow-[0_0_10px_rgba(34,211,238,0.3)]
+                            bg-gradient-to-r from-[#9C7C38]/70 via-[#9C7C38]/60 to-[#9C7C38]/40
+                            shadow-[0_0_10px_rgba(156,124,56,0.3)]
                           "
                             initial={false}
                             transition={{
@@ -3770,17 +3764,22 @@ export default function Playground({
                   `}>
                     <div className={`
                       relative px-3 py-2
-                      bg-cyan-950/30 backdrop-blur-sm
-                      border border-cyan-500/20
+                      bg-[#F5EFE0]/95 backdrop-blur-sm
+                      border border-[#9C7C38]/30
                       rounded-lg shadow-lg
-                      text-[11px] text-cyan-300/90
-                      shadow-[0_0_15px_rgba(34,211,238,0.1)]
+                      text-[11px] text-[#0A1933]
+                      shadow-[0_0_15px_rgba(156,124,56,0.1)]
                     `}>
                       <button
                         onClick={() => setIsInfoVisible(false)}
-                        className="absolute -top-1 -right-1 p-0.5 rounded-full bg-cyan-950/50 text-cyan-400/70 hover:text-cyan-400"
+                        className="absolute -top-1.5 -right-1.5 p-1 rounded-full 
+                          bg-[#9C7C38]/30 hover:bg-[#9C7C38]/40
+                          text-[#0A1933] hover:text-[#0A1933]
+                          border-2 border-[#F5EFE0]
+                          shadow-[0_0_5px_rgba(156,124,56,0.3)]
+                          transition-all duration-200"
                       >
-                        <X size={10} />
+                        <X size={12} />
                       </button>
                       Click the mic button to speak or type a message into the chat.
                     </div>
@@ -3790,15 +3789,14 @@ export default function Playground({
                   <div className={`
                     absolute inset-0
                     ${(isMobile || activeTab === 'chat') ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}
-                    transition-opacity duration-300
                   `}>
                     <div className="h-full flex flex-col">
                       {/* Sticky header - Simplified for mobile */}
-                      <div className="sticky top-0 z-10 bg-[#1a1a1a]/95 backdrop-blur-sm border-b border-gray-800 rounded-t-xl">
+                      <div className="sticky top-0 z-10 bg-[#F5EFE0]/40 backdrop-blur-sm border-b border-[#9C7C38]/10 rounded-t-xl">
                         <div className={`flex items-center justify-between ${isMobile ? 'p-1' : 'p-2'}`}>
                           {/* Brand icon - Hide text on mobile */}
                           <div className="flex items-center gap-2">
-                            <BrdgeLogo src="/new-img.png" alt="Brdge AI Logo" />
+                            <BrdgeLogo src="/stamp-logo.png" alt="Brdge AI Logo" />
                             {!isMobile && (
                               <>
                                 {/* Add BarVisualizer here */}
@@ -3825,13 +3823,12 @@ export default function Playground({
                                   className={`
                                     ml-2 p-1.5 rounded-md 
                                     ${interruptPressed
-                                      ? 'bg-cyan-600 text-cyan-100 shadow-[0_0_8px_rgba(8,145,178,0.6)]'
-                                      : 'bg-cyan-900/60 hover:bg-cyan-800/70 text-cyan-300 hover:text-cyan-200'
-                                    }
+                                      ? 'bg-[#9C7C38]/30 text-[#9C7C38] shadow-[0_0_8px_rgba(156,124,56,0.3)]'
+                                      : 'bg-[#9C7C38]/15 hover:bg-[#9C7C38]/25 text-[#9C7C38]'}
                                     ${animateInterrupt ? 'scale-105' : 'scale-100'}
                                     transition-all duration-200
                                     flex items-center gap-1.5 text-xs
-                                    border ${interruptPressed ? 'border-cyan-400' : 'border-cyan-700/50'}
+                                    border ${interruptPressed ? 'border-[#9C7C38]/20' : 'border-[#9C7C38]/0'}
                                   `}
                                   aria-label="Interrupt agent"
                                 >
@@ -3857,8 +3854,8 @@ export default function Playground({
                                 ${isMobile ? 'p-1' : 'p-1.5'}
                                 rounded-lg transition-all duration-300
                                 flex items-center gap-1.5
-                                bg-cyan-500/20 text-cyan-400
-                                hover:bg-cyan-500/30 hover:shadow-[0_0_10px_rgba(34,211,238,0.15)]
+                                bg-[#9C7C38]/20 text-[#9C7C38]
+                                hover:bg-[#9C7C38]/30 hover:shadow-[0_0_10px_rgba(156,124,56,0.15)]
                                 disabled:opacity-50 disabled:cursor-not-allowed
                                 ${isInfoVisible ? 'animate-glow' : ''}
                               `}
@@ -3877,20 +3874,20 @@ export default function Playground({
                             <div className="relative group">
                               <button
                                 className="p-1.5 rounded-lg transition-all duration-300
-                                text-cyan-400/70 hover:text-cyan-400
-                                hover:bg-cyan-500/10"
+                                text-[#9C7C38]/70 hover:text-[#9C7C38]
+                                hover:bg-[#9C7C38]/10"
                               >
                                 <Info size={isMobile ? 12 : 14} />
                               </button>
                               <div className="absolute right-0 top-full mt-2 w-64 opacity-0 group-hover:opacity-100
                                 pointer-events-none group-hover:pointer-events-auto
                                 transition-all duration-300 transform translate-y-1 group-hover:translate-y-0">
-                                <div className="bg-gray-900/95 backdrop-blur-sm rounded-lg p-3 shadow-xl
-                                  border border-cyan-500/20 text-[11px] leading-relaxed text-cyan-300/90">
-                                  <div className="font-medium mb-1 text-cyan-400">Welcome to Brdge AI!</div>
+                                <div className="bg-[#F5EFE0]/95 backdrop-blur-sm rounded-lg p-3 shadow-xl
+                                  border border-[#9C7C38]/20 text-[11px] leading-relaxed text-[#0A1933]">
+                                  <div className="font-medium mb-1 text-[#9C7C38]">Welcome to Brdge AI!</div>
                                   Watch the video while interacting with our AI voice assistant.
                                   Toggle your mic to speak or type messages to engage in real-time conversation.
-                                  <div className="mt-1 text-[10px] text-cyan-400/70">
+                                  <div className="mt-1 text-[10px] text-[#9C7C38]/70">
                                     Pro tip: Ensure your environment is quiet and free of background noise.
                                   </div>
                                 </div>
@@ -3954,63 +3951,67 @@ export default function Playground({
                       {activeTab === 'teaching-persona' && (
                         <div className="space-y-6 px-2">
                           <div className="flex items-center justify-between mb-3">
-                            <h2 className="text-[15px] font-medium text-cyan-300">Teaching Persona</h2>
+                            <h2 className={styles.header.main}>Teaching Persona</h2>
+                            {/* Update the Save Changes button in Persona tab */}
                             <motion.button
                               whileHover={{ scale: 1.02 }}
                               whileTap={{ scale: 0.98 }}
                               onClick={handleSaveConfig}
                               className={`
-                                group flex items-center gap-1.5
-                                px-3 py-1 rounded-lg
-                                ${saveSuccess ? 'from-green-500/20 to-green-400/10 border-green-500/30' : 'from-cyan-500/10 to-transparent border-cyan-500/20'}
-                                text-cyan-300 border
-                                transition-all duration-300
-                                hover:shadow-[0_0_15px_rgba(34,211,238,0.15)]
+                                flex items-center gap-1.5
+                                px-3 py-1.5 rounded-lg
+                                ${saveSuccess
+                                  ? 'bg-green-500/10 text-green-600 border-green-500/30'
+                                  : 'bg-[#9C7C38]/20 text-[#9C7C38] hover:bg-[#9C7C38]/30 border-[#9C7C38]/30 hover:border-[#9C7C38]/40'}
+                                border
+                                shadow-sm hover:shadow
+                                transition-all duration-200
+                                text-[11px] font-medium
                               `}
                             >
                               <Save size={12} />
-                              <span className="text-[11px]">Save Changes</span>
+                              <span>Save Changes</span>
                             </motion.button>
                           </div>
 
                           {/* Basic Information Section - Update styling for better spacing */}
                           <section className={sectionClass}>
                             {/* Border effect */}
-                            <div className="absolute inset-0 border border-gray-700/40 rounded-lg transition-all duration-300 group-hover:border-cyan-500/20"></div>
+                            <div className="absolute inset-0 border border-[#9C7C38]/30 rounded-lg transition-all duration-300 group-hover:border-[#9C7C38]/50"></div>
 
                             {/* Section header */}
                             <div className="flex items-center mb-2 relative z-10">
-                              <div className="w-1.5 h-1.5 rounded-full bg-amber-700/40 shadow-[0_0_5px_rgba(180,140,60,0.3)] mr-1.5"></div>
-                              <h2 className="font-serif text-[13px] font-medium tracking-[-0.01em] text-cyan-200/90">Instructor Profile</h2>
-                              <div className="h-[1px] flex-1 ml-3 bg-gradient-to-r from-amber-800/20 via-amber-700/10 to-transparent"></div>
+                              <div className="w-1.5 h-1.5 rounded-full bg-[#9C7C38]/40 shadow-[0_0_5px_rgba(156,124,56,0.3)] mr-1.5"></div>
+                              <h3 className={styles.header.sub}>Instructor Profile</h3>
+                              <div className="h-[1px] flex-1 ml-3 bg-gradient-to-r from-[#9C7C38]/20 via-[#9C7C38]/10 to-transparent"></div>
                             </div>
 
                             {/* Section content with consistent spacing */}
                             <div className="space-y-3 relative z-10">
                               {/* Name Field */}
                               <div className="relative z-10 group/field transition-all duration-300">
-                                <label className="block mb-1 text-[10px] font-medium text-gray-300/80">Name</label>
+                                <label className="block mb-1 text-[10px] font-medium text-[#0A1933]/70">Name</label>
                                 <input
                                   type="text"
                                   value={teachingPersona?.instructor_profile?.name || ''}
                                   onChange={(e) => updateTeachingPersona('instructor_profile.name', e.target.value)}
-                                  className="w-full bg-gray-800/40 border border-gray-700/50 rounded-lg
-                                  px-3 py-2 text-[12px] text-gray-100
+                                  className="w-full bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg
+                                  px-3 py-2 text-[12px] text-[#0A1933]
                                   transition-all duration-300
-                                  focus:ring-1 focus:ring-cyan-500/40 
-                                  focus:border-cyan-500/30
-                                  hover:border-cyan-600/20"
+                                  focus:ring-1 focus:ring-[#9C7C38]/40 
+                                  focus:border-[#9C7C38]/50
+                                  hover:border-[#9C7C38]/40"
                                   placeholder="Enter instructor name..."
                                 />
                               </div>
 
                               {/* Display extracted expertise level for context */}
-                              <div className="p-2.5 bg-gray-900/30 rounded-lg border border-gray-800/50">
+                              <div className="p-2.5 bg-[#F5EFE0]/80 rounded-lg border border-[#9C7C38]/20">
                                 <div className="flex items-center">
-                                  <Info size={12} className="text-gray-400/50 mr-2" />
-                                  <span className="text-[10px] text-gray-300/80">Extracted Expertise Level</span>
+                                  <Info size={12} className="text-[#1E2A42]/50 mr-2" />
+                                  <span className="text-[10px] text-[#0A1933]/70">Extracted Expertise Level</span>
                                 </div>
-                                <p className="mt-1 text-[11px] text-gray-300">
+                                <p className="mt-1 text-[11px] text-[#0A1933]">
                                   {teachingPersona?.instructor_profile?.apparent_expertise_level || 'No expertise level detected'}
                                 </p>
                               </div>
@@ -4020,29 +4021,29 @@ export default function Playground({
                           {/* Communication Style Section */}
                           <section className={sectionClass}>
                             {/* Border effect */}
-                            <div className="absolute inset-0 border border-gray-700/40 rounded-lg transition-all duration-300 group-hover:border-cyan-500/20"></div>
+                            <div className="absolute inset-0 border border-[#9C7C38]/30 rounded-lg transition-all duration-300 group-hover:border-[#9C7C38]/50"></div>
 
                             {/* Section header */}
                             <div className="flex items-center mb-2 relative z-10">
-                              <div className="w-1.5 h-1.5 rounded-full bg-gray-300/70 shadow-[0_0_5px_rgba(180,180,180,0.5)] mr-1.5"></div>
-                              <h2 className={styles.header.sub}>Communication Style</h2>
+                              <div className="w-1.5 h-1.5 rounded-full bg-[#9C7C38]/40 shadow-[0_0_5px_rgba(156,124,56,0.3)] mr-1.5"></div>
+                              <h3 className={styles.header.sub}>Communication Style</h3>
                             </div>
 
                             {/* Section content with consistent spacing */}
                             <div className="space-y-3 relative z-10">
                               {/* Communication Style Field */}
                               <div className="relative z-10 group/field transition-all duration-300">
-                                <label className="block mb-1 text-[10px] font-medium text-cyan-400/80">Overall Style</label>
+                                <label className="block mb-1 text-[10px] font-medium text-[#0A1933]/70">Overall Style</label>
                                 <input
                                   type="text"
                                   value={teachingPersona?.communication_patterns?.vocabulary_level || ''}
                                   onChange={(e) => updateTeachingPersona('communication_patterns.vocabulary_level', e.target.value)}
-                                  className="w-full bg-gray-800/40 border border-gray-700/50 rounded-lg
-                                  px-3 py-2 text-[12px] text-gray-100
+                                  className="w-full bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg
+                                  px-3 py-2 text-[12px] text-[#0A1933]
                                   transition-all duration-300
-                                  focus:ring-1 focus:ring-cyan-500/40 
-                                  focus:border-cyan-500/30
-                                  hover:border-cyan-600/20"
+                                  focus:ring-1 focus:ring-[#9C7C38]/40 
+                                  focus:border-[#9C7C38]/50
+                                  hover:border-[#9C7C38]/40"
                                   placeholder="Professional, casual, technical, etc."
                                 />
 
@@ -4058,8 +4059,8 @@ export default function Playground({
                                         transition-all duration-300
                                         border 
                                         ${teachingPersona?.communication_patterns?.vocabulary_level === style
-                                          ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
-                                          : 'bg-gray-800/30 text-gray-400 border-gray-800/50 hover:text-gray-300 hover:border-gray-700'
+                                          ? 'bg-[#9C7C38]/20 text-[#9C7C38] border-[#9C7C38]/30'
+                                          : 'bg-[#F5EFE0]/70 text-[#1E2A42] border-[#9C7C38]/20 hover:text-[#0A1933] hover:border-[#9C7C38]/30'
                                         }
                                       `}
                                     >
@@ -4071,7 +4072,7 @@ export default function Playground({
 
                               {/* Recurring Phrases */}
                               <div className="relative z-10 group/field transition-all duration-300">
-                                <label className="block mb-1 text-[10px] font-medium text-cyan-400/80">Characteristic Phrases</label>
+                                <label className="block mb-1 text-[10px] font-medium text-[#0A1933]/70">Characteristic Phrases</label>
                                 <textarea
                                   value={phrasesText}
                                   onChange={(e) => {
@@ -4091,15 +4092,15 @@ export default function Playground({
 
                                     updateTeachingPersona('communication_patterns.recurring_phrases', phrases);
                                   }}
-                                  className="w-full bg-gray-800/40 border border-gray-700/50 rounded-lg
-                                  px-3 py-2 text-[12px] text-gray-100 min-h-[70px]
+                                  className="w-full bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg
+                                  px-3 py-2 text-[12px] text-[#0A1933] min-h-[70px]
                                   transition-all duration-300
-                                  focus:ring-1 focus:ring-cyan-500/40 
-                                  focus:border-cyan-500/30
-                                  hover:border-cyan-600/20 resize-y"
+                                  focus:ring-1 focus:ring-[#9C7C38]/40 
+                                  focus:border-[#9C7C38]/50
+                                  hover:border-[#9C7C38]/40 resize-y"
                                   placeholder="Enter phrases the instructor frequently uses (one per line)..."
                                 />
-                                <div className="mt-0.5 text-[9px] text-gray-500/80 px-1 italic">
+                                <div className="mt-0.5 text-[9px] text-[#1E2A42]/60 px-1 italic">
                                   These phrases will be used by the AI to sound more like the actual instructor
                                 </div>
                               </div>
@@ -4111,40 +4112,40 @@ export default function Playground({
                           {/* Display-Only Teaching Insights Section */}
                           <section className={sectionClass}>
                             {/* Border effect */}
-                            <div className="absolute inset-0 border border-gray-700/40 rounded-lg transition-all duration-300 group-hover:border-cyan-500/20"></div>
+                            <div className="absolute inset-0 border border-[#9C7C38]/30 rounded-lg transition-all duration-300 group-hover:border-[#9C7C38]/50"></div>
 
                             {/* Section header */}
                             <div className="flex items-center mb-2 relative z-10">
-                              <div className="w-1.5 h-1.5 rounded-full bg-gray-300/70 shadow-[0_0_5px_rgba(180,180,180,0.5)] mr-1.5"></div>
-                              <h2 className={styles.header.sub}>Teaching Insights</h2>
-                              <span className="ml-2 text-[9px] px-2 py-0.5 bg-cyan-500/10 rounded-full text-cyan-400/80">Auto-Extracted</span>
+                              <div className="w-1.5 h-1.5 rounded-full bg-[#9C7C38]/40 shadow-[0_0_5px_rgba(156,124,56,0.3)] mr-1.5"></div>
+                              <h3 className={styles.header.sub}>Teaching Insights</h3>
+                              <span className="ml-2 text-[9px] px-2 py-0.5 bg-[#9C7C38]/10 rounded-full text-[#0A1933]/80 font-medium">Auto-Extracted</span>
                             </div>
 
                             {/* Section content with consistent spacing */}
                             <div className="grid grid-cols-1 gap-2 relative z-10">
                               {/* Speech Characteristics Card */}
-                              <div className="p-2.5 bg-gray-900/30 rounded-lg border border-gray-800/50">
+                              <div className="p-2.5 bg-[#F5EFE0]/80 rounded-lg border border-[#9C7C38]/20">
                                 <div className="flex justify-between items-center">
-                                  <h3 className="text-[12px] font-medium text-cyan-300/90">Speech Style</h3>
+                                  <h3 className="text-[12px] font-medium text-[#9C7C38]">Speech Style</h3>
                                 </div>
-                                <p className="mt-1 text-[11px] text-gray-400/90">
+                                <p className="mt-1 text-[11px] text-[#0A1933]/90">
                                   {teachingPersona?.speech_characteristics?.accent?.type || 'No accent detected'}
                                 </p>
-                                <p className="mt-1 text-[11px] text-gray-400/90">
+                                <p className="mt-1 text-[11px] text-[#0A1933]/90">
                                   Cadence: {teachingPersona?.speech_characteristics?.accent?.cadence || 'Not detected'}
                                 </p>
                               </div>
 
                               {/* Pedagogical Approach Card */}
-                              <div className="p-2.5 bg-gray-900/30 rounded-lg border border-gray-800/50">
+                              <div className="p-2.5 bg-[#F5EFE0]/80 rounded-lg border border-[#9C7C38]/20">
                                 <div className="flex justify-between items-center">
-                                  <h3 className="text-[12px] font-medium text-cyan-300/90">Teaching Approach</h3>
+                                  <h3 className="text-[12px] font-medium text-[#9C7C38]">Teaching Approach</h3>
                                 </div>
                                 <div className="mt-1 space-y-1">
                                   {teachingPersona?.pedagogical_approach?.explanation_techniques?.map((technique: any, idx: number) => (
                                     <div key={idx} className="flex items-start">
-                                      <span className="text-cyan-400/80 mt-1 text-[9px] mr-1">•</span>
-                                      <p className="text-[11px] text-gray-400/90">
+                                      <span className="text-[#9C7C38]/80 mt-1 text-[9px] mr-1">•</span>
+                                      <p className="text-[11px] text-[#0A1933]/90">
                                         {technique.technique}: {technique.example}
                                       </p>
                                     </div>
@@ -4153,19 +4154,19 @@ export default function Playground({
                               </div>
 
                               {/* Emotional Patterns Card */}
-                              <div className="p-2.5 bg-gray-900/30 rounded-lg border border-gray-800/50">
+                              <div className="p-2.5 bg-[#F5EFE0]/80 rounded-lg border border-[#9C7C38]/20">
                                 <div className="flex justify-between items-center">
-                                  <h3 className="text-[12px] font-medium text-cyan-300/90">Emotional Patterns</h3>
+                                  <h3 className="text-[12px] font-medium text-[#9C7C38]">Emotional Patterns</h3>
                                 </div>
-                                <p className="mt-1 text-[11px] text-gray-400/90">
+                                <p className="mt-1 text-[11px] text-[#0A1933]/90">
                                   Humor Style: {teachingPersona?.emotional_teaching_patterns?.humor_style?.type || 'None detected'}
                                 </p>
                                 {teachingPersona?.emotional_teaching_patterns?.enthusiasm_triggers?.map((trigger: any, idx: number) => (
                                   <div key={idx} className="mt-1">
-                                    <p className="text-[11px] text-cyan-400/80">
+                                    <p className="text-[11px] text-[#9C7C38]/80">
                                       {trigger.topic}:
                                     </p>
-                                    <p className="text-[11px] text-gray-400/90">
+                                    <p className="text-[11px] text-[#0A1933]/90">
                                       {trigger.vocal_cues}
                                     </p>
                                   </div>
@@ -4181,10 +4182,10 @@ export default function Playground({
                           ${activeTab === 'voice-clone' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}
                           transition-opacity duration-300
                         `}>
-                          <div className="mb-3 border-b border-gray-800/30 pb-3">
+                          <div className="mb-3 border-b border-[#9C7C38]/30 pb-3">
                             <div className="flex items-center justify-between mb-1">
                               <h2 className={styles.header.main}>Voice Configuration</h2>
-                              <div className="h-[1px] flex-1 mx-4 bg-gradient-to-r from-transparent via-gray-700/50 to-transparent" />
+                              <div className="h-[1px] flex-1 mx-4 bg-gradient-to-r from-transparent via-[#9C7C38]/30 to-transparent" />
                             </div>
 
                             {/* Default voice and voice selector section */}
@@ -4279,15 +4280,15 @@ export default function Playground({
                             </div>
 
                             {/* Voice information card */}
-                            <div className="bg-gray-900/40 backdrop-blur-sm rounded-lg p-4 border border-gray-800/50 mb-6">
+                            <div className="bg-[#F5EFE0]/80 backdrop-blur-sm rounded-lg p-4 border border-[#9C7C38]/20 mb-6">
                               <div className="flex items-center justify-between mb-3">
-                                <h3 className="text-white/80 text-[13px] font-medium">Current Voice</h3>
+                                <h3 className="text-[#0A1933] text-[13px] font-medium">Current Voice</h3>
                                 <div className={`px-2 py-0.5 rounded-md border text-[10px]
                                   ${selectedVoice === "default" || !selectedVoice
-                                    ? "bg-cyan-500/10 border-cyan-500/20 text-cyan-400/80"
+                                    ? "bg-[#9C7C38]/10 border-[#9C7C38]/20 text-[#9C7C38]"
                                     : selectedVoiceBrdgeId === params.brdgeId
-                                      ? "bg-cyan-500/10 border-cyan-500/20 text-cyan-400/80"
-                                      : "bg-purple-500/10 border-purple-500/20 text-purple-400/80"
+                                      ? "bg-[#9C7C38]/10 border-[#9C7C38]/20 text-[#9C7C38]"
+                                      : "bg-[#B89F63]/10 border-[#B89F63]/20 text-[#B89F63]"
                                   }`}
                                 >
                                   {selectedVoice === "default" || !selectedVoice
@@ -4302,30 +4303,30 @@ export default function Playground({
                               {selectedVoice === "default" || !selectedVoice ? (
                                 <div>
                                   <div className="flex items-center gap-2 mb-2">
-                                    <Volume2 size={14} className="text-cyan-400" />
-                                    <span className="text-[13px] text-white">Default AI Voice</span>
+                                    <Volume2 size={14} className="text-[#9C7C38]" />
+                                    <span className="text-[13px] text-[#0A1933]">Default AI Voice</span>
                                   </div>
-                                  <p className="text-gray-400 text-[12px] leading-relaxed">
+                                  <p className="text-[#1E2A42] text-[12px] leading-relaxed">
                                     Using the standard AI voice for this brdge. This voice is designed to be clear and natural sounding.
                                   </p>
                                 </div>
                               ) : (
                                 <div>
                                   <div className="flex items-center gap-2 mb-2">
-                                    <Radio size={14} className={selectedVoiceBrdgeId === params.brdgeId ? "text-cyan-400" : "text-purple-400"} />
-                                    <span className="text-[13px] text-white">
+                                    <Radio size={14} className={selectedVoiceBrdgeId === params.brdgeId ? "text-[#9C7C38]" : "text-[#B89F63]"} />
+                                    <span className="text-[13px] text-[#0A1933]">
                                       {allVoices.find(v => v.id === selectedVoice)?.name || 'Custom Voice'}
                                     </span>
                                   </div>
                                   {selectedVoiceBrdgeId !== params.brdgeId && (
-                                    <div className="bg-purple-500/5 border border-purple-500/10 rounded-md px-2 py-1 mb-2 text-[11px] text-purple-200/80">
+                                    <div className="bg-[#B89F63]/5 border border-[#B89F63]/10 rounded-md px-2 py-1 mb-2 text-[11px] text-[#0A1933]/80">
                                       From: {allVoices.find(v => v.id === selectedVoice)?.brdge_name || 'Another Project'}
                                     </div>
                                   )}
-                                  <p className="text-gray-400 text-[12px] leading-relaxed">
+                                  <p className="text-[#1E2A42] text-[12px] leading-relaxed">
                                     Using {selectedVoiceBrdgeId === params.brdgeId ? 'your' : 'a'} custom voice clone. This personalized voice will be used when the AI speaks.
                                   </p>
-                                  <div className="text-[10px] text-gray-500 mt-2">
+                                  <div className="text-[10px] text-[#1E2A42]/60 mt-2">
                                     Created: {allVoices.find(v => v.id === selectedVoice)?.created_at
                                       ? new Date(allVoices.find(v => v.id === selectedVoice)!.created_at).toLocaleDateString()
                                       : 'Unknown'}
@@ -4336,7 +4337,7 @@ export default function Playground({
 
                             {/* Create New Voice / Custom Voices section */}
                             <div className="flex items-center justify-between mb-4">
-                              <h3 className={styles.header.sub}>Custom Voices</h3>
+                              <h3 className="text-[13px] font-medium text-[#0A1933]">Custom Voices</h3>
                               <motion.button
                                 whileHover={{ scale: 1.02 }}
                                 whileTap={{ scale: 0.98 }}
@@ -4344,11 +4345,11 @@ export default function Playground({
                                 className={`
                                   group flex items-center gap-1.5
                                   px-3 py-1.5 rounded-lg
-                                  bg-gradient-to-r from-cyan-500/10 to-transparent
-                                  text-cyan-400 border border-cyan-500/20
+                                  bg-gradient-to-r from-[#9C7C38]/10 to-transparent
+                                  text-[#9C7C38] border border-[#9C7C38]/20
                                   transition-all duration-300
-                                  hover:border-cyan-500/40
-                                  hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]
+                                  hover:border-[#9C7C38]/40
+                                  hover:shadow-[0_0_15px_rgba(156,124,56,0.1)]
                                   ${isCreatingVoice ? 'opacity-50 pointer-events-none' : ''}
                                 `}
                               >
@@ -4359,19 +4360,19 @@ export default function Playground({
 
                             {isCreatingVoice ? (
                               // Voice Creation Section - Using existing recording UI with better styling
-                              <div className="space-y-4 bg-gray-900/30 rounded-lg p-4 border border-gray-800/50">
+                              <div className="space-y-4 bg-[#F5EFE0]/70 rounded-lg p-4 border border-[#9C7C38]/20">
                                 <div className="flex items-center justify-between mb-2">
-                                  <h4 className="text-[13px] text-white/80 font-medium">Create Voice Clone</h4>
+                                  <h4 className="text-[13px] text-[#0A1933] font-medium">Create Voice Clone</h4>
                                   <button
                                     onClick={() => setIsCreatingVoice(false)}
-                                    className="p-1 rounded hover:bg-gray-800/50 text-gray-400 hover:text-gray-300"
+                                    className="p-1 rounded hover:bg-[#F5EFE0] text-[#1E2A42] hover:text-[#0A1933]"
                                   >
                                     <X size={14} />
                                   </button>
                                 </div>
 
                                 <div className="space-y-3">
-                                  <h5 className="text-[12px] text-cyan-400/80">Record a short sample of your voice:</h5>
+                                  <h5 className="text-[12px] text-[#9C7C38]">Record a short sample of your voice:</h5>
                                   <ul className="space-y-2">
                                     {[
                                       'Record 10-20 seconds of clear speech',
@@ -4379,16 +4380,16 @@ export default function Playground({
                                       'Avoid background noise and echoes'
                                     ].map((text, i) => (
                                       <li key={i} className="flex items-start gap-2">
-                                        <span className="text-cyan-400/80 mt-1 text-[10px]">•</span>
-                                        <span className="font-satoshi text-[12px] text-gray-400/80">{text}</span>
+                                        <span className="text-[#9C7C38] mt-1 text-[10px]">•</span>
+                                        <span className="font-satoshi text-[12px] text-[#1E2A42]">{text}</span>
                                       </li>
                                     ))}
                                   </ul>
                                 </div>
 
-                                <div className="bg-black/20 rounded-lg p-3 border border-gray-800/50">
-                                  <h5 className="text-[12px] text-gray-300/90 mb-2">Sample text to read:</h5>
-                                  <p className="text-[12px] text-gray-400/90 leading-relaxed italic">
+                                <div className="bg-[#F5EFE0]/90 rounded-lg p-3 border border-[#9C7C38]/20">
+                                  <h5 className="text-[12px] text-[#0A1933]/90 mb-2">Sample text to read:</h5>
+                                  <p className="text-[12px] text-[#1E2A42] leading-relaxed italic">
                                     &ldquo;In just a few quick steps my voice based AI assistant will be integrated into my content.
                                     This way you can speak to others without being there... how cool is that?&rdquo;
                                   </p>
@@ -4400,12 +4401,12 @@ export default function Playground({
                                     value={voiceName}
                                     onChange={(e) => setVoiceName(e.target.value)}
                                     placeholder="Enter voice name"
-                                    className="w-full bg-[#1E1E1E]/80 border border-gray-700/50 rounded-lg
-                                    px-3 py-2.5 text-[13px] text-white
+                                    className="w-full bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg
+                                    px-3 py-2.5 text-[13px] text-[#0A1933]
                                     transition-all duration-300
-                                    focus:ring-1 focus:ring-cyan-500/50 
-                                    focus:border-cyan-500/30
-                                    hover:border-cyan-500/20"
+                                    focus:ring-1 focus:ring-[#9C7C38]/40 
+                                    focus:border-[#9C7C38]/50
+                                    hover:border-[#9C7C38]/40"
                                   />
 
                                   <button
@@ -4415,11 +4416,11 @@ export default function Playground({
                                       transition-all duration-300
                                       flex items-center justify-center gap-2
                                       ${isRecording
-                                        ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                                        : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
+                                        ? 'bg-red-500/20 text-red-600 hover:bg-red-500/30'
+                                        : 'bg-[#9C7C38]/20 text-[#9C7C38] hover:bg-[#9C7C38]/30'
                                       }
-                                      shadow-[0_0_15px_rgba(0,255,255,0.1)]
-                                      hover:shadow-[0_0_20px_rgba(0,255,255,0.15)]
+                                      shadow-[0_0_15px_rgba(156,124,56,0.1)]
+                                      hover:shadow-[0_0_20px_rgba(156,124,56,0.15)]
                                     `}
                                   >
                                     <span className={`
@@ -4440,7 +4441,7 @@ export default function Playground({
                                 {/* Recording Preview */}
                                 {currentRecording && (
                                   <div className="space-y-2">
-                                    <div className="bg-gray-800/30 rounded-lg p-2">
+                                    <div className="bg-[#F5EFE0]/80 rounded-lg p-2 border border-[#9C7C38]/20">
                                       <audio
                                         src={URL.createObjectURL(currentRecording)}
                                         controls
@@ -4454,10 +4455,10 @@ export default function Playground({
                                         w-full px-4 py-2.5 rounded-lg text-[13px] font-medium
                                         transition-all duration-300
                                         transform hover:-translate-y-0.5
-                                        bg-cyan-500/20 text-cyan-400 
-                                        hover:bg-cyan-500/30 
-                                        shadow-[0_0_15px_rgba(0,255,255,0.1)]
-                                        hover:shadow-[0_0_20px_rgba(0,255,255,0.15)]
+                                        bg-[#9C7C38]/20 text-[#9C7C38] 
+                                        hover:bg-[#9C7C38]/30 
+                                        shadow-[0_0_15px_rgba(156,124,56,0.1)]
+                                        hover:shadow-[0_0_20px_rgba(156,124,56,0.15)]
                                         disabled:opacity-50 disabled:cursor-not-allowed
                                         disabled:hover:transform-none
                                       `}
@@ -4478,12 +4479,12 @@ export default function Playground({
                               // Voice List Section - show as cards with better UI
                               <div className="space-y-2">
                                 {savedVoices.length === 0 ? (
-                                  <div className="text-center py-10 px-4 bg-gray-900/30 rounded-lg border border-gray-800/50">
+                                  <div className="text-center py-10 px-4 bg-[#F5EFE0]/60 rounded-lg border border-[#9C7C38]/30">
                                     <div className="mb-3 opacity-50">
-                                      <Volume2 size={24} className="mx-auto text-gray-500" />
+                                      <Volume2 size={24} className="mx-auto text-[#1E2A42]/50" />
                                     </div>
-                                    <div className="text-gray-400 text-[13px]">No custom voices yet</div>
-                                    <div className="mt-1 text-[12px] text-gray-500">
+                                    <div className="text-[#0A1933] text-[13px]">No custom voices yet</div>
+                                    <div className="mt-1 text-[12px] text-[#1E2A42]/70">
                                       Create a custom voice to make your AI sound more like you
                                     </div>
                                   </div>
@@ -4497,9 +4498,9 @@ export default function Playground({
                                           relative p-4 rounded-lg
                                           transition-all duration-300
                                           ${selectedVoice === voice.id
-                                            ? 'bg-cyan-950/30 border border-cyan-500/20 shadow-[0_0_15px_rgba(34,211,238,0.07)]'
-                                            : 'bg-gray-900/40 border border-gray-800/50'}
-                                          hover:border-cyan-500/20
+                                            ? 'bg-[#9C7C38]/10 border border-[#9C7C38]/30 shadow-[0_0_15px_rgba(156,124,56,0.07)]'
+                                            : 'bg-[#F5EFE0]/70 border border-[#9C7C38]/20'}
+                                          hover:border-[#9C7C38]/40
                                           group cursor-pointer
                                         `}
                                         onClick={() => {
@@ -4559,8 +4560,8 @@ export default function Playground({
                                           <div className={`
                                             p-2.5 rounded-full 
                                             ${selectedVoice === voice.id
-                                              ? 'bg-cyan-500/20 text-cyan-400'
-                                              : 'bg-gray-800/50 text-gray-500'}
+                                              ? 'bg-[#9C7C38]/20 text-[#9C7C38]'
+                                              : 'bg-[#F5EFE0] text-[#1E2A42]/50'}
                                             transition-all duration-300
                                           `}>
                                             <Volume2 size={14} />
@@ -4570,17 +4571,17 @@ export default function Playground({
                                             <div className="flex items-center gap-2">
                                               <h4 className={`
                                                 text-[14px] truncate
-                                                ${selectedVoice === voice.id ? 'text-cyan-300' : 'text-white'}
+                                                ${selectedVoice === voice.id ? 'text-[#9C7C38]' : 'text-[#0A1933]'}
                                               `}>
                                                 {voice.name}
                                               </h4>
                                               {selectedVoice === voice.id && (
-                                                <span className="text-[10px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded">
+                                                <span className="text-[10px] text-[#9C7C38] bg-[#9C7C38]/10 px-1.5 py-0.5 rounded">
                                                   Active
                                                 </span>
                                               )}
                                             </div>
-                                            <p className="text-[11px] text-gray-500 mt-0.5">
+                                            <p className="text-[11px] text-[#1E2A42]/60 mt-0.5">
                                               Created {new Date(voice.created_at).toLocaleDateString()}
                                             </p>
                                           </div>
@@ -4596,7 +4597,7 @@ export default function Playground({
                       )}
                       {activeTab === 'share' && (
                         <div className={`
-                          h-full pt-0 overflow-y-auto max-h-[calc(100vh-160px)]
+                          h-full pt-0 overflow-y-auto
                           ${activeTab === 'share' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}
                           transition-opacity duration-300
                         `}>
@@ -4604,38 +4605,37 @@ export default function Playground({
                             <h2 className={styles.header.main}>Sharing Configuration</h2>
                           </div>
 
-                          {/* ...existing share tab content... */}
-                          <div className="mb-6 border-b border-gray-800/30 pb-3">
+                          <div className="mb-6 pb-12 border-b border-[#9C7C38]/30">
                             {/* Public/Private Toggle Section */}
                             <section className={sectionClass}>
                               {/* Background and border effects */}
-                              <div className="absolute inset-0 border border-gray-800/50 rounded-lg transition-all duration-300 group-hover:border-cyan-500/20 group-hover:shadow-[0_0_15px_rgba(34,211,238,0.05)]"></div>
-                              <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/[0.02] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 rounded-lg"></div>
+                              <div className="absolute inset-0 border border-[#9C7C38]/30 rounded-lg transition-all duration-300 group-hover:border-[#9C7C38]/50 group-hover:shadow-[0_0_15px_rgba(156,124,56,0.05)]"></div>
+                              <div className="absolute inset-0 bg-gradient-to-b from-[#9C7C38]/[0.02] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 rounded-lg"></div>
 
                               {/* Section Header */}
                               <div className="flex items-center mb-2 relative z-10">
-                                <div className="w-1.5 h-1.5 rounded-full bg-cyan-400/70 shadow-[0_0_5px_rgba(34,211,238,0.5)] mr-1.5"></div>
+                                <div className="w-1.5 h-1.5 rounded-full bg-[#9C7C38]/70 shadow-[0_0_5px_rgba(156,124,56,0.5)] mr-1.5"></div>
                                 <h2 className={styles.header.sub}>Public Access</h2>
-                                <div className="h-[1px] flex-1 ml-2 mr-1 bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent"></div>
+                                <div className="h-[1px] flex-1 ml-2 mr-1 bg-gradient-to-r from-transparent via-[#9C7C38]/20 to-transparent"></div>
                               </div>
 
                               {/* Toggle control */}
-                              <div className="flex items-center justify-between p-4 bg-gray-900/40 backdrop-blur-sm rounded-lg border border-gray-800/50 hover:border-cyan-500/20 transition-all duration-300 relative z-10">
+                              <div className="flex items-center justify-between p-4 bg-[#F5EFE0]/80 backdrop-blur-sm rounded-lg border border-[#9C7C38]/30 hover:border-[#9C7C38]/50 transition-all duration-300 relative z-10">
                                 <div className="flex flex-col">
                                   <div className="flex items-center gap-2">
                                     {brdge?.shareable ? (
                                       <>
-                                        <Globe size={18} className="text-cyan-400 filter drop-shadow-[0_0_8px_rgba(34,211,238,0.4)]" />
-                                        <h3 className="text-[14px] font-medium text-cyan-400">Public</h3>
+                                        <Globe size={18} className="text-[#9C7C38] filter drop-shadow-[0_0_8px_rgba(156,124,56,0.4)]" />
+                                        <h3 className="text-[14px] font-medium text-[#9C7C38]">Public</h3>
                                       </>
                                     ) : (
                                       <>
-                                        <Lock size={18} className="text-gray-400" />
-                                        <h3 className="text-[14px] font-medium text-gray-400">Private</h3>
+                                        <Lock size={18} className="text-[#1E2A42]" />
+                                        <h3 className="text-[14px] font-medium text-[#1E2A42]">Private</h3>
                                       </>
                                     )}
                                   </div>
-                                  <p className="text-[12px] text-gray-400 mt-1">
+                                  <p className="text-[12px] text-[#0A1933]/70 mt-1">
                                     {brdge?.shareable
                                       ? "Anyone with the link can view this bridge"
                                       : "Only you can view this bridge"}
@@ -4656,48 +4656,48 @@ export default function Playground({
                                       after:bg-white after:rounded-full after:h-5 after:w-5
                                       after:transition-all peer-checked:after:translate-x-full
                                       ${brdge?.shareable
-                                        ? 'bg-cyan-500/30 border-cyan-500/50 after:shadow-[0_0_8px_rgba(34,211,238,0.4)]'
-                                        : 'bg-gray-800 border-gray-700'}
-                                      border transition-all duration-300
-                                    `}></div>
+                                        ? 'bg-[#9C7C38]/30 border-[#9C7C38]/50 after:shadow-[0_0_8px_rgba(156,124,56,0.4)]'
+                                        : 'bg-[#F5EFE0] border-[#9C7C38]/20'}
+                                    border transition-all duration-300
+                                  `}></div>
                                   </label>
                                 </div>
                               </div>
                             </section>
 
                             {/* Share Link Section */}
-                            <section className={sectionClass}>
+                            <section className={`${sectionClass} mt-6`}>
                               {/* Background and border effects */}
-                              <div className="absolute inset-0 border border-gray-800/50 rounded-lg transition-all duration-300 group-hover:border-cyan-500/20 group-hover:shadow-[0_0_15px_rgba(34,211,238,0.05)]"></div>
-                              <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/[0.02] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 rounded-lg"></div>
+                              <div className="absolute inset-0 border border-[#9C7C38]/30 rounded-lg transition-all duration-300 group-hover:border-[#9C7C38]/50 group-hover:shadow-[0_0_15px_rgba(156,124,56,0.05)]"></div>
+                              <div className="absolute inset-0 bg-gradient-to-b from-[#9C7C38]/[0.02] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 rounded-lg"></div>
 
                               {/* Section Header */}
                               <div className="flex items-center mb-2 relative z-10">
-                                <div className="w-1.5 h-1.5 rounded-full bg-cyan-400/70 shadow-[0_0_5px_rgba(34,211,238,0.5)] mr-1.5"></div>
+                                <div className="w-1.5 h-1.5 rounded-full bg-[#9C7C38]/70 shadow-[0_0_5px_rgba(156,124,56,0.5)] mr-1.5"></div>
                                 <h2 className={styles.header.sub}>Share Link</h2>
-                                <div className="h-[1px] flex-1 ml-2 mr-1 bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent"></div>
+                                <div className="h-[1px] flex-1 ml-2 mr-1 bg-gradient-to-r from-transparent via-[#9C7C38]/20 to-transparent"></div>
                               </div>
 
                               {/* Link display and copy button */}
                               <div className={`
-                                relative p-4 bg-gray-900/40 backdrop-blur-sm rounded-lg
+                                relative p-4 bg-[#F5EFE0]/80 backdrop-blur-sm rounded-lg
                                 border transition-all duration-300 z-10
                                 ${brdge?.shareable
-                                  ? 'border-cyan-500/20 hover:border-cyan-500/30 hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]'
-                                  : 'border-gray-800/50 opacity-50'}
+                                  ? 'border-[#9C7C38]/30 hover:border-[#9C7C38]/50 hover:shadow-[0_0_15px_rgba(156,124,56,0.1)]'
+                                  : 'border-[#9C7C38]/20 opacity-50'}
                               `}>
                                 {brdge?.shareable ? (
                                   <div className="flex flex-col space-y-3">
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-2">
-                                        <Link size={15} className="text-cyan-400" />
-                                        <span className="text-[13px] text-white">Shareable Link</span>
+                                        <Link size={15} className="text-[#9C7C38]" />
+                                        <span className="text-[13px] text-[#0A1933]">Shareable Link</span>
                                       </div>
                                       <a
                                         href={shareableLink}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="flex items-center gap-1 text-[11px] text-cyan-400 hover:text-cyan-300 transition-colors"
+                                        className="flex items-center gap-1 text-[11px] text-[#9C7C38] hover:text-[#B89F63] transition-colors"
                                       >
                                         <span>Open</span>
                                         <ExternalLink size={11} />
@@ -4705,7 +4705,7 @@ export default function Playground({
                                     </div>
 
                                     <div className="flex items-center gap-2">
-                                      <div className="flex-1 px-3 py-2 bg-black/30 border border-gray-800/50 rounded-lg text-[13px] text-gray-300 truncate">
+                                      <div className="flex-1 px-3 py-2 bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg text-[13px] text-[#0A1933] truncate">
                                         {shareableLink}
                                       </div>
                                       <button
@@ -4713,17 +4713,17 @@ export default function Playground({
                                         className={`
                                           p-2 rounded-lg transition-all duration-300
                                           ${isCopied
-                                            ? 'bg-green-500/10 text-green-400'
-                                            : 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20'}
+                                            ? 'bg-green-500/10 text-green-600'
+                                            : 'bg-[#9C7C38]/10 text-[#9C7C38] hover:bg-[#9C7C38]/20'}
                                         `}
                                       >
                                         {isCopied ? <Check size={18} /> : <Copy size={18} />}
                                       </button>
                                     </div>
 
-                                    <div className="text-[11px] text-gray-500">
+                                    <div className="text-[11px] text-[#1E2A42]/70">
                                       {isCopied ? (
-                                        <span className="text-green-400">✓ Link copied to clipboard!</span>
+                                        <span className="text-green-600">✓ Link copied to clipboard!</span>
                                       ) : (
                                         "Share this link with anyone you want to give access to your bridge"
                                       )}
@@ -4731,8 +4731,8 @@ export default function Playground({
                                   </div>
                                 ) : (
                                   <div className="flex flex-col items-center justify-center py-4">
-                                    <Lock size={24} className="text-gray-500 mb-2" />
-                                    <p className="text-[13px] text-gray-400 text-center">
+                                    <Lock size={24} className="text-[#1E2A42]/50 mb-2" />
+                                    <p className="text-[13px] text-[#0A1933]/70 text-center">
                                       Enable public access to get a shareable link
                                     </p>
                                   </div>
@@ -4741,18 +4741,18 @@ export default function Playground({
                             </section>
 
                             {/* Privacy Information */}
-                            <div className="bg-gray-900/20 border border-gray-800/30 rounded-lg p-3 mt-6">
+                            <section className={`${sectionClass} mt-6`}>
                               <div className="flex items-start gap-2">
-                                <Info size={14} className="text-gray-400 mt-0.5" />
+                                <Info size={14} className="text-[#1E2A42]/70 mt-0.5" />
                                 <div>
-                                  <h4 className="text-[12px] font-medium text-white/80 mb-1">Privacy Information</h4>
-                                  <p className="text-[11px] text-gray-400 leading-relaxed">
+                                  <h4 className="text-[12px] font-medium text-[#0A1933] mb-1">Privacy Information</h4>
+                                  <p className="text-[11px] text-[#1E2A42]/80 leading-relaxed">
                                     When shared publicly, anyone with the link can view and interact with your bridge.
                                     You can disable public access at any time by toggling the switch above.
                                   </p>
                                 </div>
                               </div>
-                            </div>
+                            </section>
                           </div>
                         </div>
                       )}
@@ -4762,14 +4762,18 @@ export default function Playground({
                           {activeTab === 'engagement' && (
                             <div className="space-y-6 px-2">
                               <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-[15px] font-medium text-cyan-300 tracking-wide">Engagement Opportunities</h2>
+                                <h2 className={styles.header.main}>Engagement Opportunities</h2>
                                 <motion.button
                                   whileHover={{ scale: 1.02 }}
                                   whileTap={{ scale: 0.98 }}
                                   onClick={handleAddEngagement}
-                                  className="px-2 py-1 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 rounded-lg text-[11px] flex items-center gap-1 font-satoshi"
+                                  className="px-2 py-1 bg-[#9C7C38]/20 text-[#9C7C38] hover:bg-[#9C7C38]/30 
+                                    rounded-lg text-[10px] flex items-center gap-1.5 font-medium
+                                    border border-[#9C7C38]/30 hover:border-[#9C7C38]/40
+                                    shadow-sm hover:shadow
+                                    transition-all duration-200"
                                 >
-                                  <Plus size={12} />
+                                  <Plus size={10} />
                                   Add New
                                 </motion.button>
                               </div>
@@ -4777,20 +4781,20 @@ export default function Playground({
                               {/* Filter controls with improved spacing */}
                               <div className="flex flex-wrap gap-2 mb-5 px-1">
                                 <button
-                                  className={`px-3 py-1 text-xs rounded-full transition-all duration-300 ${!selectedEngagement ? 'bg-cyan-500/20 text-cyan-400' : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800/70'}`}
+                                  className={`px-3 py-1 text-xs rounded-full transition-all duration-300 ${!selectedEngagement ? 'bg-[#9C7C38]/20 text-[#9C7C38]' : 'bg-[#F5EFE0]/70 text-[#1E2A42] hover:bg-[#F5EFE0]'}`}
                                   onClick={() => setSelectedEngagement(null)}
                                 >
                                   All Types
                                 </button>
                                 <button
-                                  className={`px-3 py-1 text-xs rounded-full flex items-center gap-1 transition-all duration-300 ${selectedEngagement === 'quiz' ? 'bg-cyan-500/20 text-cyan-400' : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800/70'}`}
+                                  className={`px-3 py-1 text-xs rounded-full flex items-center gap-1 transition-all duration-300 ${selectedEngagement === 'quiz' ? 'bg-[#9C7C38]/20 text-[#9C7C38]' : 'bg-[#F5EFE0]/70 text-[#1E2A42] hover:bg-[#F5EFE0]'}`}
                                   onClick={() => setSelectedEngagement(selectedEngagement === 'quiz' ? null : 'quiz')}
                                 >
                                   {getEngagementTypeIcon('quiz')}
                                   Quizzes
                                 </button>
                                 <button
-                                  className={`px-3 py-1 text-xs rounded-full flex items-center gap-1 transition-all duration-300 ${selectedEngagement === 'discussion' ? 'bg-cyan-500/20 text-cyan-400' : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800/70'}`}
+                                  className={`px-3 py-1 text-xs rounded-full flex items-center gap-1 transition-all duration-300 ${selectedEngagement === 'discussion' ? 'bg-[#9C7C38]/20 text-[#9C7C38]' : 'bg-[#F5EFE0]/70 text-[#1E2A42] hover:bg-[#F5EFE0]'}`}
                                   onClick={() => setSelectedEngagement(selectedEngagement === 'discussion' ? null : 'discussion')}
                                 >
                                   {getEngagementTypeIcon('discussion')}
@@ -4800,7 +4804,7 @@ export default function Playground({
 
                               {/* Debug output for troubleshooting */}
                               {(!engagementOpportunities || engagementOpportunities.length === 0) && (
-                                <div className="bg-gray-900/40 mb-4 p-2 rounded-lg text-xs text-gray-400">
+                                <div className="bg-[#F5EFE0]/40 mb-4 p-2 rounded-lg text-xs text-[#1E2A42]">
                                   Debug: Agent config has engagement_opportunities? {agentConfig.engagement_opportunities ? 'Yes' : 'No'}
                                 </div>
                               )}
@@ -4819,9 +4823,9 @@ export default function Playground({
                                       />
                                     ))
                                 ) : (
-                                  <div className="text-center p-6 bg-gray-900/30 rounded-lg border border-gray-800/50">
-                                    <div className="text-gray-400 text-sm">No engagement opportunities found</div>
-                                    <div className="text-gray-500 text-xs mt-1">
+                                  <div className="text-center p-6 bg-[#F5EFE0]/60 rounded-lg border border-[#9C7C38]/30">
+                                    <div className="text-[#0A1933] text-sm">No engagement opportunities found</div>
+                                    <div className="text-[#1E2A42] text-xs mt-1">
                                       Create new engagement opportunities using the "Add New" button above
                                     </div>
                                   </div>

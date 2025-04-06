@@ -7,6 +7,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Inter } from "next/font/google";
 import Head from "next/head";
 import { useCallback, useState, useEffect } from "react";
+import { ThemeProvider } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
 
 import { PlaygroundConnect } from "@/components/PlaygroundConnect";
 import Playground from "@/components/playground/Playground";
@@ -16,6 +18,7 @@ import { ConfigProvider, useConfig } from "@/hooks/useConfig";
 import { ConnectionMode, ConnectionProvider, useConnection } from "@/hooks/useConnection";
 import { useMemo } from "react";
 import { ToastProvider, useToast } from "@/components/toast/ToasterProvider";
+import neoScholarTheme from '@/theme/neo-scholar';
 
 const themeColors = [
   "cyan",
@@ -35,7 +38,10 @@ export default function Home() {
     <ToastProvider>
       <ConfigProvider>
         <ConnectionProvider>
-          <HomeInner />
+          <ThemeProvider theme={neoScholarTheme}>
+            <CssBaseline />
+            <HomeInner />
+          </ThemeProvider>
         </ConnectionProvider>
       </ConfigProvider>
     </ToastProvider>

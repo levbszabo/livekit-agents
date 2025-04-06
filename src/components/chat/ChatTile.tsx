@@ -2,26 +2,26 @@ import { ChatMessage } from "@/components/chat/ChatMessage";
 import { ChatMessageInput } from "@/components/chat/ChatMessageInput";
 import { ChatMessage as ComponentsChatMessage } from "@livekit/components-react";
 import { useEffect, useRef, useMemo } from "react";
-import { Send } from 'lucide-react';
+import { Feather, Send } from 'lucide-react';
 import styled, { keyframes } from 'styled-components';
 
-// Define the keyframes animation properly
-const lightScanAnimation = keyframes`
+// Define the keyframes animation for ink unfurling effect
+const inkUnfurlAnimation = keyframes`
   0% { transform: translateX(0%); opacity: 0; }
-  50% { opacity: 0.2; }
-  100% { transform: translateX(500%); opacity: 0; }
+  50% { opacity: 0.3; }
+  100% { transform: translateX(300%); opacity: 0; }
 `;
 
-// Create a styled component for the light scan effect
-const LightScanEffect = styled.div`
+// Create a styled component for the ink effect
+const InkEffect = styled.div`
   position: absolute;
   top: 0;
   left: -20px;
   width: 20px;
   height: 100%;
-  background: linear-gradient(to right, transparent, ${props => props.color || 'rgba(34,211,238,0.1)'}, transparent);
+  background: linear-gradient(to right, transparent, ${props => props.color || 'rgba(156,124,56,0.15)'}, transparent);
   transform: skewX(-35deg);
-  animation: ${lightScanAnimation} 3s ease-in-out infinite;
+  animation: ${inkUnfurlAnimation} 3s ease-in-out infinite;
 `;
 
 const inputHeight = 48;
@@ -87,10 +87,13 @@ export const ChatTile = ({ messages, accentColor, onSend, className = '' }: Chat
         className="
           flex-1 px-3 overflow-y-auto
           scrollbar-thin scrollbar-track-transparent
-          scrollbar-thumb-gray-700/30 hover:scrollbar-thumb-cyan-500/20
+          scrollbar-thumb-[#9C7C38]/20 hover:scrollbar-thumb-[#9C7C38]/30
+          bg-[#F5EFE0]/90 backdrop-blur-sm
+          after:absolute after:inset-0 after:bg-[url('/textures/parchment.png')] 
+          after:bg-cover after:opacity-20 after:mix-blend-overlay after:pointer-events-none
         "
       >
-        <div className="flex flex-col min-h-full justify-end py-3 space-y-1.5">
+        <div className="flex flex-col min-h-full justify-end py-3 space-y-2.5 relative z-10">
           {/* Map over the processed (combined) messages */}
           {processedMessages.map((message, index, allProcessedMsg) => {
             // Name hiding logic remains similar but uses the processed list
@@ -98,37 +101,94 @@ export const ChatTile = ({ messages, accentColor, onSend, className = '' }: Chat
             // Use a key stable across combines for the same message block
             const key = `${message.name}-${message.originalTimestamp}-${message.isSelf}`;
             return (
-              <ChatMessage
-                key={key} // Use the stable key
-                hideName={hideName}
-                name={message.name}
-                message={message.message} // Pass the potentially combined message
-                isSelf={message.isSelf}
-                accentColor={accentColor}
-                LightScanEffect={LightScanEffect}
-              />
+              <div
+                key={key}
+                className={`
+                  ${message.isSelf ? 'ml-auto' : 'mr-auto'} 
+                  max-w-[95%]
+                  relative group
+                  transition-all duration-300
+                `}
+              >
+                {/* Sender name - refined scholar style */}
+                {!hideName && (
+                  <div className={`
+                    text-[11px] font-serif 
+                    ${message.isSelf ? 'text-right mr-2 text-[#9C7C38]/90' : 'ml-2 text-[#9C7C38]/90'}
+                    mb-0.5
+                  `}>
+                    {message.name}
+                  </div>
+                )}
+
+                {/* Message bubble with refined styling */}
+                <div
+                  className={`
+                    relative
+                    ${message.isSelf
+                      ? 'bg-[#FAF7ED]/80 border border-[#9C7C38]/15 pl-3 pr-4 py-2 rounded-md'
+                      : 'bg-[#F5EFE0]/80 border border-[#9C7C38]/25 px-4 py-2 rounded-md'}
+                    shadow-sm
+                    transition-all duration-300
+                    hover:border-[#9C7C38]/40
+                    group-hover:shadow-sm
+                    ${message.isSelf
+                      ? 'hover:shadow-[0_1px_6px_rgba(156,124,56,0.08)]'
+                      : 'hover:shadow-[0_1px_6px_rgba(156,124,56,0.12)]'}
+                  `}
+                >
+                  {/* More subtle corner fold for user messages */}
+                  {message.isSelf && (
+                    <div className="absolute -top-[1px] -right-[1px] w-2.5 h-2.5 
+                      bg-[#9C7C38]/5 rounded-bl-sm transform rotate-45"></div>
+                  )}
+
+                  {/* Refined scroll styling for AI messages */}
+                  {!message.isSelf && (
+                    <div className="absolute left-0 top-0 bottom-0 w-1
+                      border-l border-[#9C7C38]/15 rounded-l-md"></div>
+                  )}
+
+                  {/* Smaller font size for message text */}
+                  <div className={`
+                    whitespace-pre-wrap
+                    ${message.isSelf
+                      ? 'text-[#0A1933] text-[11px] font-satoshi'
+                      : 'text-[#1E2A42] text-[12px] font-serif'}
+                    leading-relaxed
+                  `}>
+                    {message.message}
+                  </div>
+                </div>
+              </div>
             );
           })}
         </div>
       </div>
       {onSend && (
-        <div className="sticky bottom-0 left-0 right-0 px-3 py-2 bg-[#121212] border-t border-gray-800/40">
+        <div className="sticky bottom-0 left-0 right-0 px-3 py-2 
+          bg-[#F5EFE0]/90 backdrop-blur-sm border-t border-[#9C7C38]/20
+          after:absolute after:inset-0 after:bg-[url('/textures/parchment.png')] 
+          after:bg-cover after:opacity-50 after:mix-blend-overlay after:pointer-events-none
+        ">
           <div className="relative group">
             <textarea
-              placeholder="Type a message..."
+              placeholder="Write a message..."
               className="
-                w-full pr-8 py-2 px-3
-                bg-[#1A1A1A] 
-                text-[11px] text-gray-200
-                placeholder:text-gray-500
-                rounded-md resize-none
-                border border-gray-700/50
-                focus:outline-none focus:border-cyan-500/30 focus:ring-1 focus:ring-cyan-500/10
+                w-full pr-10 py-2 px-3
+                bg-[#FAF7ED]/80 
+                text-[11px] text-[#0A1933]
+                placeholder:text-[#1E2A42]/40
+                rounded-lg resize-none
+                border border-[#9C7C38]/20
+                focus:outline-none focus:border-[#9C7C38]/40 focus:ring-1 focus:ring-[#9C7C38]/10
+                hover:border-[#9C7C38]/30
                 transition-all duration-300
-                min-h-[32px] max-h-[80px]
+                min-h-[36px] max-h-[100px]
                 scrollbar-thin scrollbar-track-transparent
-                scrollbar-thumb-gray-700/40
-                hover:scrollbar-thumb-cyan-500/20
+                scrollbar-thumb-[#9C7C38]/20
+                hover:scrollbar-thumb-[#9C7C38]/30
+                font-satoshi
               "
               rows={1}
               onKeyDown={(e) => {
@@ -143,16 +203,16 @@ export const ChatTile = ({ messages, accentColor, onSend, className = '' }: Chat
               }}
               onChange={(e) => {
                 e.target.style.height = 'auto';
-                e.target.style.height = Math.min(e.target.scrollHeight, 80) + 'px';
+                e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px';
               }}
             />
             <button
               className="
                 absolute right-2 top-1/2 -translate-y-1/2
                 p-1.5 rounded-md
-                text-gray-500 hover:text-cyan-400/80
+                text-[#9C7C38]/70 hover:text-[#9C7C38]
                 transition-colors duration-200
-                hover:bg-cyan-500/5
+                hover:bg-[#9C7C38]/5
               "
               onClick={() => {
                 const textarea = document.querySelector('textarea');
@@ -161,12 +221,12 @@ export const ChatTile = ({ messages, accentColor, onSend, className = '' }: Chat
                   if (value) {
                     onSend(value);
                     textarea.value = '';
-                    textarea.style.height = '32px';
+                    textarea.style.height = '36px';
                   }
                 }
               }}
             >
-              <Send size={12} />
+              <Feather size={13} />
             </button>
           </div>
         </div>
