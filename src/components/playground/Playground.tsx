@@ -28,7 +28,10 @@ export interface PlaygroundProps {
   logo?: ReactNode;
   themeColors: string[];
   onConnect: (connect: boolean, opts?: { token: string; url: string }) => void;
-  agentType?: 'edit' | 'view';  // Add this line
+  agentType?: 'edit' | 'view';
+  userId?: string;
+  brdgeId?: string | null;
+  token?: string;
 }
 
 // Update the header height constant at the top of the file
@@ -1674,7 +1677,10 @@ export default function Playground({
   logo,
   themeColors,
   onConnect,
-  agentType
+  agentType,
+  userId,
+  brdgeId,
+  token
 }: PlaygroundProps) {
   const { isMobile, isLandscape } = useIsMobile();
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
@@ -1786,14 +1792,16 @@ export default function Playground({
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
       const token = urlParams.get('token');
+      const userIdFromUrl = urlParams.get('userId');
+
       const newParams = {
         brdgeId: urlParams.get('brdgeId'),
         apiBaseUrl: urlParams.get('apiBaseUrl'),
         coreApiUrl: API_BASE_URL,
-        userId: token ?
+        userId: userIdFromUrl || userId || (token ?
           jwtDecode<JWTPayload>(token).sub :
-          `anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        agentType: (urlParams.get('agentType') as 'edit' | 'view') || 'edit'
+          `anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`),
+        agentType: (urlParams.get('agentType') as 'edit' | 'view') || agentType || 'edit'
       };
       setParams(newParams);
 
@@ -1814,7 +1822,7 @@ export default function Playground({
         }
       }
     }
-  }, []);
+  }, [userId, agentType]);
 
   // Add this function to make authenticated API requests
   const makeAuthenticatedRequest = useCallback(async (url: string, options: RequestInit = {}) => {

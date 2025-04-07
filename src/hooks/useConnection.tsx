@@ -14,7 +14,7 @@ type TokenGeneratorData = {
   token: string;
   mode: ConnectionMode;
   disconnect: () => Promise<void>;
-  connect: (mode: ConnectionMode, brdgeId?: string) => Promise<void>;
+  connect: (mode: ConnectionMode, brdgeId?: string, userId?: string) => Promise<void>;
 };
 
 const ConnectionContext = createContext<TokenGeneratorData | undefined>(undefined);
@@ -35,7 +35,7 @@ export const ConnectionProvider = ({
   }>({ wsUrl: "", token: "", shouldConnect: false, mode: "manual" });
 
   const connect = useCallback(
-    async (mode: ConnectionMode, brdgeId?: string) => {
+    async (mode: ConnectionMode, brdgeId?: string, userId?: string) => {
       let token = "";
       let url = "";
       if (mode === "cloud") {
@@ -55,8 +55,16 @@ export const ConnectionProvider = ({
         }
         const path = process.env.NODE_ENV === "development" ? "/api/token" : "/playground/api/token";
         url = process.env.NEXT_PUBLIC_LIVEKIT_URL;
-        const params = brdgeId ? `?brdge_id=${brdgeId}` : '';
-        const { accessToken } = await fetch(`${path}${params}`).then((res) =>
+
+        // Build query parameters including userId if provided
+        const queryParams = new URLSearchParams();
+        if (brdgeId) queryParams.append('brdge_id', brdgeId);
+        if (userId) queryParams.append('user_id', userId);
+
+        const queryString = queryParams.toString();
+        const endpoint = queryString ? `${path}?${queryString}` : path;
+
+        const { accessToken } = await fetch(endpoint).then((res) =>
           res.json()
         );
         token = accessToken;

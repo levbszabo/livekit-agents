@@ -27,11 +27,23 @@ export default async function handleToken(
 
     const roomName = `room-${generateRandomAlphanumeric(4)}-${generateRandomAlphanumeric(4)}`;
 
-    // Get brdge_id from query params
+    // Get brdge_id and userId from query params
     const brdgeId = req.query.brdge_id as string;
-    const identity = brdgeId
-      ? `identity-${brdgeId}-${generateRandomAlphanumeric(4)}`
-      : `identity-${generateRandomAlphanumeric(4)}`;
+    const userId = req.query.user_id as string;
+
+    // Include userId in the identity if available
+    let identity;
+    if (brdgeId) {
+      if (userId) {
+        // Format: brdge-BRDGE_ID-USER_ID
+        identity = `brdge-${brdgeId}-${userId}`;
+      } else {
+        // Fallback to previous format with random ID if no userId
+        identity = `brdge-${brdgeId}-${generateRandomAlphanumeric(4)}`;
+      }
+    } else {
+      identity = `brdge-${generateRandomAlphanumeric(4)}`;
+    }
 
     const grant: VideoGrant = {
       room: roomName,

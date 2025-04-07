@@ -56,7 +56,7 @@ export function HomeInner() {
   const { toastMessage, setToastMessage } = useToast();
   const [brdgeId, setBrdgeId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
-  const [urlParams, setUrlParams] = useState<{ brdgeId: string | null; token?: string; agentType?: 'edit' | 'view' }>({ brdgeId: null, token: undefined, agentType: 'edit' });
+  const [urlParams, setUrlParams] = useState<{ brdgeId: string | null; token?: string; agentType?: 'edit' | 'view'; userId?: string }>({ brdgeId: null, token: undefined, agentType: 'edit' });
 
   // Get URL params including brdgeId and detect mobile devices
   useEffect(() => {
@@ -64,10 +64,12 @@ export function HomeInner() {
       const searchParams = new URLSearchParams(window.location.search);
       const brdgeIdParam = searchParams.get('brdgeId');
       const tokenParam = searchParams.get('token');
+      const userIdParam = searchParams.get('userId');
 
       setUrlParams({
         brdgeId: brdgeIdParam,
-        token: tokenParam || undefined
+        token: tokenParam || undefined,
+        userId: userIdParam || undefined
       });
       setBrdgeId(brdgeIdParam);
 
@@ -97,7 +99,7 @@ export function HomeInner() {
     async (c: boolean, mode: ConnectionMode) => {
       if (c) {
         if (typeof brdgeId === 'string') {
-          connect(mode, brdgeId);
+          connect(mode, brdgeId, urlParams.userId);
         } else {
           connect(mode);
         }
@@ -105,7 +107,7 @@ export function HomeInner() {
         disconnect();
       }
     },
-    [connect, disconnect, brdgeId]
+    [connect, disconnect, brdgeId, urlParams.userId]
   );
 
   const showPG = useMemo(() => {
@@ -119,7 +121,7 @@ export function HomeInner() {
   }, [wsUrl])
 
   // Determine which Playground component to render
-  const PlaygroundComponent = isMobile ? MobilePlayground : Playground;
+  const PlaygroundComponent = isMobile ? Playground : Playground;
 
   // Add global styles to prevent scrolling and bouncing effects
   useEffect(() => {
@@ -213,12 +215,14 @@ export function HomeInner() {
           >
             <PlaygroundComponent
               themeColors={themeColors}
-              params={urlParams}
               onConnect={(c) => {
                 const m = process.env.NEXT_PUBLIC_LIVEKIT_URL ? "env" : mode;
                 handleConnect(c, m);
               }}
               agentType={urlParams?.agentType as 'edit' | 'view'}
+              userId={urlParams?.userId}
+              brdgeId={urlParams.brdgeId}
+              token={urlParams.token}
             />
             <RoomAudioRenderer />
             <StartAudio label="Click to enable audio playback" />
