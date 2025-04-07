@@ -727,13 +727,25 @@ const VideoPlayer = ({
           <motion.div
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
-            className="p-4 rounded-full bg-black/30 border border-cyan-500/50
-              backdrop-blur-sm
-              shadow-[0_0_15px_rgba(34,211,238,0.2)]"
+            className="p-4 rounded-full 
+              bg-[#0A1933]/80 
+              border border-[#0A1933]/40
+              backdrop-blur-md
+              shadow-[0_0_25px_rgba(10,25,51,0.3)]
+              relative
+              before:absolute before:inset-0 before:rounded-full
+              before:bg-gradient-to-br before:from-[#0A1933]/40 before:to-[#0A1933]/20
+              before:opacity-70 before:blur-sm
+              after:absolute after:inset-0 after:rounded-full
+              after:bg-gradient-to-tl after:from-[#0A1933]/30 after:to-transparent
+              group
+              transition-all duration-300"
           >
             <Play
               size={isMobile ? 24 : 32}
-              className="text-cyan-400"
+              className="text-white/90 relative z-10 
+                group-hover:text-white transition-colors duration-300
+                drop-shadow-[0_2px_3px_rgba(0,0,0,0.3)]"
             />
           </motion.div>
         </div>
@@ -3560,9 +3572,16 @@ export default function Playground({
                 </PanelResizeHandle>
 
                 <Panel defaultSize={15} minSize={15} maxSize={40}>
-                  <div className="h-full flex flex-col bg-black/90">
-                    {/* Unified Control Bar with improved controls */}
-                    <div className="border-b border-gray-800 bg-black/90 p-2 relative">
+                  {/* Apply map texture to the main panel container */}
+
+                  <div className="h-full flex flex-col bg-[url('/textures/dark-parchment.png')] opacity-90 bg-cover bg-center relative rounded-md"> {/* <-- Updated background image */}
+                    <div className="absolute inset-0 bg-[#B8A678]/70 mix-blend z-0"></div>
+
+                    {/* Add an overlay for slight darkening/contrast if needed */}
+                    {/* <div className="absolute inset-0 bg-black/10"></div> */}
+
+                    {/* Keep controls on a slightly opaque background for better legibility */}
+                    <div className="border-b border-gray-800/30 bg-black/20 backdrop-blend-color-dodge p-2 relative z-10 shadow-inner shadow-[#9C7C38]/90"> {/* <-- Ensured this background is present */}
                       <div className="flex items-center gap-4">
                         {/* Play/Pause Button */}
                         <button
@@ -3594,10 +3613,9 @@ export default function Playground({
                         />
 
                         {/* Time Display */}
-                        <div className="flex items-center gap-2 text-[11px] text-gray-400 font-medium tracking-wider">
+                        <div className="flex items-center gap-2 text-[11px] text-black/90 font-medium tracking-wider">
                           {formatTime(currentTime)} / {formatTime(duration)}
                         </div>
-
                         {/* Volume Control */}
                         <div className="flex items-center gap-2 group relative">
                           <button
@@ -3607,7 +3625,7 @@ export default function Playground({
                                 setIsMuted(!isMuted);
                               }
                             }}
-                            className="text-white hover:text-cyan-400 transition-colors"
+                            className="text-white hover:text-[#1E2A42] transition-colors"
                           >
                             {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
                           </button>
@@ -3624,7 +3642,7 @@ export default function Playground({
                                 videoRef.current.volume = newVolume;
                               }
                             }}
-                            className="w-0 group-hover:w-20 transition-all duration-300 accent-cyan-500"
+                            className="w-0 group-hover:w-20 transition-all duration-300 accent-[#1E2A42]"
                           />
                         </div>
 
@@ -3642,8 +3660,22 @@ export default function Playground({
                       </div>
                     </div>
 
-                    {/* Empty space where transcript used to be */}
-                    <div className="flex-1 bg-black/90" />
+                    {/* This space now shows the map texture */}
+                    <div className="flex-1 relative">
+                      {/* Decorative border */}
+                      <div className="absolute inset-0 border-2 border-green-700/30 pointer-events-none shadow-[inset_0_0_8px_rgba(20,83,45,0.05)]"></div>
+                      <div className="absolute inset-0 border-2 border-green-800/20 m-2 pointer-events-none rounded shadow-[inset_0_0_5px_rgba(20,83,45,0.1)]"></div>
+                      <div className="absolute top-1 left-1 right-1 h-[2px] bg-gradient-to-r from-transparent via-green-800/35 to-transparent"></div>
+                      <div className="absolute bottom-1 left-1 right-1 h-[2px] bg-gradient-to-r from-transparent via-green-800/35 to-transparent"></div>
+                      <div className="absolute left-1 top-1 bottom-1 w-[2px] bg-gradient-to-b from-transparent via-green-800/35 to-transparent"></div>
+                      <div className="absolute right-1 top-1 bottom-1 w-[2px] bg-gradient-to-b from-transparent via-green-800/35 to-transparent"></div>
+
+                      {/* Corner accents */}
+                      <div className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-green-800/40"></div>
+                      <div className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-green-800/40"></div>
+                      <div className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-green-800/40"></div>
+                      <div className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-green-800/40"></div>
+                    </div>
                   </div>
                 </Panel>
               </>
@@ -3664,7 +3696,7 @@ export default function Playground({
               before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[1px]
               before:bg-gradient-to-b before:from-transparent before:via-[#9C7C38]/30 before:to-transparent
               before:shadow-[0_0_10px_rgba(156,124,56,0.2)]
-              after:absolute after:inset-0 after:bg-[url('/textures/parchment.png')] after:bg-cover after:opacity-20 after:mix-blend-burn after:pointer-events-none
+              after:absolute after:inset-0 after:bg-[url('/textures/crumbled-parchment.jpg')] after:bg-cover after:opacity-15 after:mix-blend after:pointer-events-none
               ${isMobile ? 'overflow-hidden' : ''}
             `}
             initial={false}
@@ -3698,22 +3730,22 @@ export default function Playground({
                 </motion.div>
               </button>
             )}
-
             {/* Panel Content - Force chat tab on mobile */}
             <div className={`
               ${isMobile ? 'h-[100dvh] touch-none' : 'h-full'} 
               pl-4 pr-0 overflow-hidden
               ${isMobile ? 'pl-2' : ''}
+              rounded-lg border border-[#9C7C38]/50
             `}>
               <div className="h-full flex flex-col">
                 {/* Only show tabs on desktop */}
                 {!isMobile && (
-                  <div className="flex items-center px-1 border-b border-gray-700/40 relative">
+                  <div className="flex items-center px-1 border-b border-gray-700/40 relative rounded-t-md">
                     {/* Add glowing border effect */}
                     <div className="absolute bottom-0 left-0 right-0">
                       <div className="absolute bottom-0 left-0 right-0 h-[1px]
-                      bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent
-                      shadow-[0_0_8px_rgba(34,211,238,0.2)]"
+                      bg-gradient-to-r from-transparent via-[#9C7C38]/30 to-transparent
+                      shadow-[0_0_8px_rgba(156,124,56,0.2)]"
                       />
                     </div>
                     {tabs.map((tab) => (
@@ -3824,7 +3856,7 @@ export default function Playground({
                                     ml-2 p-1.5 rounded-md 
                                     ${interruptPressed
                                       ? 'bg-[#9C7C38]/30 text-[#9C7C38] shadow-[0_0_8px_rgba(156,124,56,0.3)]'
-                                      : 'bg-[#9C7C38]/15 hover:bg-[#9C7C38]/25 text-[#9C7C38]'}
+                                      : 'bg-[#9C7C38]/15 hover:bg-[#9C7C38]/25 text-[#1E2A42]'}
                                     ${animateInterrupt ? 'scale-105' : 'scale-100'}
                                     transition-all duration-200
                                     flex items-center gap-1.5 text-xs
@@ -3854,7 +3886,7 @@ export default function Playground({
                                 ${isMobile ? 'p-1' : 'p-1.5'}
                                 rounded-lg transition-all duration-300
                                 flex items-center gap-1.5
-                                bg-[#9C7C38]/20 text-[#9C7C38]
+                                bg-[#9C7C38]/20 text-[#1E2A42]
                                 hover:bg-[#9C7C38]/30 hover:shadow-[0_0_10px_rgba(156,124,56,0.15)]
                                 disabled:opacity-50 disabled:cursor-not-allowed
                                 ${isInfoVisible ? 'animate-glow' : ''}
@@ -3874,7 +3906,7 @@ export default function Playground({
                             <div className="relative group">
                               <button
                                 className="p-1.5 rounded-lg transition-all duration-300
-                                text-[#9C7C38]/70 hover:text-[#9C7C38]
+                                text-[#1E2A42]/50 hover:text-[#1E2A42]
                                 hover:bg-[#9C7C38]/10"
                               >
                                 <Info size={isMobile ? 12 : 14} />
@@ -3887,7 +3919,7 @@ export default function Playground({
                                   <div className="font-medium mb-1 text-[#9C7C38]">Welcome to Brdge AI!</div>
                                   Watch the video while interacting with our AI voice assistant.
                                   Toggle your mic to speak or type messages to engage in real-time conversation.
-                                  <div className="mt-1 text-[10px] text-[#9C7C38]/70">
+                                  <div className="font-medium mb-1 text-[#9C7C38]/70">
                                     Pro tip: Ensure your environment is quiet and free of background noise.
                                   </div>
                                 </div>
@@ -4845,6 +4877,6 @@ export default function Playground({
       </div>
 
       {isMobile && <MobileFAB />}
-    </div>
+    </div >
   );
 }

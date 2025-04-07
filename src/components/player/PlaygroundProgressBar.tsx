@@ -171,15 +171,13 @@ const PlaygroundProgressBar: React.FC<PlaygroundProgressBarProps> = ({
             >
                 {/* Filled progress */}
                 <div
-                    className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 rounded-full transition-all duration-150 relative"
+                    className="h-full bg-gradient-to-r from-[#7C1D1D] to-[#7C1D1D] rounded-full transition-all duration-150 relative"
                     style={{
                         width: duration > 0
                             ? `${(currentTime / duration) * 100}%`
                             : '0%',
                     }}
                 >
-                    {/* Add subtle shine effect to the filled progress */}
-                    <div className="absolute top-0 h-1/3 left-0 right-0 bg-white/20 rounded-t-full" />
                 </div>
 
                 {/* Draggable Thumb */}
@@ -190,8 +188,8 @@ const PlaygroundProgressBar: React.FC<PlaygroundProgressBarProps> = ({
                            border-2 border-white
                            transition-all duration-200
                            ${isDragging || isHovering
-                                ? 'w-5 h-5 bg-white shadow-[0_0_8px_rgba(34,211,238,0.8)]'
-                                : 'w-4 h-4 bg-cyan-400 shadow-[0_0_5px_rgba(34,211,238,0.6)] opacity-90'}`}
+                                ? 'w-5 h-5 bg-[#7C1D1D] border-[#A83838] shadow-[0_0_10px_rgba(124,29,29,0.5)]'
+                                : 'w-4 h-4 bg-[#7C1D1D] border-[#A83838] shadow-[0_0_6px_rgba(124,29,29,0.3)] opacity-90'}`}
                         style={{
                             left: `${(currentTime / duration) * 100}%`,
                             transform: 'translate(-50%, -50%)',

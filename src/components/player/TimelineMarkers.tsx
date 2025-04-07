@@ -2,13 +2,16 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { EngagementOpportunity } from '../playground/Playground';
 
-// Increase marker size for better visibility
-const MARKER_SIZE = 16;
-const MARKER_HOVER_SCALE = 1.5;
+// Use the correct path to the stamp logo
+const stampLogoPath = '/stamp-logo.png';
 
-// Unified color scheme for all markers
-const MARKER_COLOR_ACTIVE = 'bg-white border-2 border-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.9)]';
-const MARKER_COLOR_INACTIVE = 'bg-gray-800 border-2 border-cyan-400/80 shadow-[0_0_6px_rgba(34,211,238,0.4)]';
+// Increase marker size for better visibility
+const MARKER_SIZE = 24;
+const MARKER_HOVER_SCALE = 1.2;
+
+// Stronger glow effects for markers
+const MARKER_GLOW_ACTIVE = 'shadow-[0_0_12px_rgba(124,29,29,0.9)]';
+const MARKER_GLOW_INACTIVE = 'shadow-[0_0_8px_rgba(124,29,29,0.6)]';
 
 interface TimelineMarkersProps {
     engagementOpportunities: EngagementOpportunity[];
@@ -61,7 +64,7 @@ const TimelineMarkers: React.FC<TimelineMarkersProps> = ({
     });
 
     // Minimum distance between markers to avoid visual overlapping (in percentage of total width)
-    const MIN_MARKER_DISTANCE = 3; // percentage - increased for better spacing
+    const MIN_MARKER_DISTANCE = 5; // percentage - increased for better spacing
 
     // Check for markers that are too close to each other
     const adjustedPositions: Record<string, number> = {};
@@ -99,7 +102,7 @@ const TimelineMarkers: React.FC<TimelineMarkersProps> = ({
             return {
                 left: `calc(${position}% + 8px)`,
                 transform: 'translateX(0)',
-                top: '24px' // Position below marker
+                top: '30px' // Position below marker
             };
         }
         // If marker is near the right edge
@@ -107,14 +110,14 @@ const TimelineMarkers: React.FC<TimelineMarkersProps> = ({
             return {
                 left: `calc(${position}% - 8px)`,
                 transform: 'translateX(-100%)',
-                top: '24px' // Position below marker
+                top: '30px' // Position below marker
             };
         }
         // Normal positioning (centered)
         return {
             left: `calc(${position}%)`,
             transform: 'translateX(-50%)',
-            top: '24px' // Position below marker
+            top: '30px' // Position below marker
         };
     };
 
@@ -129,9 +132,6 @@ const TimelineMarkers: React.FC<TimelineMarkersProps> = ({
                 const markerCount = engagements.length;
 
                 return engagements.map((engagement, index) => {
-                    // Vertically stagger markers at the same timestamp
-                    const verticalOffset = markerCount > 1 ? (index - (markerCount - 1) / 2) * (MARKER_SIZE + 6) : 0;
-
                     // Determine if this marker is active
                     const isActive = currentTime >= seconds && currentTime <= seconds + 1;
                     const isSelected = engagement.id === selectedEngagementId;
@@ -142,36 +142,47 @@ const TimelineMarkers: React.FC<TimelineMarkersProps> = ({
 
                     return (
                         <React.Fragment key={engagement.id}>
-                            {/* The actual marker - now always a circle */}
+                            {/* The stamp logo marker */}
                             <motion.div
-                                className="absolute top-1/2 pointer-events-auto"
+                                className="absolute pointer-events-auto cursor-pointer"
                                 style={{
-                                    left: `calc(${position}% - ${MARKER_SIZE / 2}px)`,
-                                    transform: `translateY(${verticalOffset - MARKER_SIZE / 2}px)`,
+                                    left: `${position}%`,
+                                    top: "50%",
+                                    marginTop: "-14px", // Half of marker size
                                     zIndex: isHovered || isSelected ? 20 : 10
                                 }}
                                 animate={{
                                     scale: isHovered || isSelected ? MARKER_HOVER_SCALE : 1,
-                                    y: isHovered || isSelected ? -10 : 0 // Move up slightly more when hovered
+                                    y: isHovered || isSelected ? -5 : 0 // Slight raise on hover
                                 }}
                                 transition={{ duration: 0.2, type: "spring", stiffness: 200 }}
                                 onMouseEnter={() => setHoveredMarkerId(engagement.id)}
                                 onMouseLeave={() => setHoveredMarkerId(null)}
                             >
-                                {/* Unified circle design for all marker types */}
+                                {/* Circular background */}
                                 <div
-                                    className={`rounded-full cursor-pointer transition-all duration-200 flex items-center justify-center
-                                    ${isActive || isSelected ? MARKER_COLOR_ACTIVE : MARKER_COLOR_INACTIVE}`}
+                                    className={`
+                                        rounded-full bg-[#7C1D1D]/90 p-0.1
+                                        flex items-center justify-center
+                                        ${isActive || isSelected ? MARKER_GLOW_ACTIVE : MARKER_GLOW_INACTIVE}
+                                        ${isActive || isSelected || isHovered ? 'border-2 border-[#A83838]' : ''}
+                                    `}
                                     style={{
                                         width: `${MARKER_SIZE}px`,
                                         height: `${MARKER_SIZE}px`,
+                                        transform: 'translateX(-50%)',
                                     }}
                                 >
-                                    {(isHovered || isSelected) ? (
-                                        <div className="w-2.5 h-2.5 bg-cyan-400 rounded-full animate-pulse"></div>
-                                    ) : (isActive ? (
-                                        <div className="w-2 h-2 bg-cyan-400 rounded-full"></div>
-                                    ) : null)}
+                                    {/* Stamp logo image */}
+                                    <img
+                                        src={stampLogoPath}
+                                        alt="Marker"
+                                        className={`w-full h-full object-contain`}
+                                        style={{
+                                            opacity: isActive || isSelected || isHovered ? 1 : 0.9,
+                                            filter: `brightness(${isActive || isSelected || isHovered ? 1.2 : 1}) drop-shadow(0 0 3px #FFF)`
+                                        }}
+                                    />
                                 </div>
                             </motion.div>
 
@@ -180,7 +191,7 @@ const TimelineMarkers: React.FC<TimelineMarkersProps> = ({
                                 {isHovered && (
                                     <motion.div
                                         className="absolute bg-gray-900/95 backdrop-blur-sm text-[10px] px-2.5 py-1.5 
-                                        rounded-md border border-gray-700 shadow-lg z-30"
+                                        rounded-md border border-[#A83838] shadow-lg z-30"
                                         style={{
                                             top: tooltipPosition.top,
                                             left: tooltipPosition.left,
@@ -193,13 +204,8 @@ const TimelineMarkers: React.FC<TimelineMarkersProps> = ({
                                         exit={{ opacity: 0, y: -10, scale: 0.95 }}
                                         transition={{ duration: 0.2 }}
                                     >
-                                        {/* Add pointer triangle at the top of tooltip */}
-                                        <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-0 h-0 
-                                            border-l-[4px] border-r-[4px] border-b-[4px] 
-                                            border-l-transparent border-r-transparent border-b-gray-900/95 z-10"></div>
-
                                         <div className="font-medium flex items-center justify-center gap-2">
-                                            <span className="w-2 h-2 rounded-full bg-cyan-400 flex-shrink-0"></span>
+                                            <span className="w-2 h-2 rounded-full bg-[#A83838] flex-shrink-0"></span>
                                             <span className="text-white">
                                                 {engagement.engagement_type === 'quiz' ? 'Quiz' : 'Discussion'} {timestamp}
                                             </span>
