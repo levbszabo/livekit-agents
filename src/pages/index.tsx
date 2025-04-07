@@ -57,6 +57,8 @@ export function HomeInner() {
   const [brdgeId, setBrdgeId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [urlParams, setUrlParams] = useState<{ brdgeId: string | null; token?: string; agentType?: 'edit' | 'view'; userId?: string }>({ brdgeId: null, token: undefined, agentType: 'edit' });
+  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
+  const [showRotationPrompt, setShowRotationPrompt] = useState(false);
 
   // Get URL params including brdgeId and detect mobile devices
   useEffect(() => {
@@ -77,7 +79,16 @@ export function HomeInner() {
       const checkMobile = () => {
         const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         const isSmallScreen = window.innerWidth <= 768;
-        setIsMobile(isMobileDevice || isSmallScreen || searchParams.get('mobile') === '1');
+        const isMobileResult = isMobileDevice || isSmallScreen || searchParams.get('mobile') === '1';
+
+        // Check orientation
+        const isPortrait = window.innerHeight > window.innerWidth;
+
+        setIsMobile(isMobileResult);
+        setOrientation(isPortrait ? 'portrait' : 'landscape');
+
+        // Show rotation prompt only if mobile AND portrait
+        setShowRotationPrompt(isMobileResult && isPortrait);
       };
 
       // Initial check
@@ -194,6 +205,46 @@ export function HomeInner() {
               exit={{ opacity: 0, translateY: -50 }}
             >
               <PlaygroundToast />
+            </motion.div>
+          )}
+        </AnimatePresence>
+        {/* Rotation Prompt Overlay */}
+        <AnimatePresence>
+          {showRotationPrompt && (
+            <motion.div
+              className="fixed inset-0 z-50 bg-black/80 flex flex-col items-center justify-center text-white p-5"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <motion.div
+                className="mb-5"
+                animate={{
+                  rotate: [0, -90],
+                  transition: {
+                    repeat: Infinity,
+                    repeatType: "reverse",
+                    duration: 1.5
+                  }
+                }}
+              >
+                <svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="5" y="2" width="14" height="20" rx="2" stroke="white" strokeWidth="2" />
+                  <circle cx="12" cy="18" r="1" fill="white" />
+                </svg>
+              </motion.div>
+
+              <h2 className="text-xl font-bold mb-2">Please rotate your device</h2>
+              <p className="text-center mb-6">
+                Brdge works best in landscape mode on mobile devices.
+              </p>
+
+              <button
+                onClick={() => setShowRotationPrompt(false)}
+                className="px-4 py-2 bg-white/10 rounded-md hover:bg-white/20 transition-colors"
+              >
+                Continue anyway
+              </button>
             </motion.div>
           )}
         </AnimatePresence>
