@@ -1993,18 +1993,25 @@ export default function Playground({
   // Add this function to handle config updates
   const updateAgentConfig = async (newConfig: typeof agentConfig) => {
     try {
-      console.log('Sending updated config:', newConfig); // For debugging
+      // console.log('Sending updated config:', newConfig); // Removed log
 
       const response = await fetch(
         `${params.apiBaseUrl}/brdges/${params.brdgeId}/agent-config`,
         {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            // Confirmed Authorization header logic is here
+            ...(authToken ? {
+              'Authorization': `Bearer ${authToken}`
+            } : {})
+          },
           body: JSON.stringify({
             personality: newConfig.personality,
             agentPersonality: newConfig.agentPersonality,
             teaching_persona: newConfig.teaching_persona, // ADD THIS LINE
-            knowledgeBase: newConfig.knowledgeBase
+            knowledgeBase: newConfig.knowledgeBase,
+            engagement_opportunities: newConfig.engagement_opportunities // Ensure this is included
             // REMOVE the script field entirely
           }),
         }
@@ -2012,9 +2019,16 @@ export default function Playground({
 
       if (response.ok) {
         setAgentConfig(newConfig);
+      } else { // Add error handling for the fetch call itself
+        console.error(`Failed to update agent config: ${response.status} ${response.statusText}`);
+        const errorBody = await response.text();
+        console.error('Error response body:', errorBody);
+        // Optionally alert the user or handle the error state
+        // alert('Failed to save configuration. Please check console for details.');
       }
     } catch (error) {
       console.error('Error updating agent config:', error);
+      // alert('An unexpected error occurred while saving. Please try again.');
     }
   };
 
@@ -2454,6 +2468,9 @@ export default function Playground({
 
   // Update the save button click handler
   const handleSaveConfig = async () => {
+    // <<< REMOVED LOGGING HERE >>>
+    // console.log('[Persona Save] Auth Token:', authToken);
+
     setIsSaving(true);
     try {
       // Update the agent config with the teaching persona
@@ -2461,6 +2478,9 @@ export default function Playground({
         ...agentConfig,
         teaching_persona: teachingPersona  // Direct update to top level
       };
+
+      // <<< REMOVED LOGGING HERE >>>
+      // console.log('[Persona Save] Calling updateAgentConfig with:', newConfig);
 
       // Call your existing update function
       await updateAgentConfig(newConfig);
@@ -3014,6 +3034,10 @@ export default function Playground({
   // Updated function to properly update engagement opportunities in the backend
   const updateEngagementOpportunities = (opportunities: EngagementOpportunity[]) => {
     if (!params.brdgeId || !params.apiBaseUrl) return;
+
+    // <<< REMOVED LOGGING HERE >>>
+    // console.log('[Engagement Save] Auth Token:', authToken);
+    // console.log('[Engagement Save] Sending opportunities:', opportunities);
 
     try {
       // Create updated config object that FULLY REPLACES the existing config
@@ -4262,8 +4286,9 @@ export default function Playground({
                                         method: 'POST',
                                         headers: {
                                           'Content-Type': 'application/json',
-                                          ...(localStorage.getItem('token') ? {
-                                            'Authorization': `Bearer ${localStorage.getItem('token')}`
+                                          // Use authToken prop instead of localStorage
+                                          ...(authToken ? {
+                                            'Authorization': `Bearer ${authToken}`
                                           } : {})
                                         },
                                         body: JSON.stringify({ voice_id }),
@@ -4568,8 +4593,9 @@ export default function Playground({
                                                 method: 'POST',
                                                 headers: {
                                                   'Content-Type': 'application/json',
-                                                  ...(localStorage.getItem('token') ? {
-                                                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                                                  // Use authToken prop instead of localStorage
+                                                  ...(authToken ? {
+                                                    'Authorization': `Bearer ${authToken}`
                                                   } : {})
                                                 },
                                                 body: JSON.stringify({ voice_id: voice.id }),
