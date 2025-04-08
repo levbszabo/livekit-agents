@@ -720,7 +720,7 @@ const VideoPlayer = ({
       ) : (
         // Show loading state if no video URL yet
         <div className="absolute inset-0 flex items-center justify-center bg-black">
-          <div className="w-8 h-8 border-2 border-[#9C7C38]/30 border-t-[#9C7C38] animate-spin rounded-full" />
+          <div className="w-8 h-8 border-2 border-red-900/30 border-t-red-900 animate-spin rounded-full" />
         </div>
       )}
 
@@ -757,7 +757,7 @@ const VideoPlayer = ({
       {/* Loading Overlay */}
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10">
-          <div className="w-8 h-8 border-2 border-cyan-500/30 border-t-cyan-400 animate-spin rounded-full" />
+          <div className="w-8 h-8 border-2 border-red-500/30 border-t-red-500 animate-spin rounded-full" />
         </div>
       )}
 
