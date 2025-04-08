@@ -19,6 +19,7 @@ import { ConnectionMode, ConnectionProvider, useConnection } from "@/hooks/useCo
 import { useMemo } from "react";
 import { ToastProvider, useToast } from "@/components/toast/ToasterProvider";
 import neoScholarTheme from '@/theme/neo-scholar';
+import { setAuthToken } from "@/api";
 
 const themeColors = [
   "cyan",
@@ -49,31 +50,30 @@ export default function Home() {
 }
 
 export function HomeInner() {
-  const { shouldConnect, wsUrl, token, mode, connect, disconnect } =
+  const { shouldConnect, wsUrl, token: livekitToken, mode, connect, disconnect } =
     useConnection();
 
   const { config } = useConfig();
   const { toastMessage, setToastMessage } = useToast();
-  const [brdgeId, setBrdgeId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
-  const [urlParams, setUrlParams] = useState<{ brdgeId: string | null; token?: string; agentType?: 'edit' | 'view'; userId?: string }>({ brdgeId: null, token: undefined, agentType: 'edit' });
+  const [urlParams, setUrlParams] = useState<{ brdgeId: string | null; agentType?: 'edit' | 'view'; userId?: string }>({ brdgeId: null, agentType: 'edit' });
+  const [authToken, setAuthTokenState] = useState<string | null>(null);
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [showRotationPrompt, setShowRotationPrompt] = useState(false);
 
-  // Get URL params including brdgeId and detect mobile devices
+  // Get URL params (excluding token) and detect mobile devices
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const searchParams = new URLSearchParams(window.location.search);
       const brdgeIdParam = searchParams.get('brdgeId');
-      const tokenParam = searchParams.get('token');
       const userIdParam = searchParams.get('userId');
+      const agentTypeParam = searchParams.get('agentType') as 'edit' | 'view'; // Read agentType
 
       setUrlParams({
         brdgeId: brdgeIdParam,
-        token: tokenParam || undefined,
-        userId: userIdParam || undefined
+        userId: userIdParam || undefined,
+        agentType: agentTypeParam || 'edit' // Default to edit if not specified
       });
-      setBrdgeId(brdgeIdParam);
 
       // Function to check if device is mobile
       const checkMobile = () => {
@@ -106,11 +106,52 @@ export function HomeInner() {
     }
   }, []);
 
+  // Effect to listen for AUTH_TOKEN from parent window
+  useEffect(() => {
+    console.log("Setting up postMessage listener for AUTH_TOKEN");
+
+    const handleMessage = (event: MessageEvent) => {
+      // Log all incoming messages for debugging
+      console.log("Message received:", {
+        origin: event.origin,
+        type: event.data?.type,
+        hasToken: !!event.data?.token
+      });
+
+      // TEMPORARY: For testing, accept messages from any origin
+      // WARNING: This is not secure for production!
+      if (event.data && event.data.type === 'AUTH_TOKEN' && typeof event.data.token === 'string') {
+        console.log('AUTH_TOKEN received from:', event.origin);
+
+        // Update React state
+        setAuthTokenState(event.data.token);
+
+        // Update API module
+        setAuthToken(event.data.token);
+
+        // Verify token was set
+        console.log("Token set in state and API module");
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    // Log to confirm listener is active
+    console.log("PostMessage listener active");
+
+    // Cleanup: remove the listener when the component unmounts
+    return () => {
+      console.log("Removing postMessage listener");
+      window.removeEventListener('message', handleMessage);
+      setAuthToken(null);
+    };
+  }, []); // Empty dependency array means this effect runs once on mount
+
   const handleConnect = useCallback(
     async (c: boolean, mode: ConnectionMode) => {
       if (c) {
-        if (typeof brdgeId === 'string') {
-          connect(mode, brdgeId, urlParams.userId);
+        if (typeof urlParams.brdgeId === 'string') { // Use urlParams.brdgeId
+          connect(mode, urlParams.brdgeId, urlParams.userId);
         } else {
           connect(mode);
         }
@@ -118,7 +159,7 @@ export function HomeInner() {
         disconnect();
       }
     },
-    [connect, disconnect, brdgeId, urlParams.userId]
+    [connect, disconnect, urlParams.brdgeId, urlParams.userId] // Use urlParams values
   );
 
   const showPG = useMemo(() => {
@@ -257,7 +298,7 @@ export function HomeInner() {
               overflow: 'hidden'
             }}
             serverUrl={wsUrl}
-            token={token}
+            token={livekitToken}
             connect={shouldConnect}
             onError={(e) => {
               setToastMessage({ message: e.message, type: "error" });
@@ -270,10 +311,10 @@ export function HomeInner() {
                 const m = process.env.NEXT_PUBLIC_LIVEKIT_URL ? "env" : mode;
                 handleConnect(c, m);
               }}
-              agentType={urlParams?.agentType as 'edit' | 'view'}
+              agentType={urlParams?.agentType}
               userId={urlParams?.userId}
               brdgeId={urlParams.brdgeId}
-              token={urlParams.token}
+              authToken={authToken}
             />
             <RoomAudioRenderer />
             <StartAudio label="Click to enable audio playback" />

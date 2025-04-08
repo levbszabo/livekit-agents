@@ -31,7 +31,7 @@ export interface PlaygroundProps {
   agentType?: 'edit' | 'view';
   userId?: string;
   brdgeId?: string | null;
-  token?: string;
+  authToken?: string | null; // Changed from token to authToken
 }
 
 // Update the header height constant at the top of the file
@@ -1680,7 +1680,7 @@ export default function Playground({
   agentType,
   userId,
   brdgeId,
-  token
+  authToken // Changed from token to authToken
 }: PlaygroundProps) {
   const { isMobile, isLandscape } = useIsMobile();
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
@@ -1732,11 +1732,10 @@ export default function Playground({
       try {
         console.log('Loading voices for brdge', params.brdgeId);
 
-        // Use token from localStorage if available
-        const token = localStorage.getItem('token');
+        // Use authToken prop if available
         const headers: HeadersInit = {};
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
+        if (authToken) {
+          headers['Authorization'] = `Bearer ${authToken}`;
         }
 
         const response = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/voices`, {
@@ -1778,7 +1777,7 @@ export default function Playground({
     };
 
     loadVoices();
-  }, [params.brdgeId, params.apiBaseUrl, brdge?.voice_id]); // Add brdge.voice_id to dependencies
+  }, [params.brdgeId, params.apiBaseUrl, brdge?.voice_id, authToken]); // Add authToken to dependencies
 
   // LiveKit related hooks
   const { localParticipant } = useLocalParticipant();
@@ -1791,46 +1790,39 @@ export default function Playground({
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
-      const token = urlParams.get('token');
       const userIdFromUrl = urlParams.get('userId');
 
       const newParams = {
         brdgeId: urlParams.get('brdgeId'),
         apiBaseUrl: urlParams.get('apiBaseUrl'),
         coreApiUrl: API_BASE_URL,
-        userId: userIdFromUrl || userId || (token ?
-          jwtDecode<JWTPayload>(token).sub :
+        userId: userIdFromUrl || userId || (authToken ?
+          jwtDecode<JWTPayload>(authToken).sub :
           `anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`),
         agentType: (urlParams.get('agentType') as 'edit' | 'view') || agentType || 'edit'
       };
       setParams(newParams);
-
-      // Store token in localStorage if it exists
-      if (token) {
-        try {
-          // Store the token in localStorage
-          localStorage.setItem('token', token);
-          console.log('JWT token stored in localStorage');
-
-          // Set up authorization header for future API calls
-          if (api.defaults) {
-            api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-            console.log('Authorization header set for API calls');
-          }
-        } catch (error) {
-          console.error('Error storing token:', error);
-        }
-      }
     }
-  }, [userId, agentType]);
+  }, [userId, agentType, authToken]); // Add authToken as dependency
 
-  // Add this function to make authenticated API requests
+  // Add useEffect to set up the Authorization header based on the authToken prop
+  useEffect(() => {
+    if (authToken) {
+      // Set authorization header for API calls
+      api.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
+      console.log('Authorization header set from authToken prop');
+    } else {
+      // Remove authorization header if no token
+      delete api.defaults.headers.common['Authorization'];
+    }
+  }, [authToken]);
+
+  // Update the makeAuthenticatedRequest helper function to use authToken prop
   const makeAuthenticatedRequest = useCallback(async (url: string, options: RequestInit = {}) => {
     try {
-      const token = localStorage.getItem('token');
       const headers = {
         ...(options.headers || {}),
-        'Authorization': `Bearer ${token}`
+        ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
       };
 
       return fetch(url, {
@@ -1841,16 +1833,16 @@ export default function Playground({
       console.error('Error making authenticated request:', error);
       throw error;
     }
-  }, []);
+  }, [authToken]); // Add authToken as a dependency
 
-  // Modify the fetchUserVoices function to use the authenticated request helper
+  // Update the fetchUserVoices function to use authToken prop instead of localStorage token
+  // Replace the reference at line 1850
   const fetchUserVoices = useCallback(async () => {
     if (!params.apiBaseUrl) return;
 
     setIsLoadingUserVoices(true);
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
+      if (!authToken) {
         // If no token, we can't fetch user voices (just use bridge-specific voices)
         setIsLoadingUserVoices(false);
         return;
@@ -1875,7 +1867,7 @@ export default function Playground({
     } finally {
       setIsLoadingUserVoices(false);
     }
-  }, [params.apiBaseUrl, params.brdgeId, makeAuthenticatedRequest]);
+  }, [params.apiBaseUrl, params.brdgeId, makeAuthenticatedRequest, authToken]); // Add authToken as dependency
 
   // Handle chat messages
   const handleChatMessage = useCallback(async (message: string) => {
@@ -2074,11 +2066,10 @@ export default function Playground({
         const url = `${params.apiBaseUrl}/brdges/${params.brdgeId}`;
         console.log('Fetching brdge from:', url);
 
-        // Use token from localStorage if available
-        const token = localStorage.getItem('token');
+        // Use authToken from props if available
         const headers: HeadersInit = {};
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
+        if (authToken) {
+          headers['Authorization'] = `Bearer ${authToken}`;
         }
 
         const response = await fetch(url, {
@@ -2124,7 +2115,7 @@ export default function Playground({
     };
 
     fetchBrdge();
-  }, [params.brdgeId, params.apiBaseUrl]);
+  }, [params.brdgeId, params.apiBaseUrl, authToken]); // Add authToken as dependency
 
   useEffect(() => {
     console.log('Current params:', params);
@@ -2251,13 +2242,12 @@ export default function Playground({
       formData.append('audio', currentRecording);
       formData.append('name', voiceName);
 
-      // Use the token from localStorage
-      const token = localStorage.getItem('token');
+      // Use the authToken prop
       const headers: HeadersInit = {};
 
       // Add auth token if available
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
       }
 
       // Use fetch directly instead of the api object
@@ -2286,8 +2276,8 @@ export default function Playground({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            ...(localStorage.getItem('token') ? {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            ...(authToken ? {
+              'Authorization': `Bearer ${authToken}`
             } : {})
           },
           body: JSON.stringify({ voice_id: responseData.voice.id }),
@@ -2349,8 +2339,8 @@ export default function Playground({
           body: JSON.stringify({ voice_id: voice.id }),
           headers: {
             'Content-Type': 'application/json',
-            ...(localStorage.getItem('token') ? {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            ...(authToken ? {
+              'Authorization': `Bearer ${authToken}`
             } : {})
           },
           credentials: 'omit'
@@ -2373,8 +2363,8 @@ export default function Playground({
         body: JSON.stringify({ voice_id: mostRecent.id }),
         headers: {
           'Content-Type': 'application/json',
-          ...(localStorage.getItem('token') ? {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...(authToken ? {
+            'Authorization': `Bearer ${authToken}`
           } : {})
         },
         credentials: 'omit'
@@ -2389,7 +2379,7 @@ export default function Playground({
         })
         .catch(error => console.error('Error activating most recent voice:', error));
     }
-  }, [savedVoices, params.brdgeId, params.apiBaseUrl]);
+  }, [savedVoices, params.brdgeId, params.apiBaseUrl, authToken]);
 
   // Update tabs array
   const tabs = params.agentType === 'view' ? [
@@ -2694,20 +2684,26 @@ export default function Playground({
     if (!params.brdgeId || !params.apiBaseUrl || !brdge) return;
 
     try {
+      console.log("Toggling shareable status with token:", authToken ? "Token exists" : "No token");
+
+      // Make a direct fetch request without credentials but with the auth token header
       const response = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/toggle_shareable`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(localStorage.getItem('token') ? {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          } : {})
+          'Authorization': authToken ? `Bearer ${authToken}` : ''
         },
+        // Don't include credentials - this is crucial for CORS
         credentials: 'omit'
       });
 
-      if (!response.ok) throw new Error('Failed to toggle shareable status');
+      if (!response.ok) {
+        console.error('Failed to toggle shareable status:', response.status, response.statusText);
+        throw new Error(`Failed to toggle shareable status: ${response.status}`);
+      }
 
       const data = await response.json();
+      console.log('Toggle response:', data);
 
       // Update the brdge object with the new shareable status
       setBrdge(prev => prev ? { ...prev, shareable: data.shareable } : null);
@@ -3036,7 +3032,10 @@ export default function Playground({
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache' // Add this to prevent caching issues
+            'Cache-Control': 'no-cache', // Add this to prevent caching issues
+            ...(authToken ? {
+              'Authorization': `Bearer ${authToken}`
+            } : {})
           },
           body: JSON.stringify({
             personality: newConfig.personality,
@@ -3173,14 +3172,14 @@ export default function Playground({
   const sendTimestamp = useCallback(() => {
     // --- Add detailed logging at the start ---
     const currentVideo = videoRef.current;
-    const currentSend = sendRef.current;
+    const sendFn = sendRef.current; // Get the current send function
     const currentState = roomState; // Capture current state
-    console.log(`sendTimestamp called. Video: ${currentVideo ? 'Exists' : 'Missing'}, Send: ${currentSend ? 'Exists' : 'Missing'}, State: ${currentState}`);
+    console.log(`sendTimestamp called. Video: ${currentVideo ? 'Exists' : 'Missing'}, SendRef exists: ${!!sendFn}, State: ${currentState}`);
     // --- End detailed logging ---
 
-    // Check 1: Video and Send function must exist
-    if (!currentVideo || !currentSend) {
-      console.log("sendTimestamp aborted: Video or Send Ref missing.");
+    // Check 1: Video must exist and we must have a send function
+    if (!currentVideo) {
+      console.log("sendTimestamp aborted: Video ref is missing.");
       return;
     }
 
@@ -3190,11 +3189,12 @@ export default function Playground({
       return;
     }
 
-    // Now we know video and send exist, and room is connected
+    // Now we know video exists and room is connected
     const currentTime = currentVideo.currentTime;
 
     // Check 3: Threshold check
-    const thresholdMet = lastSentTimestampRef.current === null || Math.abs(currentTime - lastSentTimestampRef.current) >= 0.7;
+    const thresholdMet = lastSentTimestampRef.current === null ||
+      Math.abs(currentTime - lastSentTimestampRef.current) >= 0.7;
 
     if (thresholdMet) {
       console.log(`Threshold met. Attempting to send timestamp: ${currentTime}`); // <-- Log before sending
@@ -3205,20 +3205,19 @@ export default function Playground({
       const payload = new TextEncoder().encode(message);
 
       try {
-        // Use the send function from the ref
-        currentSend(payload, { topic: "video-timestamp", reliable: false });
-        lastSentTimestampRef.current = currentTime; // Update only on successful send attempt
-        console.log(`Timestamp ${currentTime} sent successfully via ref.`);
+        // Send the timestamp using the function from the ref
+        if (sendFn) {
+          sendFn(payload, { topic: "video-timestamp", reliable: false });
+          lastSentTimestampRef.current = currentTime; // Update only on successful send attempt
+          console.log(`Timestamp ${currentTime} sent successfully via ref.`);
+        } else {
+          console.log("Cannot send timestamp: send function is not available.");
+        }
       } catch (err) {
         console.error(`Failed to send timestamp ${currentTime} via ref:`, err);
-        // If sending fails, maybe don't update lastSentTimestampRef? Or reset it?
-        // lastSentTimestampRef.current = null; // Optional: Allow resending immediately after an error
       }
-    } else {
-      // Log if the threshold is the reason for not sending
-      // console.log(`Threshold NOT met. Current: ${currentTime}, Last: ${lastSentTimestampRef.current}. Skipping send.`);
     }
-  }, [videoRef, roomState]); // Keep roomState here as it's checked directly
+  }, [roomState]); // Keep roomState here as it's checked directly
 
   // 2. Create stable event handler callbacks
   const handlePlay = useCallback(() => {
@@ -3444,6 +3443,18 @@ export default function Playground({
     group
     p-4 my-4
   `;
+
+  // Set up API authorization when authToken changes
+  useEffect(() => {
+    if (authToken) {
+      // Set authorization header for API calls
+      api.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
+      console.log('Authorization header set from authToken prop');
+    } else {
+      // Remove authorization header if no token
+      delete api.defaults.headers.common['Authorization'];
+    }
+  }, [authToken]);
 
   return (
     <div className="h-screen flex flex-col bg-[#F5EFE0] relative overflow-hidden">
