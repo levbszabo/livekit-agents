@@ -3871,7 +3871,10 @@ export default function Playground({
                         <div className={`flex items-center justify-between ${isMobile ? 'p-1' : 'p-2'}`}>
                           {/* Brand icon - Hide text on mobile */}
                           <div className="flex items-center gap-2">
-                            <BrdgeLogo src="/stamp-logo.png" alt="Brdge AI Logo" />
+                            <BrdgeLogo
+                              src={process.env.NODE_ENV === 'production' ? '/playground/public/stamp-logo.png' : '/stamp-logo.png'}
+                              alt="Brdge AI Logo"
+                            />
                             {!isMobile && (
                               <>
                                 {/* Add BarVisualizer here */}
