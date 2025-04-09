@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { EngagementOpportunity } from '../playground/Playground';
 
 // Use the correct path to the stamp logo
-const stampLogoPath = '/stamp-logo.png';
+const stampLogoPath = process.env.NODE_ENV === 'production' ? '/playground/stamp-logo.png' : '/stamp-logo.png';
 
 // Increase marker size for better visibility
 const MARKER_SIZE = 24;
