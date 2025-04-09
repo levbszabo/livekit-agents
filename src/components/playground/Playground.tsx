@@ -3872,7 +3872,7 @@ export default function Playground({
                           {/* Brand icon - Hide text on mobile */}
                           <div className="flex items-center gap-2">
                             <BrdgeLogo
-                              src={process.env.NODE_ENV === 'production' ? '/playground/public/stamp-logo.png' : '/stamp-logo.png'}
+                              src={process.env.NODE_ENV === 'production' ? '/playground/stamp-logo.png' : '/stamp-logo.png'}
                               alt="Brdge AI Logo"
                             />
                             {!isMobile && (
