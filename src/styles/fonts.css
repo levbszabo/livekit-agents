@@ -1,39 +1,42 @@
 @font-face {
     font-family: 'Satoshi';
-    src: url('/playground/fonts/Satoshi-Light.woff2') format('woff2'),
-        url('/playground/fonts/Satoshi-Light.woff') format('woff');
+    src: url('/fonts/Satoshi-Light.woff2') format('woff2'),
+        url('/fonts/Satoshi-Light.woff') format('woff');
     font-weight: 300;
     font-style: normal;
 }
 
 @font-face {
     font-family: 'Satoshi';
-    src: url('/playground/fonts/Satoshi-Regular.woff2') format('woff2'),
-        url('/playground/fonts/Satoshi-Regular.woff') format('woff');
+    src: url('/fonts/Satoshi-Regular.woff2') format('woff2'),
+        url('/fonts/Satoshi-Regular.woff') format('woff');
     font-weight: 400;
     font-style: normal;
 }
 
 @font-face {
     font-family: 'Satoshi';
-    src: url('/playground/fonts/Satoshi-Medium.woff2') format('woff2'),
-        url('/playground/fonts/Satoshi-Medium.woff') format('woff');
+    src: url('/fonts/Satoshi-Medium.woff2') format('woff2'),
+        url('/fonts/Satoshi-Medium.woff') format('woff');
     font-weight: 500;
     font-style: normal;
 }
 
 @font-face {
     font-family: 'Satoshi';
-    src: url('/playground/fonts/Satoshi-Bold.woff2') format('woff2'),
-        url('/playground/fonts/Satoshi-Bold.woff') format('woff');
+    src: url('/fonts/Satoshi-Bold.woff2') format('woff2'),
+        url('/fonts/Satoshi-Bold.woff') format('woff');
     font-weight: 700;
     font-style: normal;
 }
 
 @font-face {
     font-family: 'Satoshi';
-    src: url('/playground/fonts/Satoshi-Black.woff2') format('woff2'),
-        url('/playground/fonts/Satoshi-Black.woff') format('woff');
+    src: url('/fonts/Satoshi-Black.woff2') format('woff2'),
+        url('/fonts/Satoshi-Black.woff') format('woff');
     font-weight: 900;
     font-style: normal;
 }
+
+@import url('https://fonts.cdnfonts.com/css/satoshi');
+@import url('https://fonts.cdnfonts.com/css/canela-text');

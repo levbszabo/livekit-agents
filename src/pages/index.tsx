@@ -6,9 +6,8 @@ import {
 import { AnimatePresence, motion } from "framer-motion";
 import { Inter } from "next/font/google";
 import Head from "next/head";
-import { useCallback, useState, useEffect } from "react";
-import { ThemeProvider } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
+import dynamic from 'next/dynamic';
+import { useCallback, useState, useEffect, useMemo } from "react";
 
 import { PlaygroundConnect } from "@/components/PlaygroundConnect";
 import Playground from "@/components/playground/Playground";
@@ -16,9 +15,7 @@ import MobilePlayground from "@/components/playground/mobile/MobilePlayground";
 import { PlaygroundToast, ToastType } from "@/components/toast/PlaygroundToast";
 import { ConfigProvider, useConfig } from "@/hooks/useConfig";
 import { ConnectionMode, ConnectionProvider, useConnection } from "@/hooks/useConnection";
-import { useMemo } from "react";
 import { ToastProvider, useToast } from "@/components/toast/ToasterProvider";
-import neoScholarTheme from '@/theme/neo-scholar';
 import { setAuthToken } from "@/api";
 
 const themeColors = [
@@ -34,19 +31,28 @@ const themeColors = [
 
 const inter = Inter({ subsets: ["latin"] });
 
-export default function Home() {
+// Define the component that includes providers and HomeInner
+function ClientSideApp() {
   return (
     <ToastProvider>
       <ConfigProvider>
         <ConnectionProvider>
-          <ThemeProvider theme={neoScholarTheme}>
-            <CssBaseline />
-            <HomeInner />
-          </ThemeProvider>
+          <HomeInner />
         </ConnectionProvider>
       </ConfigProvider>
     </ToastProvider>
   );
+}
+
+// Dynamically import the ClientSideApp with ssr: false
+// Use a more explicit type hint for dynamic import
+const DynamicClientSideApp = dynamic<{}>(() => Promise.resolve(ClientSideApp), {
+  ssr: false,
+});
+
+export default function Home() {
+  // Render the dynamically imported component
+  return <DynamicClientSideApp />;
 }
 
 export function HomeInner() {

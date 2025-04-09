@@ -4903,7 +4903,7 @@ export default function Playground({
                                   <div className="text-center p-6 bg-[#F5EFE0]/60 rounded-lg border border-[#9C7C38]/30">
                                     <div className="text-[#0A1933] text-sm">No engagement opportunities found</div>
                                     <div className="text-[#1E2A42] text-xs mt-1">
-                                      Create new engagement opportunities using the "Add New" button above
+                                      Create new engagement opportunities using the &quot;Add New&quot; button above
                                     </div>
                                   </div>
                                 )}
