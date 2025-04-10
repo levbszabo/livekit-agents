@@ -23,6 +23,7 @@ import { Plus, FileText, X, Edit2, Save, ChevronDown, ChevronUp, Play, Pause, Vo
 import { motion, AnimatePresence } from 'framer-motion';
 import styled, { keyframes } from 'styled-components';
 import PlaygroundProgressBar from '../player/PlaygroundProgressBar';
+import stampLogo from '../../assets/stamp-logo.png';
 
 export interface PlaygroundProps {
   logo?: ReactNode;
@@ -3872,7 +3873,7 @@ export default function Playground({
                           {/* Brand icon - Hide text on mobile */}
                           <div className="flex items-center gap-2">
                             <BrdgeLogo
-                              src={process.env.NODE_ENV === 'production' ? '/playground/stamp-logo.png' : '/stamp-logo.png'}
+                              src={stampLogo.src}
                               alt="Brdge AI Logo"
                             />
                             {!isMobile && (

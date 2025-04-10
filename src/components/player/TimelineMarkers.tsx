@@ -2,8 +2,11 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { EngagementOpportunity } from '../playground/Playground';
 
-// Use the correct path to the stamp logo
-const stampLogoPath = process.env.NODE_ENV === 'production' ? '/playground/stamp-logo.png' : '/stamp-logo.png';
+// Import the logo directly to let webpack handle it
+// This is more reliable than using conditional paths
+import stampLogo from '../../assets/stamp-logo.png';
+// Extract the src property for TypeScript compatibility
+const stampLogoPath = stampLogo.src;
 
 // Increase marker size for better visibility
 const MARKER_SIZE = 24;
