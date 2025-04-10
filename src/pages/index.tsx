@@ -11,7 +11,7 @@ import { useCallback, useState, useEffect, useMemo } from "react";
 
 import { PlaygroundConnect } from "@/components/PlaygroundConnect";
 import Playground from "@/components/playground/Playground";
-import MobilePlayground from "@/components/playground/mobile/MobilePlayground";
+import MobilePlayground from "@/components/playground/PlaygroundMobile";
 import { PlaygroundToast, ToastType } from "@/components/toast/PlaygroundToast";
 import { ConfigProvider, useConfig } from "@/hooks/useConfig";
 import { ConnectionMode, ConnectionProvider, useConnection } from "@/hooks/useConnection";
@@ -93,8 +93,8 @@ export function HomeInner() {
         setIsMobile(isMobileResult);
         setOrientation(isPortrait ? 'portrait' : 'landscape');
 
-        // Show rotation prompt only if mobile AND portrait
-        setShowRotationPrompt(isMobileResult && isPortrait);
+        // Disable rotation prompt by setting to false regardless of orientation
+        setShowRotationPrompt(false);
       };
 
       // Initial check
@@ -177,9 +177,6 @@ export function HomeInner() {
     }
     return false;
   }, [wsUrl])
-
-  // Determine which Playground component to render
-  const PlaygroundComponent = isMobile ? Playground : Playground;
 
   // Add global styles to prevent scrolling and bouncing effects
   useEffect(() => {
@@ -311,17 +308,31 @@ export function HomeInner() {
               console.error(e);
             }}
           >
-            <PlaygroundComponent
-              themeColors={themeColors}
-              onConnect={(c) => {
-                const m = process.env.NEXT_PUBLIC_LIVEKIT_URL ? "env" : mode;
-                handleConnect(c, m);
-              }}
-              agentType={urlParams?.agentType}
-              userId={urlParams?.userId}
-              brdgeId={urlParams.brdgeId}
-              authToken={authToken}
-            />
+            {isMobile ? (
+              <MobilePlayground
+                themeColors={themeColors}
+                onConnect={(c) => {
+                  const m = process.env.NEXT_PUBLIC_LIVEKIT_URL ? "env" : mode;
+                  handleConnect(c, m);
+                }}
+                agentType={urlParams?.agentType}
+                brdgeId={urlParams.brdgeId}
+                authToken={authToken || undefined}
+                userId={urlParams?.userId}
+              />
+            ) : (
+              <Playground
+                themeColors={themeColors}
+                onConnect={(c) => {
+                  const m = process.env.NEXT_PUBLIC_LIVEKIT_URL ? "env" : mode;
+                  handleConnect(c, m);
+                }}
+                agentType={urlParams?.agentType}
+                userId={urlParams?.userId}
+                brdgeId={urlParams.brdgeId}
+                authToken={authToken}
+              />
+            )}
             <RoomAudioRenderer />
             <StartAudio label="Click to enable audio playback" />
           </LiveKitRoom>

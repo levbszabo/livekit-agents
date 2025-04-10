@@ -129,29 +129,6 @@ interface Transcript {
   metadata: any;
 }
 
-// Update the useIsMobile hook to also detect orientation
-const useIsMobile = () => {
-  const [isMobile, setIsMobile] = useState(false);
-  const [isLandscape, setIsLandscape] = useState(false);
-
-  useEffect(() => {
-    const checkLayout = () => {
-      setIsMobile(window.innerWidth < 640);
-      setIsLandscape(window.innerWidth > window.innerHeight);
-    };
-
-    checkLayout();
-    window.addEventListener('resize', checkLayout);
-    window.addEventListener('orientationchange', checkLayout);
-    return () => {
-      window.removeEventListener('resize', checkLayout);
-      window.removeEventListener('orientationchange', checkLayout);
-    };
-  }, []);
-
-  return { isMobile, isLandscape };
-};
-
 // Update the styles object to include better font styling
 const styles = {
   section: {
@@ -199,32 +176,6 @@ const resizeHandleStyles = {
     flex items-center justify-center
     group
   `
-};
-
-const MobileConfigDrawer = ({
-  isOpen,
-  onClose,
-  configTab,
-  setConfigTab,
-  children
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  configTab: ConfigTab;
-  setConfigTab: (tab: ConfigTab) => void;
-  children: ReactNode;
-}) => {
-  return (
-    <div
-      className={`
-        fixed inset-0 z-50 
-        transition-all duration-300 ease-in-out
-        ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}
-      `}
-    >
-      {/* Rest of the MobileConfigDrawer implementation */}
-    </div>
-  );
 };
 
 // First, let's create a proper TypeScript interface for engagement opportunities
@@ -560,7 +511,6 @@ const VideoPlayer = ({
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [hasInteracted, setHasInteracted] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false); // Internal state
-  const { isMobile } = useIsMobile();
 
   // Handle initial load and duration updates
   const handleLoadedMetadata = () => {
@@ -569,9 +519,10 @@ const VideoPlayer = ({
     if (dur && !isNaN(dur) && isFinite(dur)) {
       setDuration(dur);
       // Don't set loading false here, wait for canplay
-      if (isMobile) {
-        videoRef.current.muted = true;
-      }
+      // Remove mobile specific logic
+      // if (isMobile) {
+      //   videoRef.current.muted = true;
+      // }
     }
   };
 
@@ -581,10 +532,11 @@ const VideoPlayer = ({
     setIsLoading(false); // Move loading state here
     onVideoReady(true); // <<< Call the callback here
 
+    // Remove mobile specific logic
     // Auto-play on mobile if muted
-    if (isMobile && videoRef.current?.muted && !hasInteracted) {
-      attemptPlay();
-    }
+    // if (isMobile && videoRef.current?.muted && !hasInteracted) {
+    //   attemptPlay();
+    // }
   };
 
   // Enhanced error handling
@@ -606,13 +558,13 @@ const VideoPlayer = ({
     try {
       setPlaybackError(null);
 
-      // Don't set loading true here anymore
+      // Remove mobile specific logic
       // setIsLoading(true);
 
       // For mobile, ensure video is muted for first play
-      if (isMobile && !hasInteracted) {
-        videoRef.current.muted = true;
-      }
+      // if (isMobile && !hasInteracted) {
+      //   videoRef.current.muted = true;
+      // }
 
       await videoRef.current.play();
       setIsPlaying(true);
@@ -630,10 +582,11 @@ const VideoPlayer = ({
       videoRef.current.pause();
       setIsPlaying(false);
     } else {
+      // Remove mobile specific logic
       // If on mobile and first interaction, unmute
-      if (isMobile && hasInteracted && videoRef.current.muted) {
-        videoRef.current.muted = false;
-      }
+      // if (isMobile && hasInteracted && videoRef.current.muted) {
+      //   videoRef.current.muted = false;
+      // }
       attemptPlay();
     }
   };
@@ -707,7 +660,6 @@ const VideoPlayer = ({
               webkit-playsinline="true"
               x-webkit-airplay="allow"
               preload="metadata"
-              muted={isMobile && !hasInteracted}
               controls={false}
               autoPlay={false}
             >
@@ -746,7 +698,7 @@ const VideoPlayer = ({
               transition-all duration-300"
           >
             <Play
-              size={isMobile ? 24 : 32}
+              size={32}
               className="text-white/90 relative z-10 
                 group-hover:text-white transition-colors duration-300
                 drop-shadow-[0_2px_3px_rgba(0,0,0,0.3)]"
@@ -1683,7 +1635,6 @@ export default function Playground({
   brdgeId,
   authToken // Changed from token to authToken
 }: PlaygroundProps) {
-  const { isMobile, isLandscape } = useIsMobile();
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
   const [selectedVoice, setSelectedVoice] = useState<string | null>(null);
   const [selectedVoiceBrdgeId, setSelectedVoiceBrdgeId] = useState<string | null>(null);
@@ -2577,98 +2528,7 @@ export default function Playground({
     }
   }, [localParticipant?.isMicrophoneEnabled, voiceAssistant?.audioTrack]);
 
-  // First, update the mobile layout class to be simpler
-  const mobileLayoutClass = isMobile ? 'flex flex-col' : '';
-
-  // Add mobile-specific video controls that overlay the video
-  const MobileVideoControls = () => {
-    return (
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => {
-              if (videoRef.current) {
-                if (isPlaying) {
-                  videoRef.current.pause();
-                } else {
-                  videoRef.current.play();
-                }
-                setIsPlaying(!isPlaying);
-              }
-            }}
-            className="text-white/90 hover:text-cyan-400 transition-colors"
-          >
-            {isPlaying ? <Pause size={16} /> : <Play size={16} />}
-          </button>
-
-          <div className="flex-1 text-[11px] text-white/60 font-medium">
-            {formatTime(currentTime)} / {formatTime(videoRef.current?.duration || 0)}
-          </div>
-
-          <button
-            onClick={() => {
-              if (videoRef.current) {
-                videoRef.current.muted = !isMuted;
-                setIsMuted(!isMuted);
-              }
-            }}
-            className="text-white/90 hover:text-cyan-400 transition-colors"
-          >
-            {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  // Add a FAB component for quick mobile actions
-  const MobileFAB = () => {
-    return (
-      <div className="fixed bottom-4 right-4 z-50">
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          onClick={() => {
-            if (roomState === ConnectionState.Connected && localParticipant) {
-              localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
-            }
-          }}
-          className={`
-            w-12 h-12 rounded-full
-            flex items-center justify-center
-            ${localParticipant?.isMicrophoneEnabled
-              ? 'bg-red-500/90 text-white'
-              : 'bg-cyan-500/90 text-white'}
-            shadow-lg backdrop-blur-sm
-            border border-white/10
-          `}
-        >
-          {localParticipant?.isMicrophoneEnabled
-            ? <MicOff size={18} />
-            : <Mic size={18} />}
-        </motion.button>
-      </div>
-    );
-  };
-
-  // Add this effect to send agent config when connected
-  useEffect(() => {
-    if (roomState === ConnectionState.Connected && agentConfig) {
-      try {
-        const configPayload = {
-          agent_config: agentConfig,
-          user_id: params.userId,
-          brdge_id: params.brdgeId
-        };
-
-        console.log('Agent config updated:', configPayload);
-        // Removed sendData call since we're removing data channel functionality
-      } catch (error) {
-        console.error('Error updating agent config:', error);
-      }
-    }
-  }, [roomState, agentConfig, params.userId, params.brdgeId]);
-
-  // Then update the main container and content area for mobile
+  // Add this near other state declarations
   const [isInfoVisible, setIsInfoVisible] = useState(true);
 
   useEffect(() => {
@@ -3483,53 +3343,51 @@ export default function Playground({
 
   return (
     <div className="h-screen flex flex-col bg-[#F5EFE0] relative overflow-hidden">
-      {/* Hide header on mobile as before */}
-      {!isMobile && (
-        <div className="h-[0px] flex items-center px-4 relative">
-          {logo}
-          {/* Multi-layered border effect */}
-          <div className="absolute bottom-0 left-0 right-0">
-            {/* Primary glowing line */}
-            <div className="absolute bottom-0 left-0 right-0 h-[1px] 
+      {/* Header */}
+      <div className="h-[0px] flex items-center px-4 relative">
+        {logo}
+        {/* Multi-layered border effect */}
+        <div className="absolute bottom-0 left-0 right-0">
+          {/* Primary glowing line */}
+          <div className="absolute bottom-0 left-0 right-0 h-[1px] 
             bg-gradient-to-r from-transparent via-[#9C7C38]/80 to-transparent 
             shadow-[0_0_10px_rgba(156,124,56,0.4)]
             animate-pulse"
-            />
+          />
 
-            {/* Secondary accent lines */}
-            <div className="absolute bottom-[1px] left-1/4 right-1/4 h-[1px] 
+          {/* Secondary accent lines */}
+          <div className="absolute bottom-[1px] left-1/4 right-1/4 h-[1px] 
             bg-gradient-to-r from-transparent via-[#9C7C38]/40 to-transparent
             shadow-[0_0_8px_rgba(156,124,56,0.3)]"
-            />
+          />
 
-            {/* Edge accents */}
-            <div className="absolute bottom-0 left-0 w-8 h-[2px]
+          {/* Edge accents */}
+          <div className="absolute bottom-0 left-0 w-8 h-[2px]
             bg-gradient-to-r from-[#9C7C38]/80 to-transparent
             shadow-[0_0_10px_rgba(156,124,56,0.4)]"
-            />
-            <div className="absolute bottom-0 right-0 w-8 h-[2px]
+          />
+          <div className="absolute bottom-0 right-0 w-8 h-[2px]
             bg-gradient-to-l from-[#9C7C38]/80 to-transparent
             shadow-[0_0_10px_rgba(156,124,56,0.4)]"
-            />
-          </div>
+          />
         </div>
-      )}
+      </div>
 
       {/* Main container */}
-      <div className={`flex-1 relative ${mobileLayoutClass}`}>
-        {/* Main Content */}
+      <div className={`flex-1 relative`}>
+        {/* Main Content - Always use desktop layout */}
         <div
           className={`
-            ${!isMobile ? 'absolute inset-0' : 'w-full h-full flex flex-col'}
-            ${!isMobile && !isRightPanelCollapsed ? 'right-[360px]' : 'right-0'}
+            absolute inset-0
+            ${!isRightPanelCollapsed ? 'right-[360px]' : 'right-0'}
             transition-all duration-300
           `}
         >
           <PanelGroup direction="vertical">
-            {/* Video Panel - Adjust size for mobile */}
+            {/* Video Panel - Always use desktop size */}
             <Panel
-              defaultSize={isMobile ? 40 : 85}
-              minSize={isMobile ? 30 : 60}
+              defaultSize={85}
+              minSize={60}
             >
               <div className="h-full w-full bg-black">
                 <VideoPlayer
@@ -3552,188 +3410,140 @@ export default function Playground({
               </div>
             </Panel>
 
-            {/* Chat/Transcript Panel for Mobile */}
-            {isMobile && (
-              <Panel defaultSize={60} minSize={30}>
-                <div className="h-full flex flex-col bg-black/90">
-                  {/* Chat content */}
-                  <div className="flex-1 overflow-y-auto">
-                    {/* Voice Assistant Transcription */}
-                    {voiceAssistant?.audioTrack && (
-                      <div className="p-2">
-                        <TranscriptionTile
-                          agentAudioTrack={voiceAssistant.audioTrack}
-                          accentColor="cyan"
-                        />
-                      </div>
-                    )}
-
-                    {/* Chat Messages */}
-                    <div className="flex-1 p-2 space-y-1">
-                      {transcripts.map((message) => (
-                        <div
-                          key={message.timestamp}
-                          className={`
-                            ${message.isSelf ? 'ml-auto bg-cyan-950/30' : 'mr-auto bg-gray-800/30'} 
-                            max-w-[95%]
-                            rounded-lg p-1.5
-                            backdrop-blur-sm
-                            border border-gray-700/50
-                            transition-all duration-300
-                            hover:border-cyan-500/30
-                            group
-                          `}
-                        >
-                          <div className="text-[11px] leading-relaxed text-gray-300">
-                            {message.message}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </Panel>
-            )}
-
-            {/* Desktop Transcript Panel */}
-            {!isMobile && (
-              <>
-                <PanelResizeHandle className={resizeHandleStyles.horizontal}>
-                  <div className="relative w-full h-2 group">
-                    <div className="absolute left-1/2 -translate-x-1/2 w-8 h-0.5 
+            {/* Transcript Panel */}
+            <>
+              <PanelResizeHandle className={resizeHandleStyles.horizontal}>
+                <div className="relative w-full h-2 group">
+                  <div className="absolute left-1/2 -translate-x-1/2 w-8 h-0.5 
                       bg-gradient-to-r from-transparent via-[#9C7C38]/40 to-transparent 
                       group-hover:via-[#9C7C38]/60
                       shadow-[0_0_8px_rgba(156,124,56,0.3)]
                       transition-all duration-300"
-                    />
-                    <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-[1px] overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <div className="absolute inset-0 w-1/3
+                  />
+                  <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-[1px] overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="absolute inset-0 w-1/3
                         bg-gradient-to-r from-transparent via-[#9C7C38]/40 to-transparent
                         animate-[scan_3s_ease-in-out_infinite]"
+                    />
+                  </div>
+                </div>
+              </PanelResizeHandle>
+
+              <Panel defaultSize={15} minSize={15} maxSize={40}>
+                {/* Apply map texture to the main panel container */}
+
+                <div className="h-full flex flex-col bg-[url('/textures/dark-parchment.png')] opacity-90 bg-cover bg-center relative rounded-md"> {/* <-- Updated background image */}
+                  <div className="absolute inset-0 bg-[#B8A678]/70 mix-blend z-0"></div>
+
+                  {/* Add an overlay for slight darkening/contrast if needed */}
+                  {/* <div className="absolute inset-0 bg-black/10"></div> */}
+
+                  {/* Keep controls on a slightly opaque background for better legibility */}
+                  <div className="border-b border-gray-800/30 bg-black/20 backdrop-blend-color-dodge p-2 relative z-10 shadow-inner shadow-[#9C7C38]/90"> {/* <-- Ensured this background is present */}
+                    <div className="flex items-center gap-4">
+                      {/* Play/Pause Button */}
+                      <button
+                        onClick={() => {
+                          if (videoRef.current) {
+                            if (isPlaying) {
+                              videoRef.current.pause();
+                            } else {
+                              videoRef.current.play();
+                            }
+                            setIsPlaying(!isPlaying);
+                          }
+                        }}
+                        className="text-white hover:text-cyan-400 transition-colors"
+                      >
+                        {isPlaying ? <Pause size={18} /> : <Play size={18} />}
+                      </button>
+
+                      {/* Progress Bar Container */}
+                      <PlaygroundProgressBar
+                        currentTime={currentTime}
+                        duration={duration}
+                        videoRef={videoRef}
+                        setCurrentTime={setCurrentTime}
+                        isPlaying={isPlaying}
+                        setIsPlaying={setIsPlaying}
+                        engagementOpportunities={engagementOpportunities || []}
+                        setActiveTab={setActiveTab}
                       />
-                    </div>
-                  </div>
-                </PanelResizeHandle>
 
-                <Panel defaultSize={15} minSize={15} maxSize={40}>
-                  {/* Apply map texture to the main panel container */}
-
-                  <div className="h-full flex flex-col bg-[url('/textures/dark-parchment.png')] opacity-90 bg-cover bg-center relative rounded-md"> {/* <-- Updated background image */}
-                    <div className="absolute inset-0 bg-[#B8A678]/70 mix-blend z-0"></div>
-
-                    {/* Add an overlay for slight darkening/contrast if needed */}
-                    {/* <div className="absolute inset-0 bg-black/10"></div> */}
-
-                    {/* Keep controls on a slightly opaque background for better legibility */}
-                    <div className="border-b border-gray-800/30 bg-black/20 backdrop-blend-color-dodge p-2 relative z-10 shadow-inner shadow-[#9C7C38]/90"> {/* <-- Ensured this background is present */}
-                      <div className="flex items-center gap-4">
-                        {/* Play/Pause Button */}
-                        <button
-                          onClick={() => {
-                            if (videoRef.current) {
-                              if (isPlaying) {
-                                videoRef.current.pause();
-                              } else {
-                                videoRef.current.play();
-                              }
-                              setIsPlaying(!isPlaying);
-                            }
-                          }}
-                          className="text-white hover:text-cyan-400 transition-colors"
-                        >
-                          {isPlaying ? <Pause size={18} /> : <Play size={18} />}
-                        </button>
-
-                        {/* Progress Bar Container */}
-                        <PlaygroundProgressBar
-                          currentTime={currentTime}
-                          duration={duration}
-                          videoRef={videoRef}
-                          setCurrentTime={setCurrentTime}
-                          isPlaying={isPlaying}
-                          setIsPlaying={setIsPlaying}
-                          engagementOpportunities={engagementOpportunities || []}
-                          setActiveTab={setActiveTab}
-                        />
-
-                        {/* Time Display */}
-                        <div className="flex items-center gap-2 text-[11px] text-black/90 font-medium tracking-wider">
-                          {formatTime(currentTime)} / {formatTime(duration)}
-                        </div>
-                        {/* Volume Control */}
-                        <div className="flex items-center gap-2 group relative">
-                          <button
-                            onClick={() => {
-                              if (videoRef.current) {
-                                videoRef.current.muted = !isMuted;
-                                setIsMuted(!isMuted);
-                              }
-                            }}
-                            className="text-white hover:text-[#1E2A42] transition-colors"
-                          >
-                            {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-                          </button>
-                          <input
-                            type="range"
-                            min="0"
-                            max="1"
-                            step="0.1"
-                            value={isMuted ? 0 : volume}
-                            onChange={(e) => {
-                              const newVolume = parseFloat(e.target.value);
-                              setVolume(newVolume);
-                              if (videoRef.current) {
-                                videoRef.current.volume = newVolume;
-                              }
-                            }}
-                            className="w-0 group-hover:w-20 transition-all duration-300 accent-[#1E2A42]"
-                          />
-                        </div>
-
-                        {/* Fullscreen Button */}
-                        <button
-                          onClick={() => {
-                            if (videoRef.current) {
-                              videoRef.current.requestFullscreen();
-                            }
-                          }}
-                          className="text-white hover:text-cyan-400 transition-colors"
-                        >
-                          <Maximize2 size={18} />
-                        </button>
+                      {/* Time Display */}
+                      <div className="flex items-center gap-2 text-[11px] text-black/90 font-medium tracking-wider">
+                        {formatTime(currentTime)} / {formatTime(duration)}
                       </div>
-                    </div>
+                      {/* Volume Control */}
+                      <div className="flex items-center gap-2 group relative">
+                        <button
+                          onClick={() => {
+                            if (videoRef.current) {
+                              videoRef.current.muted = !isMuted;
+                              setIsMuted(!isMuted);
+                            }
+                          }}
+                          className="text-white hover:text-[#1E2A42] transition-colors"
+                        >
+                          {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                        </button>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.1"
+                          value={isMuted ? 0 : volume}
+                          onChange={(e) => {
+                            const newVolume = parseFloat(e.target.value);
+                            setVolume(newVolume);
+                            if (videoRef.current) {
+                              videoRef.current.volume = newVolume;
+                            }
+                          }}
+                          className="w-0 group-hover:w-20 transition-all duration-300 accent-[#1E2A42]"
+                        />
+                      </div>
 
-                    {/* This space now shows the map texture */}
-                    <div className="flex-1 relative">
-                      {/* Decorative border */}
-                      <div className="absolute inset-0 border-2 border-green-700/30 pointer-events-none shadow-[inset_0_0_8px_rgba(20,83,45,0.05)]"></div>
-                      <div className="absolute inset-0 border-2 border-green-800/20 m-2 pointer-events-none rounded shadow-[inset_0_0_5px_rgba(20,83,45,0.1)]"></div>
-                      <div className="absolute top-1 left-1 right-1 h-[2px] bg-gradient-to-r from-transparent via-green-800/35 to-transparent"></div>
-                      <div className="absolute bottom-1 left-1 right-1 h-[2px] bg-gradient-to-r from-transparent via-green-800/35 to-transparent"></div>
-                      <div className="absolute left-1 top-1 bottom-1 w-[2px] bg-gradient-to-b from-transparent via-green-800/35 to-transparent"></div>
-                      <div className="absolute right-1 top-1 bottom-1 w-[2px] bg-gradient-to-b from-transparent via-green-800/35 to-transparent"></div>
-
-                      {/* Corner accents */}
-                      <div className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-green-800/40"></div>
-                      <div className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-green-800/40"></div>
-                      <div className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-green-800/40"></div>
-                      <div className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-green-800/40"></div>
+                      {/* Fullscreen Button */}
+                      <button
+                        onClick={() => {
+                          if (videoRef.current) {
+                            videoRef.current.requestFullscreen();
+                          }
+                        }}
+                        className="text-white hover:text-cyan-400 transition-colors"
+                      >
+                        <Maximize2 size={18} />
+                      </button>
                     </div>
                   </div>
-                </Panel>
-              </>
-            )}
+
+                  {/* This space now shows the map texture */}
+                  <div className="flex-1 relative">
+                    {/* Decorative border */}
+                    <div className="absolute inset-0 border-2 border-green-700/30 pointer-events-none shadow-[inset_0_0_8px_rgba(20,83,45,0.05)]"></div>
+                    <div className="absolute inset-0 border-2 border-green-800/20 m-2 pointer-events-none rounded shadow-[inset_0_0_5px_rgba(20,83,45,0.1)]"></div>
+                    <div className="absolute top-1 left-1 right-1 h-[2px] bg-gradient-to-r from-transparent via-green-800/35 to-transparent"></div>
+                    <div className="absolute bottom-1 left-1 right-1 h-[2px] bg-gradient-to-r from-transparent via-green-800/35 to-transparent"></div>
+                    <div className="absolute left-1 top-1 bottom-1 w-[2px] bg-gradient-to-b from-transparent via-green-800/35 to-transparent"></div>
+                    <div className="absolute right-1 top-1 bottom-1 w-[2px] bg-gradient-to-b from-transparent via-green-800/35 to-transparent"></div>
+
+                    {/* Corner accents */}
+                    <div className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-green-800/40"></div>
+                    <div className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-green-800/40"></div>
+                    <div className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-green-800/40"></div>
+                    <div className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-green-800/40"></div>
+                  </div>
+                </div>
+              </Panel>
+            </>
           </PanelGroup>
         </div>
 
-        {/* Right Panel - Desktop only */}
-        {!isMobile && (
-          <motion.div
-            className={`
-              ${isMobile && isLandscape
-                ? 'w-[10%] h-[100dvh] border-l border-[#9C7C38]/30 touch-none'
-                : 'absolute right-0 top-0 bottom-0 w-[360px] border-l border-[#9C7C38]/30'}
+        {/* Right Panel */}
+        <motion.div
+          className={`
+            absolute right-0 top-0 bottom-0 w-[360px] border-l border-[#9C7C38]/30
               bg-[#C99868]/20 backdrop-blur-sm
               z-30
               transition-transform duration-300 ease-in-out
@@ -3741,104 +3551,75 @@ export default function Playground({
               before:bg-gradient-to-b before:from-transparent before:via-[#9C7C38]/30 before:to-transparent
               before:shadow-[0_0_10px_rgba(156,124,56,0.2)]
               after:absolute after:inset-0 after:bg-[url('/textures/crumbled-parchment.jpg')] after:bg-cover after:opacity-15 after:mix-blend after:pointer-events-none
-              ${isMobile ? 'overflow-hidden' : ''}
             `}
-            initial={false}
-            animate={{
-              transform: (!isMobile && isRightPanelCollapsed) ? 'translateX(360px)' : 'translateX(0)'
-            }}
-          >
-            {/* Hide collapse button on mobile */}
-            {!isMobile && (
-              <button
-                onClick={() => setIsRightPanelCollapsed(!isRightPanelCollapsed)}
-                className="absolute -left-8 top-1/2 transform -translate-y-1/2
-                w-8 h-16 bg-[#F5EFE0]/90 backdrop-blur-sm
-                rounded-l-lg flex items-center justify-center
-                text-[#9C7C38] transition-all duration-300
-                border-y border-l border-[#9C7C38]/30
-                outline outline-1 outline-offset-[-3px] outline-[#9C7C38]/20
-                hover:border-[#9C7C38]/40 hover:text-[#9C7C38]
-                hover:shadow-[0_0_10px_rgba(156,124,56,0.1)]
-                group
-              "
-              >
-                <motion.div
-                  animate={{ rotate: isRightPanelCollapsed ? 180 : 0 }}
-                  transition={{ duration: 0.3 }}
-                  className="relative z-10"
-                >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                  </svg>
-                </motion.div>
-              </button>
-            )}
-            {/* Panel Content - Force chat tab on mobile */}
-            <div className={`
-              ${isMobile ? 'h-[100dvh] touch-none' : 'h-full'} 
+          initial={false}
+          animate={{
+            transform: isRightPanelCollapsed ? 'translateX(360px)' : 'translateX(0)'
+          }}
+        >
+          {/* Hide collapse button on mobile */}
+          {/* Panel Content - Force chat tab on mobile */}
+          <div className={`
+            h-full
               pl-4 pr-0 overflow-hidden
-              ${isMobile ? 'pl-2' : ''}
               rounded-lg border border-[#9C7C38]/50
             `}>
-              <div className="h-full flex flex-col">
-                {/* Only show tabs on desktop */}
-                {!isMobile && (
-                  <div className="flex items-center px-1 border-b border-gray-700/40 relative rounded-t-md">
-                    {/* Add glowing border effect */}
-                    <div className="absolute bottom-0 left-0 right-0">
-                      <div className="absolute bottom-0 left-0 right-0 h-[1px]
+            <div className="h-full flex flex-col">
+              {/* Only show tabs on desktop */}
+              <div className="flex items-center px-1 border-b border-gray-700/40 relative rounded-t-md">
+                {/* Add glowing border effect */}
+                <div className="absolute bottom-0 left-0 right-0">
+                  <div className="absolute bottom-0 left-0 right-0 h-[1px]
                       bg-gradient-to-r from-transparent via-[#9C7C38]/30 to-transparent
                       shadow-[0_0_8px_rgba(156,124,56,0.2)]"
-                      />
-                    </div>
-                    {tabs.map((tab) => (
-                      <motion.button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id as ConfigTab)}
-                        className={`
+                  />
+                </div>
+                {tabs.map((tab) => (
+                  <motion.button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as ConfigTab)}
+                    className={`
                         ${styles.tab.base}
                         ${activeTab === tab.id ? styles.tab.active : styles.tab.inactive}
                         text-sm px-2 py-2
                       `}
-                      >
-                        {tab.label}
-                        {activeTab === tab.id && (
-                          <motion.div
-                            layoutId="activeTab"
-                            className="
+                  >
+                    {tab.label}
+                    {activeTab === tab.id && (
+                      <motion.div
+                        layoutId="activeTab"
+                        className="
                             absolute bottom-0 left-0 right-0 h-[2px]
                             bg-gradient-to-r from-[#9C7C38]/70 via-[#9C7C38]/60 to-[#9C7C38]/40
                             shadow-[0_0_10px_rgba(156,124,56,0.3)]
                           "
-                            initial={false}
-                            transition={{
-                              type: "spring",
-                              stiffness: 500,
-                              damping: 30
-                            }}
-                          />
-                        )}
-                      </motion.button>
-                    ))}
-                  </div>
-                )}
+                        initial={false}
+                        transition={{
+                          type: "spring",
+                          stiffness: 500,
+                          damping: 30
+                        }}
+                      />
+                    )}
+                  </motion.button>
+                ))}
+              </div>
 
-                {/* Tab Content - Always show chat on mobile */}
-                <div className={`
+              {/* Tab Content - Always show chat on mobile */}
+              <div className={`
                   flex-1 
-                  ${isMobile ? 'overflow-hidden p-1' : 'overflow-y-auto p-3'} 
+                overflow-y-auto p-3
                   space-y-4
                   relative
                   h-[calc(100vh-120px)] // Add this to ensure sufficient height
                 `}>
-                  {/* Info Tooltip */}
-                  <div className={`
+                {/* Info Tooltip */}
+                <div className={`
                     absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20
                     transition-all duration-500
-                    ${(isMobile || activeTab === 'chat') && isInfoVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'}
+                  ${isInfoVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'}
                   `}>
-                    <div className={`
+                  <div className={`
                       relative px-3 py-2
                       bg-[#F5EFE0]/95 backdrop-blur-sm
                       border border-[#9C7C38]/30
@@ -3846,80 +3627,98 @@ export default function Playground({
                       text-[11px] text-[#0A1933]
                       shadow-[0_0_15px_rgba(156,124,56,0.1)]
                     `}>
-                      <button
-                        onClick={() => setIsInfoVisible(false)}
-                        className="absolute -top-1.5 -right-1.5 p-1 rounded-full 
+                    <button
+                      onClick={() => setIsInfoVisible(false)}
+                      className="absolute -top-1.5 -right-1.5 p-1 rounded-full 
                           bg-[#9C7C38]/30 hover:bg-[#9C7C38]/40
                           text-[#0A1933] hover:text-[#0A1933]
                           border-2 border-[#F5EFE0]
                           shadow-[0_0_5px_rgba(156,124,56,0.3)]
                           transition-all duration-200"
-                      >
-                        <X size={12} />
-                      </button>
-                      Click the mic button to speak or type a message into the chat.
-                    </div>
+                    >
+                      <X size={12} />
+                    </button>
+                    Click the mic button to speak or type a message into the chat.
                   </div>
+                </div>
 
-                  {/* Chat component - Always mounted but conditionally hidden */}
-                  <div className={`
+                {/* Chat component - Always mounted but conditionally hidden */}
+                <div className={`
                     absolute inset-0
-                    ${(isMobile || activeTab === 'chat') ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}
+                  ${activeTab === 'chat' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}
                   `}>
-                    <div className="h-full flex flex-col">
-                      {/* Sticky header - Simplified for mobile */}
-                      <div className="sticky top-0 z-10 bg-[#F5EFE0]/40 backdrop-blur-sm border-b border-[#9C7C38]/10 rounded-t-xl">
-                        <div className={`flex items-center justify-between ${isMobile ? 'p-1' : 'p-2'}`}>
-                          {/* Brand icon - Hide text on mobile */}
-                          <div className="flex items-center gap-2">
-                            <BrdgeLogo
-                              src={stampLogo.src}
-                              alt="Brdge AI Logo"
+                  <div className="h-full flex flex-col">
+                    {/* Sticky header - Simplified for mobile */}
+                    <div className="sticky top-0 z-10 bg-[#F5EFE0]/40 backdrop-blur-sm border-b border-[#9C7C38]/10 rounded-t-xl">
+                      <div className={`flex items-center justify-between p-2`}>
+                        {/* Brand icon - Hide text on mobile */}
+                        <div className="flex items-center gap-2">
+                          <BrdgeLogo
+                            src={stampLogo.src}
+                            alt="Brdge AI Logo"
+                          />
+                          {/* Add BarVisualizer here */}
+                          <div className="h-5 w-20 ml-1">
+                            <BarVisualizer
+                              trackRef={assistantAudioTrack}
+                              barCount={10}
+                              options={{
+                                minHeight: 15,
+                                maxHeight: 85
+                              }}
+                              style={{
+                                borderRadius: '4px',
+                                overflow: 'hidden',
+                                gap: '2px',
+                                padding: '2px',
+                              }}
                             />
-                            {!isMobile && (
-                              <>
-                                {/* Add BarVisualizer here */}
-                                <div className="h-5 w-20 ml-1">
-                                  <BarVisualizer
-                                    trackRef={assistantAudioTrack}
-                                    barCount={10}
-                                    options={{
-                                      minHeight: 15,
-                                      maxHeight: 85
-                                    }}
-                                    style={{
-                                      borderRadius: '4px',
-                                      overflow: 'hidden',
-                                      gap: '2px',
-                                      padding: '2px',
-                                    }}
-                                  />
-                                </div>
+                          </div>
 
-                                {/* Add Interrupt Button */}
-                                <button
-                                  onClick={handleInterruptAgent}
-                                  className={`
+                          {/* Add Interrupt Button */}
+                          <button
+                            onClick={handleInterruptAgent}
+                            className={`
                                     ml-2 p-1.5 rounded-md 
                                     ${interruptPressed
-                                      ? 'bg-[#9C7C38]/30 text-[#9C7C38] shadow-[0_0_8px_rgba(156,124,56,0.3)]'
-                                      : 'bg-[#9C7C38]/15 hover:bg-[#9C7C38]/25 text-[#1E2A42]'}
+                                ? 'bg-[#9C7C38]/30 text-[#9C7C38] shadow-[0_0_8px_rgba(156,124,56,0.3)]'
+                                : 'bg-[#9C7C38]/15 hover:bg-[#9C7C38]/25 text-[#1E2A42]'}
                                     ${animateInterrupt ? 'scale-105' : 'scale-100'}
                                     transition-all duration-200
                                     flex items-center gap-1.5 text-xs
                                     border ${interruptPressed ? 'border-[#9C7C38]/20' : 'border-[#9C7C38]/0'}
                                   `}
-                                  aria-label="Interrupt agent"
-                                >
-                                  <Square size={12} className={`fill-current ${animateInterrupt ? 'animate-pulse' : ''}`} />
-                                  <span>Stop</span>
-                                </button>
-                              </>
-                            )}
+                            aria-label="Interrupt agent"
+                          >
+                            <Square size={12} className={`fill-current ${animateInterrupt ? 'animate-pulse' : ''}`} />
+                            <span>Stop</span>
+                          </button>
+                        </div>
+
+                        {/* Info tooltip and Mic controls */}
+                        <div className="flex items-center gap-2">
+                          <div className="relative group">
+                            <button
+                              className="p-1.5 rounded-lg transition-all duration-300
+                              text-[#1E2A42]/50 hover:text-[#1E2A42]
+                              hover:bg-[#9C7C38]/10"
+                            >
+                              <Info size={14} />
+                            </button>
+                            <div className="absolute right-0 top-full mt-2 w-64 opacity-0 group-hover:opacity-100
+                              pointer-events-none group-hover:pointer-events-auto
+                              transition-all duration-300 transform translate-y-1 group-hover:translate-y-0">
+                              <div className="bg-[#F5EFE0]/95 backdrop-blur-sm rounded-lg p-3 shadow-xl
+                                border border-[#9C7C38]/20 text-[11px] leading-relaxed text-[#0A1933]">
+                                <div className="font-medium mb-1 text-[#9C7C38]">Welcome to Brdge AI!</div>
+                                Watch the video while interacting with our AI voice assistant.
+                                Toggle your mic to speak or type messages to engage in real-time conversation.
+                                <div className="font-medium mb-1 text-[#9C7C38]/70">
+                                  Pro tip: Ensure your environment is quiet and free of background noise.
+                                </div>
+                              </div>
+                            </div>
                           </div>
-
-                          {/* Info tooltip and Mic controls */}
-
 
                           {/* Mic toggle button - Simplified for mobile */}
                           <button
@@ -3930,7 +3729,7 @@ export default function Playground({
                             }}
                             disabled={roomState !== ConnectionState.Connected}
                             className={`
-                                ${isMobile ? 'p-1' : 'p-1.5'}
+                                p-1.5
                                 rounded-lg transition-all duration-300
                                 flex items-center gap-1.5
                                 bg-[#9C7C38]/20 text-[#1E2A42]
@@ -3940,66 +3739,40 @@ export default function Playground({
                               `}
                           >
                             {localParticipant?.isMicrophoneEnabled ?
-                              <Mic size={isMobile ? 10 : 14} /> :
-                              <MicOff size={isMobile ? 10 : 14} />
+                              <Mic size={14} /> :
+                              <MicOff size={14} />
                             }
-                            {!isMobile && (
-                              <span className="text-[11px] font-medium">
-                                {localParticipant?.isMicrophoneEnabled ? 'Mic: On' : 'Mic: Off'}
-                              </span>
-                            )}
+                            <span className="text-[11px] font-medium">
+                              {localParticipant?.isMicrophoneEnabled ? 'Mic: On' : 'Mic: Off'}
+                            </span>
                           </button>
-                          <div className="flex items-center gap-2">
-                            <div className="relative group">
-                              <button
-                                className="p-1.5 rounded-lg transition-all duration-300
-                                text-[#1E2A42]/50 hover:text-[#1E2A42]
-                                hover:bg-[#9C7C38]/10"
-                              >
-                                <Info size={isMobile ? 12 : 14} />
-                              </button>
-                              <div className="absolute right-0 top-full mt-2 w-64 opacity-0 group-hover:opacity-100
-                                pointer-events-none group-hover:pointer-events-auto
-                                transition-all duration-300 transform translate-y-1 group-hover:translate-y-0">
-                                <div className="bg-[#F5EFE0]/95 backdrop-blur-sm rounded-lg p-3 shadow-xl
-                                  border border-[#9C7C38]/20 text-[11px] leading-relaxed text-[#0A1933]">
-                                  <div className="font-medium mb-1 text-[#9C7C38]">Welcome to Brdge AI!</div>
-                                  Watch the video while interacting with our AI voice assistant.
-                                  Toggle your mic to speak or type messages to engage in real-time conversation.
-                                  <div className="font-medium mb-1 text-[#9C7C38]/70">
-                                    Pro tip: Ensure your environment is quiet and free of background noise.
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
                         </div>
                       </div>
+                    </div>
 
-                      {/* Scrollable chat content */}
-                      <div className={`
+                    {/* Scrollable chat content */}
+                    <div className={`
                         flex-1 
-                        ${isMobile ? 'overflow-hidden' : 'overflow-y-auto'}
-                        ${isMobile ? 'touch-none' : ''}
+                      overflow-y-auto
                       `}>
-                        {/* Voice Assistant Transcription */}
-                        {voiceAssistant?.audioTrack && (
-                          <div className={`${isMobile ? 'p-1' : 'p-2'}`}>
-                            <TranscriptionTile
-                              agentAudioTrack={voiceAssistant.audioTrack}
-                              accentColor="cyan"
-                            />
-                          </div>
-                        )}
+                      {/* Voice Assistant Transcription */}
+                      {voiceAssistant?.audioTrack && (
+                        <div className={`p-2`}>
+                          <TranscriptionTile
+                            agentAudioTrack={voiceAssistant.audioTrack}
+                            accentColor="cyan"
+                          />
+                        </div>
+                      )}
 
-                        {/* Chat Messages */}
-                        <div className={`flex-1 ${isMobile ? 'p-1' : 'p-2'} space-y-1`}>
-                          {transcripts.map((message) => (
-                            <div
-                              key={message.timestamp}
-                              className={`
+                      {/* Chat Messages */}
+                      <div className={`flex-1 p-2 space-y-1`}>
+                        {transcripts.map((message) => (
+                          <div
+                            key={message.timestamp}
+                            className={`
                                 ${message.isSelf ? 'ml-auto bg-cyan-950/30' : 'mr-auto bg-gray-800/30'} 
-                                ${isMobile ? 'max-w-[95%]' : 'max-w-[85%]'}
+                              max-w-[85%]
                                 rounded-lg p-1.5
                                 backdrop-blur-sm
                                 border border-gray-700/50
@@ -4007,422 +3780,499 @@ export default function Playground({
                                 hover:border-cyan-500/30
                                 group
                               `}
-                            >
-                              <div className={`
-                                ${isMobile ? 'text-[9px]' : 'text-[11px]'}
+                          >
+                            <div className={`
+                              text-[11px]
                                 leading-relaxed
                                 ${message.isSelf ? 'text-cyan-300' : 'text-gray-300'}
                                 group-hover:text-cyan-400/90
                                 transition-colors duration-300
                               `}>
-                                {message.message}
-                              </div>
+                              {message.message}
                             </div>
-                          ))}
-                        </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
+                </div>
 
-                  {/* Only render AI Agent and Voice Clone tabs in edit mode */}
-                  {!isMobile && params.agentType !== 'view' && (
-                    <>
-                      {activeTab === 'teaching-persona' && (
-                        <div className="space-y-6 px-2">
-                          <div className="flex items-center justify-between mb-3">
-                            <h2 className={styles.header.main}>Teaching Persona</h2>
-                            {/* Update the Save Changes button in Persona tab */}
-                            <motion.button
-                              whileHover={{ scale: 1.02 }}
-                              whileTap={{ scale: 0.98 }}
-                              onClick={handleSaveConfig}
-                              className={`
+                {/* Only render AI Agent and Voice Clone tabs in edit mode */}
+                {params.agentType !== 'view' && (
+                  <>
+                    {activeTab === 'teaching-persona' && (
+                      <div className="space-y-6 px-2">
+                        <div className="flex items-center justify-between mb-3">
+                          <h2 className={styles.header.main}>Teaching Persona</h2>
+                          {/* Update the Save Changes button in Persona tab */}
+                          <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={handleSaveConfig}
+                            className={`
                                 flex items-center gap-1.5
                                 px-3 py-1.5 rounded-lg
                                 ${saveSuccess
-                                  ? 'bg-green-500/10 text-green-600 border-green-500/30'
-                                  : 'bg-[#9C7C38]/20 text-[#9C7C38] hover:bg-[#9C7C38]/30 border-[#9C7C38]/30 hover:border-[#9C7C38]/40'}
+                                ? 'bg-green-500/10 text-green-600 border-green-500/30'
+                                : 'bg-[#9C7C38]/20 text-[#9C7C38] hover:bg-[#9C7C38]/30 border-[#9C7C38]/30 hover:border-[#9C7C38]/40'}
                                 border
                                 shadow-sm hover:shadow
                                 transition-all duration-200
                                 text-[11px] font-medium
                               `}
-                            >
-                              <Save size={12} />
-                              <span>Save Changes</span>
-                            </motion.button>
+                          >
+                            <Save size={12} />
+                            <span>Save Changes</span>
+                          </motion.button>
+                        </div>
+
+                        {/* Basic Information Section - Update styling for better spacing */}
+                        <section className={sectionClass}>
+                          {/* Border effect */}
+                          <div className="absolute inset-0 border border-[#9C7C38]/30 rounded-lg transition-all duration-300 group-hover:border-[#9C7C38]/50"></div>
+
+                          {/* Section header */}
+                          <div className="flex items-center mb-2 relative z-10">
+                            <div className="w-1.5 h-1.5 rounded-full bg-[#9C7C38]/40 shadow-[0_0_5px_rgba(156,124,56,0.3)] mr-1.5"></div>
+                            <h3 className={styles.header.sub}>Instructor Profile</h3>
+                            <div className="h-[1px] flex-1 ml-3 bg-gradient-to-r from-[#9C7C38]/20 via-[#9C7C38]/10 to-transparent"></div>
                           </div>
 
-                          {/* Basic Information Section - Update styling for better spacing */}
-                          <section className={sectionClass}>
-                            {/* Border effect */}
-                            <div className="absolute inset-0 border border-[#9C7C38]/30 rounded-lg transition-all duration-300 group-hover:border-[#9C7C38]/50"></div>
-
-                            {/* Section header */}
-                            <div className="flex items-center mb-2 relative z-10">
-                              <div className="w-1.5 h-1.5 rounded-full bg-[#9C7C38]/40 shadow-[0_0_5px_rgba(156,124,56,0.3)] mr-1.5"></div>
-                              <h3 className={styles.header.sub}>Instructor Profile</h3>
-                              <div className="h-[1px] flex-1 ml-3 bg-gradient-to-r from-[#9C7C38]/20 via-[#9C7C38]/10 to-transparent"></div>
-                            </div>
-
-                            {/* Section content with consistent spacing */}
-                            <div className="space-y-3 relative z-10">
-                              {/* Name Field */}
-                              <div className="relative z-10 group/field transition-all duration-300">
-                                <label className="block mb-1 text-[10px] font-medium text-[#0A1933]/70">Name</label>
-                                <input
-                                  type="text"
-                                  value={teachingPersona?.instructor_profile?.name || ''}
-                                  onChange={(e) => updateTeachingPersona('instructor_profile.name', e.target.value)}
-                                  className="w-full bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg
+                          {/* Section content with consistent spacing */}
+                          <div className="space-y-3 relative z-10">
+                            {/* Name Field */}
+                            <div className="relative z-10 group/field transition-all duration-300">
+                              <label className="block mb-1 text-[10px] font-medium text-[#0A1933]/70">Name</label>
+                              <input
+                                type="text"
+                                value={teachingPersona?.instructor_profile?.name || ''}
+                                onChange={(e) => updateTeachingPersona('instructor_profile.name', e.target.value)}
+                                className="w-full bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg
                                   px-3 py-2 text-[12px] text-[#0A1933]
                                   transition-all duration-300
                                   focus:ring-1 focus:ring-[#9C7C38]/40 
                                   focus:border-[#9C7C38]/50
                                   hover:border-[#9C7C38]/40"
-                                  placeholder="Enter instructor name..."
-                                />
-                              </div>
-
-                              {/* Display extracted expertise level for context */}
-                              <div className="p-2.5 bg-[#F5EFE0]/80 rounded-lg border border-[#9C7C38]/20">
-                                <div className="flex items-center">
-                                  <Info size={12} className="text-[#1E2A42]/50 mr-2" />
-                                  <span className="text-[10px] text-[#0A1933]/70">Extracted Expertise Level</span>
-                                </div>
-                                <p className="mt-1 text-[11px] text-[#0A1933]">
-                                  {teachingPersona?.instructor_profile?.apparent_expertise_level || 'No expertise level detected'}
-                                </p>
-                              </div>
-                            </div>
-                          </section>
-
-                          {/* Communication Style Section */}
-                          <section className={sectionClass}>
-                            {/* Border effect */}
-                            <div className="absolute inset-0 border border-[#9C7C38]/30 rounded-lg transition-all duration-300 group-hover:border-[#9C7C38]/50"></div>
-
-                            {/* Section header */}
-                            <div className="flex items-center mb-2 relative z-10">
-                              <div className="w-1.5 h-1.5 rounded-full bg-[#9C7C38]/40 shadow-[0_0_5px_rgba(156,124,56,0.3)] mr-1.5"></div>
-                              <h3 className={styles.header.sub}>Communication Style</h3>
+                                placeholder="Enter instructor name..."
+                              />
                             </div>
 
-                            {/* Section content with consistent spacing */}
-                            <div className="space-y-3 relative z-10">
-                              {/* Communication Style Field */}
-                              <div className="relative z-10 group/field transition-all duration-300">
-                                <label className="block mb-1 text-[10px] font-medium text-[#0A1933]/70">Overall Style</label>
-                                <input
-                                  type="text"
-                                  value={teachingPersona?.communication_patterns?.vocabulary_level || ''}
-                                  onChange={(e) => updateTeachingPersona('communication_patterns.vocabulary_level', e.target.value)}
-                                  className="w-full bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg
+                            {/* Display extracted expertise level for context */}
+                            <div className="p-2.5 bg-[#F5EFE0]/80 rounded-lg border border-[#9C7C38]/20">
+                              <div className="flex items-center">
+                                <Info size={12} className="text-[#1E2A42]/50 mr-2" />
+                                <span className="text-[10px] text-[#0A1933]/70">Extracted Expertise Level</span>
+                              </div>
+                              <p className="mt-1 text-[11px] text-[#0A1933]">
+                                {teachingPersona?.instructor_profile?.apparent_expertise_level || 'No expertise level detected'}
+                              </p>
+                            </div>
+                          </div>
+                        </section>
+
+                        {/* Communication Style Section */}
+                        <section className={sectionClass}>
+                          {/* Border effect */}
+                          <div className="absolute inset-0 border border-[#9C7C38]/30 rounded-lg transition-all duration-300 group-hover:border-[#9C7C38]/50"></div>
+
+                          {/* Section header */}
+                          <div className="flex items-center mb-2 relative z-10">
+                            <div className="w-1.5 h-1.5 rounded-full bg-[#9C7C38]/40 shadow-[0_0_5px_rgba(156,124,56,0.3)] mr-1.5"></div>
+                            <h3 className={styles.header.sub}>Communication Style</h3>
+                          </div>
+
+                          {/* Section content with consistent spacing */}
+                          <div className="space-y-3 relative z-10">
+                            {/* Communication Style Field */}
+                            <div className="relative z-10 group/field transition-all duration-300">
+                              <label className="block mb-1 text-[10px] font-medium text-[#0A1933]/70">Overall Style</label>
+                              <input
+                                type="text"
+                                value={teachingPersona?.communication_patterns?.vocabulary_level || ''}
+                                onChange={(e) => updateTeachingPersona('communication_patterns.vocabulary_level', e.target.value)}
+                                className="w-full bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg
                                   px-3 py-2 text-[12px] text-[#0A1933]
                                   transition-all duration-300
                                   focus:ring-1 focus:ring-[#9C7C38]/40 
                                   focus:border-[#9C7C38]/50
                                   hover:border-[#9C7C38]/40"
-                                  placeholder="Professional, casual, technical, etc."
-                                />
+                                placeholder="Professional, casual, technical, etc."
+                              />
 
-                                {/* Style Quick Selectors */}
-                                <div className="flex flex-wrap gap-1.5 mt-1.5">
-                                  {["professional", "friendly", "technical", "casual", "authoritative"].map(style => (
-                                    <button
-                                      key={style}
-                                      type="button"
-                                      onClick={() => updateTeachingPersona('communication_patterns.vocabulary_level', style)}
-                                      className={`
+                              {/* Style Quick Selectors */}
+                              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                {["professional", "friendly", "technical", "casual", "authoritative"].map(style => (
+                                  <button
+                                    key={style}
+                                    type="button"
+                                    onClick={() => updateTeachingPersona('communication_patterns.vocabulary_level', style)}
+                                    className={`
                                         px-2 py-0.5 rounded-full text-[9px]
                                         transition-all duration-300
                                         border 
                                         ${teachingPersona?.communication_patterns?.vocabulary_level === style
-                                          ? 'bg-[#9C7C38]/20 text-[#9C7C38] border-[#9C7C38]/30'
-                                          : 'bg-[#F5EFE0]/70 text-[#1E2A42] border-[#9C7C38]/20 hover:text-[#0A1933] hover:border-[#9C7C38]/30'
-                                        }
+                                        ? 'bg-[#9C7C38]/20 text-[#9C7C38] border-[#9C7C38]/30'
+                                        : 'bg-[#F5EFE0]/70 text-[#1E2A42] border-[#9C7C38]/20 hover:text-[#0A1933] hover:border-[#9C7C38]/30'
+                                      }
                                       `}
-                                    >
-                                      {style}
-                                    </button>
-                                  ))}
-                                </div>
+                                  >
+                                    {style}
+                                  </button>
+                                ))}
                               </div>
+                            </div>
 
-                              {/* Recurring Phrases */}
-                              <div className="relative z-10 group/field transition-all duration-300">
-                                <label className="block mb-1 text-[10px] font-medium text-[#0A1933]/70">Characteristic Phrases</label>
-                                <textarea
-                                  value={phrasesText}
-                                  onChange={(e) => {
-                                    // Just update the text state directly
-                                    setPhrasesText(e.target.value);
-                                  }}
-                                  onBlur={() => {
-                                    // Only when focus leaves the textarea, update the actual phrases
-                                    const phrases = phrasesText
-                                      .split('\n')
-                                      .filter(line => line.trim() !== '')
-                                      .map(phrase => ({
-                                        phrase: phrase.trim(),
-                                        frequency: "medium",
-                                        usage_context: "General conversation"
-                                      }));
+                            {/* Recurring Phrases */}
+                            <div className="relative z-10 group/field transition-all duration-300">
+                              <label className="block mb-1 text-[10px] font-medium text-[#0A1933]/70">Characteristic Phrases</label>
+                              <textarea
+                                value={phrasesText}
+                                onChange={(e) => {
+                                  // Just update the text state directly
+                                  setPhrasesText(e.target.value);
+                                }}
+                                onBlur={() => {
+                                  // Only when focus leaves the textarea, update the actual phrases
+                                  const phrases = phrasesText
+                                    .split('\n')
+                                    .filter(line => line.trim() !== '')
+                                    .map(phrase => ({
+                                      phrase: phrase.trim(),
+                                      frequency: "medium",
+                                      usage_context: "General conversation"
+                                    }));
 
-                                    updateTeachingPersona('communication_patterns.recurring_phrases', phrases);
-                                  }}
-                                  className="w-full bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg
+                                  updateTeachingPersona('communication_patterns.recurring_phrases', phrases);
+                                }}
+                                className="w-full bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg
                                   px-3 py-2 text-[12px] text-[#0A1933] min-h-[70px]
                                   transition-all duration-300
                                   focus:ring-1 focus:ring-[#9C7C38]/40 
                                   focus:border-[#9C7C38]/50
                                   hover:border-[#9C7C38]/40 resize-y"
-                                  placeholder="Enter phrases the instructor frequently uses (one per line)..."
-                                />
-                                <div className="mt-0.5 text-[9px] text-[#1E2A42]/60 px-1 italic">
-                                  These phrases will be used by the AI to sound more like the actual instructor
-                                </div>
+                                placeholder="Enter phrases the instructor frequently uses (one per line)..."
+                              />
+                              <div className="mt-0.5 text-[9px] text-[#1E2A42]/60 px-1 italic">
+                                These phrases will be used by the AI to sound more like the actual instructor
                               </div>
-
-                              {/* REMOVED: Speaking Pace with Slider - as requested */}
-                            </div>
-                          </section>
-
-                          {/* Display-Only Teaching Insights Section */}
-                          <section className={sectionClass}>
-                            {/* Border effect */}
-                            <div className="absolute inset-0 border border-[#9C7C38]/30 rounded-lg transition-all duration-300 group-hover:border-[#9C7C38]/50"></div>
-
-                            {/* Section header */}
-                            <div className="flex items-center mb-2 relative z-10">
-                              <div className="w-1.5 h-1.5 rounded-full bg-[#9C7C38]/40 shadow-[0_0_5px_rgba(156,124,56,0.3)] mr-1.5"></div>
-                              <h3 className={styles.header.sub}>Teaching Insights</h3>
-                              <span className="ml-2 text-[9px] px-2 py-0.5 bg-[#9C7C38]/10 rounded-full text-[#0A1933]/80 font-medium">Auto-Extracted</span>
                             </div>
 
-                            {/* Section content with consistent spacing */}
-                            <div className="grid grid-cols-1 gap-2 relative z-10">
-                              {/* Speech Characteristics Card */}
-                              <div className="p-2.5 bg-[#F5EFE0]/80 rounded-lg border border-[#9C7C38]/20">
-                                <div className="flex justify-between items-center">
-                                  <h3 className="text-[12px] font-medium text-[#9C7C38]">Speech Style</h3>
-                                </div>
-                                <p className="mt-1 text-[11px] text-[#0A1933]/90">
-                                  {teachingPersona?.speech_characteristics?.accent?.type || 'No accent detected'}
-                                </p>
-                                <p className="mt-1 text-[11px] text-[#0A1933]/90">
-                                  Cadence: {teachingPersona?.speech_characteristics?.accent?.cadence || 'Not detected'}
-                                </p>
-                              </div>
+                            {/* REMOVED: Speaking Pace with Slider - as requested */}
+                          </div>
+                        </section>
 
-                              {/* Pedagogical Approach Card */}
-                              <div className="p-2.5 bg-[#F5EFE0]/80 rounded-lg border border-[#9C7C38]/20">
-                                <div className="flex justify-between items-center">
-                                  <h3 className="text-[12px] font-medium text-[#9C7C38]">Teaching Approach</h3>
-                                </div>
-                                <div className="mt-1 space-y-1">
-                                  {teachingPersona?.pedagogical_approach?.explanation_techniques?.map((technique: any, idx: number) => (
-                                    <div key={idx} className="flex items-start">
-                                      <span className="text-[#9C7C38]/80 mt-1 text-[9px] mr-1">•</span>
-                                      <p className="text-[11px] text-[#0A1933]/90">
-                                        {technique.technique}: {technique.example}
-                                      </p>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
+                        {/* Display-Only Teaching Insights Section */}
+                        <section className={sectionClass}>
+                          {/* Border effect */}
+                          <div className="absolute inset-0 border border-[#9C7C38]/30 rounded-lg transition-all duration-300 group-hover:border-[#9C7C38]/50"></div>
 
-                              {/* Emotional Patterns Card */}
-                              <div className="p-2.5 bg-[#F5EFE0]/80 rounded-lg border border-[#9C7C38]/20">
-                                <div className="flex justify-between items-center">
-                                  <h3 className="text-[12px] font-medium text-[#9C7C38]">Emotional Patterns</h3>
-                                </div>
-                                <p className="mt-1 text-[11px] text-[#0A1933]/90">
-                                  Humor Style: {teachingPersona?.emotional_teaching_patterns?.humor_style?.type || 'None detected'}
-                                </p>
-                                {teachingPersona?.emotional_teaching_patterns?.enthusiasm_triggers?.map((trigger: any, idx: number) => (
-                                  <div key={idx} className="mt-1">
-                                    <p className="text-[11px] text-[#9C7C38]/80">
-                                      {trigger.topic}:
-                                    </p>
+                          {/* Section header */}
+                          <div className="flex items-center mb-2 relative z-10">
+                            <div className="w-1.5 h-1.5 rounded-full bg-[#9C7C38]/40 shadow-[0_0_5px_rgba(156,124,56,0.3)] mr-1.5"></div>
+                            <h3 className={styles.header.sub}>Teaching Insights</h3>
+                            <span className="ml-2 text-[9px] px-2 py-0.5 bg-[#9C7C38]/10 rounded-full text-[#0A1933]/80 font-medium">Auto-Extracted</span>
+                          </div>
+
+                          {/* Section content with consistent spacing */}
+                          <div className="grid grid-cols-1 gap-2 relative z-10">
+                            {/* Speech Characteristics Card */}
+                            <div className="p-2.5 bg-[#F5EFE0]/80 rounded-lg border border-[#9C7C38]/20">
+                              <div className="flex justify-between items-center">
+                                <h3 className="text-[12px] font-medium text-[#9C7C38]">Speech Style</h3>
+                              </div>
+                              <p className="mt-1 text-[11px] text-[#0A1933]/90">
+                                {teachingPersona?.speech_characteristics?.accent?.type || 'No accent detected'}
+                              </p>
+                              <p className="mt-1 text-[11px] text-[#0A1933]/90">
+                                Cadence: {teachingPersona?.speech_characteristics?.accent?.cadence || 'Not detected'}
+                              </p>
+                            </div>
+
+                            {/* Pedagogical Approach Card */}
+                            <div className="p-2.5 bg-[#F5EFE0]/80 rounded-lg border border-[#9C7C38]/20">
+                              <div className="flex justify-between items-center">
+                                <h3 className="text-[12px] font-medium text-[#9C7C38]">Teaching Approach</h3>
+                              </div>
+                              <div className="mt-1 space-y-1">
+                                {teachingPersona?.pedagogical_approach?.explanation_techniques?.map((technique: any, idx: number) => (
+                                  <div key={idx} className="flex items-start">
+                                    <span className="text-[#9C7C38]/80 mt-1 text-[9px] mr-1">•</span>
                                     <p className="text-[11px] text-[#0A1933]/90">
-                                      {trigger.vocal_cues}
+                                      {technique.technique}: {technique.example}
                                     </p>
                                   </div>
                                 ))}
                               </div>
                             </div>
-                          </section>
+
+                            {/* Emotional Patterns Card */}
+                            <div className="p-2.5 bg-[#F5EFE0]/80 rounded-lg border border-[#9C7C38]/20">
+                              <div className="flex justify-between items-center">
+                                <h3 className="text-[12px] font-medium text-[#9C7C38]">Emotional Patterns</h3>
+                              </div>
+                              <p className="mt-1 text-[11px] text-[#0A1933]/90">
+                                Humor Style: {teachingPersona?.emotional_teaching_patterns?.humor_style?.type || 'None detected'}
+                              </p>
+                              {teachingPersona?.emotional_teaching_patterns?.enthusiasm_triggers?.map((trigger: any, idx: number) => (
+                                <div key={idx} className="mt-1">
+                                  <p className="text-[11px] text-[#9C7C38]/80">
+                                    {trigger.topic}:
+                                  </p>
+                                  <p className="text-[11px] text-[#0A1933]/90">
+                                    {trigger.vocal_cues}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </section>
+                      </div>
+                    )}
+
+                    {/* Add this new section for the Engagement tab */}
+                    {activeTab === 'engagement' && (
+                      <div className="space-y-6 px-2">
+                        <div className="flex items-center justify-between mb-4">
+                          <h2 className={styles.header.main}>Engagement Opportunities</h2>
+                          <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={handleAddEngagement}
+                            className="px-2 py-1 bg-[#9C7C38]/20 text-[#9C7C38] hover:bg-[#9C7C38]/30 
+                              rounded-lg text-[10px] flex items-center gap-1.5 font-medium
+                              border border-[#9C7C38]/30 hover:border-[#9C7C38]/40
+                              shadow-sm hover:shadow
+                              transition-all duration-200"
+                          >
+                            <Plus size={10} />
+                            Add New
+                          </motion.button>
                         </div>
-                      )}
-                      {activeTab === 'voice-clone' && (
-                        <div className={`
+
+                        {/* Filter controls with improved spacing */}
+                        <div className="flex flex-wrap gap-2 mb-5 px-1">
+                          <button
+                            className={`px-3 py-1 text-xs rounded-full transition-all duration-300 ${!selectedEngagement ? 'bg-[#9C7C38]/20 text-[#9C7C38]' : 'bg-[#F5EFE0]/70 text-[#1E2A42] hover:bg-[#F5EFE0]'}`}
+                            onClick={() => setSelectedEngagement(null)}
+                          >
+                            All Types
+                          </button>
+                          <button
+                            className={`px-3 py-1 text-xs rounded-full flex items-center gap-1 transition-all duration-300 ${selectedEngagement === 'quiz' ? 'bg-[#9C7C38]/20 text-[#9C7C38]' : 'bg-[#F5EFE0]/70 text-[#1E2A42] hover:bg-[#F5EFE0]'}`}
+                            onClick={() => setSelectedEngagement(selectedEngagement === 'quiz' ? null : 'quiz')}
+                          >
+                            {getEngagementTypeIcon('quiz')}
+                            Quizzes
+                          </button>
+                          <button
+                            className={`px-3 py-1 text-xs rounded-full flex items-center gap-1 transition-all duration-300 ${selectedEngagement === 'discussion' ? 'bg-[#9C7C38]/20 text-[#9C7C38]' : 'bg-[#F5EFE0]/70 text-[#1E2A42] hover:bg-[#F5EFE0]'}`}
+                            onClick={() => setSelectedEngagement(selectedEngagement === 'discussion' ? null : 'discussion')}
+                          >
+                            {getEngagementTypeIcon('discussion')}
+                            Discussions
+                          </button>
+                        </div>
+
+                        {/* Debug output for troubleshooting */}
+                        {(!engagementOpportunities || engagementOpportunities.length === 0) && (
+                          <div className="bg-[#F5EFE0]/40 mb-4 p-2 rounded-lg text-xs text-[#1E2A42]">
+                            Debug: Agent config has engagement_opportunities? {agentConfig.engagement_opportunities ? 'Yes' : 'No'}
+                          </div>
+                        )}
+
+                        {/* Engagement list with improved container spacing */}
+                        <div className="space-y-4 px-1">
+                          {engagementOpportunities && engagementOpportunities.length > 0 ? (
+                            engagementOpportunities
+                              .filter(engagement => !selectedEngagement || engagement.engagement_type === selectedEngagement)
+                              .map((engagement, index) => (
+                                <EngagementCard
+                                  key={engagement.id || index}
+                                  engagement={engagement}
+                                  onEdit={handleUpdateEngagement}
+                                  onDelete={handleDeleteEngagement}
+                                />
+                              ))
+                          ) : (
+                            <div className="text-center p-6 bg-[#F5EFE0]/60 rounded-lg border border-[#9C7C38]/30">
+                              <div className="text-[#0A1933] text-sm">No engagement opportunities found</div>
+                              <div className="text-[#1E2A42] text-xs mt-1">
+                                Create new engagement opportunities using the &quot;Add New&quot; button above
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {activeTab === 'voice-clone' && (
+                      <div className={`
                           h-full pt-0 overflow-y-auto
                           ${activeTab === 'voice-clone' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}
                           transition-opacity duration-300
                         `}>
-                          <div className="mb-3 border-b border-[#9C7C38]/30 pb-3">
-                            <div className="flex items-center justify-between mb-1">
-                              <h2 className={styles.header.main}>Voice Configuration</h2>
-                              <div className="h-[1px] flex-1 mx-4 bg-gradient-to-r from-transparent via-[#9C7C38]/30 to-transparent" />
-                            </div>
+                        <div className="mb-3 border-b border-[#9C7C38]/30 pb-3">
+                          <div className="flex items-center justify-between mb-1">
+                            <h2 className={styles.header.main}>Voice Configuration</h2>
+                            <div className="h-[1px] flex-1 mx-4 bg-gradient-to-r from-transparent via-[#9C7C38]/30 to-transparent" />
+                          </div>
 
-                            {/* Default voice and voice selector section */}
-                            <div className="mb-6">
-                              <VoiceSelector
-                                voices={allVoices}
-                                selectedVoice={selectedVoice}
-                                selectedVoiceBrdgeId={selectedVoiceBrdgeId} // Add this prop
-                                defaultVoiceId="default"
-                                currentBrdgeId={params.brdgeId}
-                                onSelectVoice={async (voiceId, fromBrdgeId) => {
-                                  // Update the brdge's voice_id first - this is the only necessary step
-                                  if (params.brdgeId && params.apiBaseUrl) {
-                                    try {
-                                      // If default voice is selected, set voice_id to null
-                                      const voice_id = voiceId === "default" ? null : voiceId;
+                          {/* Default voice and voice selector section */}
+                          <div className="mb-6">
+                            <VoiceSelector
+                              voices={allVoices}
+                              selectedVoice={selectedVoice}
+                              selectedVoiceBrdgeId={selectedVoiceBrdgeId} // Add this prop
+                              defaultVoiceId="default"
+                              currentBrdgeId={params.brdgeId}
+                              onSelectVoice={async (voiceId, fromBrdgeId) => {
+                                // Update the brdge's voice_id first - this is the only necessary step
+                                if (params.brdgeId && params.apiBaseUrl) {
+                                  try {
+                                    // If default voice is selected, set voice_id to null
+                                    const voice_id = voiceId === "default" ? null : voiceId;
 
-                                      // Log what we're about to do
-                                      console.log(`Updating voice_id for brdge ${params.brdgeId} to:`, voice_id);
+                                    // Log what we're about to do
+                                    console.log(`Updating voice_id for brdge ${params.brdgeId} to:`, voice_id);
 
-                                      // Update the brdge's voice_id in the database
-                                      const updateResponse = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/update-voice`, {
-                                        method: 'POST',
-                                        headers: {
-                                          'Content-Type': 'application/json',
-                                          // Use authToken prop instead of localStorage
-                                          ...(authToken ? {
-                                            'Authorization': `Bearer ${authToken}`
-                                          } : {})
-                                        },
-                                        body: JSON.stringify({ voice_id }),
-                                        credentials: 'omit'
-                                      });
+                                    // Update the brdge's voice_id in the database
+                                    const updateResponse = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/update-voice`, {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                        // Use authToken prop instead of localStorage
+                                        ...(authToken ? {
+                                          'Authorization': `Bearer ${authToken}`
+                                        } : {})
+                                      },
+                                      body: JSON.stringify({ voice_id }),
+                                      credentials: 'omit'
+                                    });
 
-                                      // Log the full response for debugging
-                                      const responseData = await updateResponse.json();
-                                      console.log('Update voice response:', responseData);
+                                    // Log the full response for debugging
+                                    const responseData = await updateResponse.json();
+                                    console.log('Update voice response:', responseData);
 
-                                      if (!updateResponse.ok) {
-                                        console.error('Failed to update brdge voice_id:', updateResponse.status, updateResponse.statusText);
+                                    if (!updateResponse.ok) {
+                                      console.error('Failed to update brdge voice_id:', updateResponse.status, updateResponse.statusText);
+                                    } else {
+                                      console.log('Successfully updated brdge voice_id to:', voice_id);
+
+                                      // No need to call voice/activate, just update UI state directly
+                                      if (voiceId === "default") {
+                                        // If default voice selected, update local state
+                                        setSavedVoices(prev => prev.map(v => ({
+                                          ...v,
+                                          status: 'inactive'
+                                        })));
+                                        setSelectedVoice("default");
+                                        setSelectedVoiceBrdgeId(null);
                                       } else {
-                                        console.log('Successfully updated brdge voice_id to:', voice_id);
+                                        // If custom voice selected, update UI state to show it as selected
+                                        setSelectedVoice(voiceId);
+                                        setSelectedVoiceBrdgeId(fromBrdgeId as string);
 
-                                        // No need to call voice/activate, just update UI state directly
-                                        if (voiceId === "default") {
-                                          // If default voice selected, update local state
-                                          setSavedVoices(prev => prev.map(v => ({
-                                            ...v,
-                                            status: 'inactive'
-                                          })));
-                                          setSelectedVoice("default");
-                                          setSelectedVoiceBrdgeId(null);
-                                        } else {
-                                          // If custom voice selected, update UI state to show it as selected
-                                          setSelectedVoice(voiceId);
-                                          setSelectedVoiceBrdgeId(fromBrdgeId as string);
+                                        // Update the "status" field in the savedVoices array to show the correct one as active
+                                        // This is just UI state, not affecting the backend
+                                        setSavedVoices(prev => prev.map(v => ({
+                                          ...v,
+                                          status: v.id === voiceId ? 'active' : 'inactive'
+                                        })));
+                                      }
 
-                                          // Update the "status" field in the savedVoices array to show the correct one as active
-                                          // This is just UI state, not affecting the backend
-                                          setSavedVoices(prev => prev.map(v => ({
-                                            ...v,
-                                            status: v.id === voiceId ? 'active' : 'inactive'
-                                          })));
-                                        }
+                                      // Refresh the brdge data after updating voice_id
+                                      const brdgeResponse = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}`);
+                                      if (brdgeResponse.ok) {
+                                        const brdgeData = await brdgeResponse.json();
+                                        console.log('Refreshed brdge data:', brdgeData);
+                                        console.log('Brdge voice_id after update:', brdgeData.voice_id);
+                                        setBrdge(brdgeData);
+                                      }
 
-                                        // Refresh the brdge data after updating voice_id
-                                        const brdgeResponse = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}`);
-                                        if (brdgeResponse.ok) {
-                                          const brdgeData = await brdgeResponse.json();
-                                          console.log('Refreshed brdge data:', brdgeData);
-                                          console.log('Brdge voice_id after update:', brdgeData.voice_id);
-                                          setBrdge(brdgeData);
-                                        }
-
-                                        // Refresh the voice list to update UI
-                                        if (params.brdgeId) {
-                                          const voicesResponse = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/voices`);
-                                          if (voicesResponse.ok) {
-                                            const voicesData = await voicesResponse.json();
-                                            if (voicesData.voices) {
-                                              setSavedVoices(voicesData.voices);
-                                            }
+                                      // Refresh the voice list to update UI
+                                      if (params.brdgeId) {
+                                        const voicesResponse = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/voices`);
+                                        if (voicesResponse.ok) {
+                                          const voicesData = await voicesResponse.json();
+                                          if (voicesData.voices) {
+                                            setSavedVoices(voicesData.voices);
                                           }
                                         }
                                       }
-                                    } catch (error) {
-                                      console.error('Error updating brdge voice_id:', error);
                                     }
+                                  } catch (error) {
+                                    console.error('Error updating brdge voice_id:', error);
                                   }
-                                }}
-                                isLoading={isLoadingUserVoices}
-                              />
+                                }
+                              }}
+                              isLoading={isLoadingUserVoices}
+                            />
+                          </div>
+
+                          {/* Voice information card */}
+                          <div className="bg-[#F5EFE0]/80 backdrop-blur-sm rounded-lg p-4 border border-[#9C7C38]/20 mb-6">
+                            <div className="flex items-center justify-between mb-3">
+                              <h3 className="text-[#0A1933] text-[13px] font-medium">Current Voice</h3>
+                              <div className={`px-2 py-0.5 rounded-md border text-[10px]
+                                  ${selectedVoice === "default" || !selectedVoice
+                                  ? "bg-[#9C7C38]/10 border-[#9C7C38]/20 text-[#9C7C38]"
+                                  : selectedVoiceBrdgeId === params.brdgeId
+                                    ? "bg-[#9C7C38]/10 border-[#9C7C38]/20 text-[#9C7C38]"
+                                    : "bg-[#B89F63]/10 border-[#B89F63]/20 text-[#B89F63]"
+                                }`}
+                              >
+                                {selectedVoice === "default" || !selectedVoice
+                                  ? "Default"
+                                  : selectedVoiceBrdgeId === params.brdgeId
+                                    ? "Custom"
+                                    : "From Other Project"
+                                }
+                              </div>
                             </div>
 
-                            {/* Voice information card */}
-                            <div className="bg-[#F5EFE0]/80 backdrop-blur-sm rounded-lg p-4 border border-[#9C7C38]/20 mb-6">
-                              <div className="flex items-center justify-between mb-3">
-                                <h3 className="text-[#0A1933] text-[13px] font-medium">Current Voice</h3>
-                                <div className={`px-2 py-0.5 rounded-md border text-[10px]
-                                  ${selectedVoice === "default" || !selectedVoice
-                                    ? "bg-[#9C7C38]/10 border-[#9C7C38]/20 text-[#9C7C38]"
-                                    : selectedVoiceBrdgeId === params.brdgeId
-                                      ? "bg-[#9C7C38]/10 border-[#9C7C38]/20 text-[#9C7C38]"
-                                      : "bg-[#B89F63]/10 border-[#B89F63]/20 text-[#B89F63]"
-                                  }`}
-                                >
-                                  {selectedVoice === "default" || !selectedVoice
-                                    ? "Default"
-                                    : selectedVoiceBrdgeId === params.brdgeId
-                                      ? "Custom"
-                                      : "From Other Project"
-                                  }
+                            {selectedVoice === "default" || !selectedVoice ? (
+                              <div>
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Volume2 size={14} className="text-[#9C7C38]" />
+                                  <span className="text-[13px] text-[#0A1933]">Default AI Voice</span>
+                                </div>
+                                <p className="text-[#1E2A42] text-[12px] leading-relaxed">
+                                  Using the standard AI voice for this brdge. This voice is designed to be clear and natural sounding.
+                                </p>
+                              </div>
+                            ) : (
+                              <div>
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Radio size={14} className={selectedVoiceBrdgeId === params.brdgeId ? "text-[#9C7C38]" : "text-[#B89F63]"} />
+                                  <span className="text-[13px] text-[#0A1933]">
+                                    {allVoices.find(v => v.id === selectedVoice)?.name || 'Custom Voice'}
+                                  </span>
+                                </div>
+                                {selectedVoiceBrdgeId !== params.brdgeId && (
+                                  <div className="bg-[#B89F63]/5 border border-[#B89F63]/10 rounded-md px-2 py-1 mb-2 text-[11px] text-[#0A1933]/80">
+                                    From: {allVoices.find(v => v.id === selectedVoice)?.brdge_name || 'Another Project'}
+                                  </div>
+                                )}
+                                <p className="text-[#1E2A42] text-[12px] leading-relaxed">
+                                  Using {selectedVoiceBrdgeId === params.brdgeId ? 'your' : 'a'} custom voice clone. This personalized voice will be used when the AI speaks.
+                                </p>
+                                <div className="text-[10px] text-[#1E2A42]/60 mt-2">
+                                  Created: {allVoices.find(v => v.id === selectedVoice)?.created_at
+                                    ? new Date(allVoices.find(v => v.id === selectedVoice)!.created_at).toLocaleDateString()
+                                    : 'Unknown'}
                                 </div>
                               </div>
+                            )}
+                          </div>
 
-                              {selectedVoice === "default" || !selectedVoice ? (
-                                <div>
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <Volume2 size={14} className="text-[#9C7C38]" />
-                                    <span className="text-[13px] text-[#0A1933]">Default AI Voice</span>
-                                  </div>
-                                  <p className="text-[#1E2A42] text-[12px] leading-relaxed">
-                                    Using the standard AI voice for this brdge. This voice is designed to be clear and natural sounding.
-                                  </p>
-                                </div>
-                              ) : (
-                                <div>
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <Radio size={14} className={selectedVoiceBrdgeId === params.brdgeId ? "text-[#9C7C38]" : "text-[#B89F63]"} />
-                                    <span className="text-[13px] text-[#0A1933]">
-                                      {allVoices.find(v => v.id === selectedVoice)?.name || 'Custom Voice'}
-                                    </span>
-                                  </div>
-                                  {selectedVoiceBrdgeId !== params.brdgeId && (
-                                    <div className="bg-[#B89F63]/5 border border-[#B89F63]/10 rounded-md px-2 py-1 mb-2 text-[11px] text-[#0A1933]/80">
-                                      From: {allVoices.find(v => v.id === selectedVoice)?.brdge_name || 'Another Project'}
-                                    </div>
-                                  )}
-                                  <p className="text-[#1E2A42] text-[12px] leading-relaxed">
-                                    Using {selectedVoiceBrdgeId === params.brdgeId ? 'your' : 'a'} custom voice clone. This personalized voice will be used when the AI speaks.
-                                  </p>
-                                  <div className="text-[10px] text-[#1E2A42]/60 mt-2">
-                                    Created: {allVoices.find(v => v.id === selectedVoice)?.created_at
-                                      ? new Date(allVoices.find(v => v.id === selectedVoice)!.created_at).toLocaleDateString()
-                                      : 'Unknown'}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Create New Voice / Custom Voices section */}
-                            <div className="flex items-center justify-between mb-4">
-                              <h3 className="text-[13px] font-medium text-[#0A1933]">Custom Voices</h3>
-                              <motion.button
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
-                                onClick={() => setIsCreatingVoice(true)}
-                                className={`
+                          {/* Create New Voice / Custom Voices section */}
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-[13px] font-medium text-[#0A1933]">Custom Voices</h3>
+                            <motion.button
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() => setIsCreatingVoice(true)}
+                              className={`
                                   group flex items-center gap-1.5
                                   px-3 py-1.5 rounded-lg
                                   bg-gradient-to-r from-[#9C7C38]/10 to-transparent
@@ -4432,106 +4282,106 @@ export default function Playground({
                                   hover:shadow-[0_0_15px_rgba(156,124,56,0.1)]
                                   ${isCreatingVoice ? 'opacity-50 pointer-events-none' : ''}
                                 `}
-                              >
-                                <Plus size={12} className="group-hover:rotate-90 transition-transform duration-300" />
-                                <span className="text-[11px] font-satoshi">Create New Voice</span>
-                              </motion.button>
-                            </div>
+                            >
+                              <Plus size={12} className="group-hover:rotate-90 transition-transform duration-300" />
+                              <span className="text-[11px] font-satoshi">Create New Voice</span>
+                            </motion.button>
+                          </div>
 
-                            {isCreatingVoice ? (
-                              // Voice Creation Section - Using existing recording UI with better styling
-                              <div className="space-y-4 bg-[#F5EFE0]/70 rounded-lg p-4 border border-[#9C7C38]/20">
-                                <div className="flex items-center justify-between mb-2">
-                                  <h4 className="text-[13px] text-[#0A1933] font-medium">Create Voice Clone</h4>
-                                  <button
-                                    onClick={() => setIsCreatingVoice(false)}
-                                    className="p-1 rounded hover:bg-[#F5EFE0] text-[#1E2A42] hover:text-[#0A1933]"
-                                  >
-                                    <X size={14} />
-                                  </button>
-                                </div>
+                          {isCreatingVoice ? (
+                            // Voice Creation Section - Using existing recording UI with better styling
+                            <div className="space-y-4 bg-[#F5EFE0]/70 rounded-lg p-4 border border-[#9C7C38]/20">
+                              <div className="flex items-center justify-between mb-2">
+                                <h4 className="text-[13px] text-[#0A1933] font-medium">Create Voice Clone</h4>
+                                <button
+                                  onClick={() => setIsCreatingVoice(false)}
+                                  className="p-1 rounded hover:bg-[#F5EFE0] text-[#1E2A42] hover:text-[#0A1933]"
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
 
-                                <div className="space-y-3">
-                                  <h5 className="text-[12px] text-[#9C7C38]">Record a short sample of your voice:</h5>
-                                  <ul className="space-y-2">
-                                    {[
-                                      'Record 10-20 seconds of clear speech',
-                                      'Speak naturally at your normal pace',
-                                      'Avoid background noise and echoes'
-                                    ].map((text, i) => (
-                                      <li key={i} className="flex items-start gap-2">
-                                        <span className="text-[#9C7C38] mt-1 text-[10px]">•</span>
-                                        <span className="font-satoshi text-[12px] text-[#1E2A42]">{text}</span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
+                              <div className="space-y-3">
+                                <h5 className="text-[12px] text-[#9C7C38]">Record a short sample of your voice:</h5>
+                                <ul className="space-y-2">
+                                  {[
+                                    'Record 10-20 seconds of clear speech',
+                                    'Speak naturally at your normal pace',
+                                    'Avoid background noise and echoes'
+                                  ].map((text, i) => (
+                                    <li key={i} className="flex items-start gap-2">
+                                      <span className="text-[#9C7C38] mt-1 text-[10px]">•</span>
+                                      <span className="font-satoshi text-[12px] text-[#1E2A42]">{text}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
 
-                                <div className="bg-[#F5EFE0]/90 rounded-lg p-3 border border-[#9C7C38]/20">
-                                  <h5 className="text-[12px] text-[#0A1933]/90 mb-2">Sample text to read:</h5>
-                                  <p className="text-[12px] text-[#1E2A42] leading-relaxed italic">
-                                    &ldquo;In just a few quick steps my voice based AI assistant will be integrated into my content.
-                                    This way you can speak to others without being there... how cool is that?&rdquo;
-                                  </p>
-                                </div>
+                              <div className="bg-[#F5EFE0]/90 rounded-lg p-3 border border-[#9C7C38]/20">
+                                <h5 className="text-[12px] text-[#0A1933]/90 mb-2">Sample text to read:</h5>
+                                <p className="text-[12px] text-[#1E2A42] leading-relaxed italic">
+                                  &ldquo;In just a few quick steps my voice based AI assistant will be integrated into my content.
+                                  This way you can speak to others without being there... how cool is that?&rdquo;
+                                </p>
+                              </div>
 
-                                <div className="space-y-3 pt-2">
-                                  <input
-                                    type="text"
-                                    value={voiceName}
-                                    onChange={(e) => setVoiceName(e.target.value)}
-                                    placeholder="Enter voice name"
-                                    className="w-full bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg
+                              <div className="space-y-3 pt-2">
+                                <input
+                                  type="text"
+                                  value={voiceName}
+                                  onChange={(e) => setVoiceName(e.target.value)}
+                                  placeholder="Enter voice name"
+                                  className="w-full bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg
                                     px-3 py-2.5 text-[13px] text-[#0A1933]
                                     transition-all duration-300
                                     focus:ring-1 focus:ring-[#9C7C38]/40 
                                     focus:border-[#9C7C38]/50
                                     hover:border-[#9C7C38]/40"
-                                  />
+                                />
 
-                                  <button
-                                    onClick={isRecording ? stopRecording : startRecording}
-                                    className={`
+                                <button
+                                  onClick={isRecording ? stopRecording : startRecording}
+                                  className={`
                                       w-full px-4 py-2.5 rounded-lg text-[13px] font-medium
                                       transition-all duration-300
                                       flex items-center justify-center gap-2
                                       ${isRecording
-                                        ? 'bg-red-500/20 text-red-600 hover:bg-red-500/30'
-                                        : 'bg-[#9C7C38]/20 text-[#9C7C38] hover:bg-[#9C7C38]/30'
-                                      }
+                                      ? 'bg-red-500/20 text-red-600 hover:bg-red-500/30'
+                                      : 'bg-[#9C7C38]/20 text-[#9C7C38] hover:bg-[#9C7C38]/30'
+                                    }
                                       shadow-[0_0_15px_rgba(156,124,56,0.1)]
                                       hover:shadow-[0_0_20px_rgba(156,124,56,0.15)]
                                     `}
-                                  >
-                                    <span className={`
+                                >
+                                  <span className={`
                                       w-1.5 h-1.5 rounded-full 
                                       ${isRecording
-                                        ? 'bg-red-500 animate-[pulse_1s_ease-in-out_infinite]'
-                                        : 'bg-cyan-500'
-                                      }
+                                      ? 'bg-red-500 animate-[pulse_1s_ease-in-out_infinite]'
+                                      : 'bg-cyan-500'
+                                    }
                                     `} />
-                                    {isRecording ? (
-                                      <>Recording... {formatTime(recordingTime)}</>
-                                    ) : (
-                                      'Start Recording'
-                                    )}
-                                  </button>
-                                </div>
+                                  {isRecording ? (
+                                    <>Recording... {formatTime(recordingTime)}</>
+                                  ) : (
+                                    'Start Recording'
+                                  )}
+                                </button>
+                              </div>
 
-                                {/* Recording Preview */}
-                                {currentRecording && (
-                                  <div className="space-y-2">
-                                    <div className="bg-[#F5EFE0]/80 rounded-lg p-2 border border-[#9C7C38]/20">
-                                      <audio
-                                        src={URL.createObjectURL(currentRecording)}
-                                        controls
-                                        className="w-full h-8"
-                                      />
-                                    </div>
-                                    <button
-                                      onClick={handleCloneVoice}
-                                      disabled={!voiceName || isCloning}
-                                      className={`
+                              {/* Recording Preview */}
+                              {currentRecording && (
+                                <div className="space-y-2">
+                                  <div className="bg-[#F5EFE0]/80 rounded-lg p-2 border border-[#9C7C38]/20">
+                                    <audio
+                                      src={URL.createObjectURL(currentRecording)}
+                                      controls
+                                      className="w-full h-8"
+                                    />
+                                  </div>
+                                  <button
+                                    onClick={handleCloneVoice}
+                                    disabled={!voiceName || isCloning}
+                                    className={`
                                         w-full px-4 py-2.5 rounded-lg text-[13px] font-medium
                                         transition-all duration-300
                                         transform hover:-translate-y-0.5
@@ -4542,390 +4392,308 @@ export default function Playground({
                                         disabled:opacity-50 disabled:cursor-not-allowed
                                         disabled:hover:transform-none
                                       `}
-                                    >
-                                      {isCloning ? (
-                                        <div className="flex items-center justify-center gap-2">
-                                          <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                          Creating Voice Clone...
-                                        </div>
-                                      ) : (
-                                        'Create Voice Clone'
-                                      )}
-                                    </button>
+                                  >
+                                    {isCloning ? (
+                                      <div className="flex items-center justify-center gap-2">
+                                        <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                        Creating Voice Clone...
+                                      </div>
+                                    ) : (
+                                      'Create Voice Clone'
+                                    )}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            // Voice List Section - show as cards with better UI
+                            <div className="space-y-2">
+                              {savedVoices.length === 0 ? (
+                                <div className="text-center py-10 px-4 bg-[#F5EFE0]/60 rounded-lg border border-[#9C7C38]/30">
+                                  <div className="mb-3 opacity-50">
+                                    <Volume2 size={24} className="mx-auto text-[#1E2A42]/50" />
                                   </div>
-                                )}
-                              </div>
-                            ) : (
-                              // Voice List Section - show as cards with better UI
-                              <div className="space-y-2">
-                                {savedVoices.length === 0 ? (
-                                  <div className="text-center py-10 px-4 bg-[#F5EFE0]/60 rounded-lg border border-[#9C7C38]/30">
-                                    <div className="mb-3 opacity-50">
-                                      <Volume2 size={24} className="mx-auto text-[#1E2A42]/50" />
-                                    </div>
-                                    <div className="text-[#0A1933] text-[13px]">No custom voices yet</div>
-                                    <div className="mt-1 text-[12px] text-[#1E2A42]/70">
-                                      Create a custom voice to make your AI sound more like you
-                                    </div>
+                                  <div className="text-[#0A1933] text-[13px]">No custom voices yet</div>
+                                  <div className="mt-1 text-[12px] text-[#1E2A42]/70">
+                                    Create a custom voice to make your AI sound more like you
                                   </div>
-                                ) : (
-                                  <div className="grid grid-cols-1 gap-3">
-                                    {savedVoices.map((voice) => (
-                                      <motion.div
-                                        key={voice.id}
-                                        layout
-                                        className={`
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-1 gap-3">
+                                  {savedVoices.map((voice) => (
+                                    <motion.div
+                                      key={voice.id}
+                                      layout
+                                      className={`
                                           relative p-4 rounded-lg
                                           transition-all duration-300
                                           ${selectedVoice === voice.id
-                                            ? 'bg-[#9C7C38]/10 border border-[#9C7C38]/30 shadow-[0_0_15px_rgba(156,124,56,0.07)]'
-                                            : 'bg-[#F5EFE0]/70 border border-[#9C7C38]/20'}
+                                          ? 'bg-[#9C7C38]/10 border border-[#9C7C38]/30 shadow-[0_0_15px_rgba(156,124,56,0.07)]'
+                                          : 'bg-[#F5EFE0]/70 border border-[#9C7C38]/20'}
                                           hover:border-[#9C7C38]/40
                                           group cursor-pointer
                                         `}
-                                        onClick={() => {
-                                          // Simply select this voice when clicked - no separate activate button needed
-                                          if (selectedVoice !== voice.id) {
-                                            // Same logic as in the VoiceSelector's onSelectVoice handler
-                                            setSelectedVoice(voice.id);
-                                            setSelectedVoiceBrdgeId(params.brdgeId);
+                                      onClick={() => {
+                                        // Simply select this voice when clicked - no separate activate button needed
+                                        if (selectedVoice !== voice.id) {
+                                          // Same logic as in the VoiceSelector's onSelectVoice handler
+                                          setSelectedVoice(voice.id);
+                                          setSelectedVoiceBrdgeId(params.brdgeId);
 
-                                            // Save the voice ID to the brdge via API call
-                                            if (params.brdgeId && params.apiBaseUrl) {
-                                              // Call the endpoint to update the brdge's voice_id
-                                              fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/update-voice`, {
-                                                method: 'POST',
-                                                headers: {
-                                                  'Content-Type': 'application/json',
-                                                  // Use authToken prop instead of localStorage
-                                                  ...(authToken ? {
-                                                    'Authorization': `Bearer ${authToken}`
-                                                  } : {})
-                                                },
-                                                body: JSON.stringify({ voice_id: voice.id }),
-                                                credentials: 'omit'
+                                          // Save the voice ID to the brdge via API call
+                                          if (params.brdgeId && params.apiBaseUrl) {
+                                            // Call the endpoint to update the brdge's voice_id
+                                            fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/update-voice`, {
+                                              method: 'POST',
+                                              headers: {
+                                                'Content-Type': 'application/json',
+                                                // Use authToken prop instead of localStorage
+                                                ...(authToken ? {
+                                                  'Authorization': `Bearer ${authToken}`
+                                                } : {})
+                                              },
+                                              body: JSON.stringify({ voice_id: voice.id }),
+                                              credentials: 'omit'
+                                            })
+                                              .then(response => {
+                                                if (!response.ok) {
+                                                  console.error('Failed to update brdge voice_id:', response.status, response.statusText);
+                                                  throw new Error('Failed to update voice');
+                                                }
+
+                                                // After successfully updating voice in database, update local state
+                                                // No need to call activate, just update UI directly
+                                                setSavedVoices(prev => prev.map(v => ({
+                                                  ...v,
+                                                  status: v.id === voice.id ? 'active' : 'inactive'
+                                                })));
+                                                console.log('Successfully updated voice selection');
+
+                                                // Refresh voice list
+                                                return fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/voices`);
                                               })
-                                                .then(response => {
-                                                  if (!response.ok) {
-                                                    console.error('Failed to update brdge voice_id:', response.status, response.statusText);
-                                                    throw new Error('Failed to update voice');
-                                                  }
-
-                                                  // After successfully updating voice in database, update local state
-                                                  // No need to call activate, just update UI directly
-                                                  setSavedVoices(prev => prev.map(v => ({
-                                                    ...v,
-                                                    status: v.id === voice.id ? 'active' : 'inactive'
-                                                  })));
-                                                  console.log('Successfully updated voice selection');
-
-                                                  // Refresh voice list
-                                                  return fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/voices`);
-                                                })
-                                                .then(response => {
-                                                  if (response && response.ok) {
-                                                    return response.json();
-                                                  }
-                                                })
-                                                .then(data => {
-                                                  if (data && data.voices) {
-                                                    setSavedVoices(data.voices);
-                                                  }
-                                                })
-                                                .catch(error => console.error('Error updating brdge voice:', error));
-                                            }
+                                              .then(response => {
+                                                if (response && response.ok) {
+                                                  return response.json();
+                                                }
+                                              })
+                                              .then(data => {
+                                                if (data && data.voices) {
+                                                  setSavedVoices(data.voices);
+                                                }
+                                              })
+                                              .catch(error => console.error('Error updating brdge voice:', error));
                                           }
-                                        }}
-                                      >
-                                        <div className="flex items-center gap-3">
-                                          <div className={`
+                                        }
+                                      }}
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <div className={`
                                             p-2.5 rounded-full 
                                             ${selectedVoice === voice.id
-                                              ? 'bg-[#9C7C38]/20 text-[#9C7C38]'
-                                              : 'bg-[#F5EFE0] text-[#1E2A42]/50'}
+                                            ? 'bg-[#9C7C38]/20 text-[#9C7C38]'
+                                            : 'bg-[#F5EFE0] text-[#1E2A42]/50'}
                                             transition-all duration-300
                                           `}>
-                                            <Volume2 size={14} />
-                                          </div>
+                                          <Volume2 size={14} />
+                                        </div>
 
-                                          <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2">
-                                              <h4 className={`
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-center gap-2">
+                                            <h4 className={`
                                                 text-[14px] truncate
                                                 ${selectedVoice === voice.id ? 'text-[#9C7C38]' : 'text-[#0A1933]'}
                                               `}>
-                                                {voice.name}
-                                              </h4>
-                                              {selectedVoice === voice.id && (
-                                                <span className="text-[10px] text-[#9C7C38] bg-[#9C7C38]/10 px-1.5 py-0.5 rounded">
-                                                  Active
-                                                </span>
-                                              )}
-                                            </div>
-                                            <p className="text-[11px] text-[#1E2A42]/60 mt-0.5">
-                                              Created {new Date(voice.created_at).toLocaleDateString()}
-                                            </p>
+                                              {voice.name}
+                                            </h4>
+                                            {selectedVoice === voice.id && (
+                                              <span className="text-[10px] text-[#9C7C38] bg-[#9C7C38]/10 px-1.5 py-0.5 rounded">
+                                                Active
+                                              </span>
+                                            )}
                                           </div>
+                                          <p className="text-[11px] text-[#1E2A42]/60 mt-0.5">
+                                            Created {new Date(voice.created_at).toLocaleDateString()}
+                                          </p>
                                         </div>
-                                      </motion.div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
+                                      </div>
+                                    </motion.div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      )}
-                      {activeTab === 'share' && (
-                        <div className={`
+                      </div>
+                    )}
+                    {activeTab === 'share' && (
+                      <div className={`
                           h-full pt-0 overflow-y-auto
                           ${activeTab === 'share' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}
                           transition-opacity duration-300
                         `}>
-                          <div className="flex items-center justify-between mb-1">
-                            <h2 className={styles.header.main}>Sharing Configuration</h2>
-                          </div>
+                        <div className="flex items-center justify-between mb-1">
+                          <h2 className={styles.header.main}>Sharing Configuration</h2>
+                        </div>
 
-                          <div className="mb-6 pb-12 border-b border-[#9C7C38]/30">
-                            {/* Public/Private Toggle Section */}
-                            <section className={sectionClass}>
-                              {/* Background and border effects */}
-                              <div className="absolute inset-0 border border-[#9C7C38]/30 rounded-lg transition-all duration-300 group-hover:border-[#9C7C38]/50 group-hover:shadow-[0_0_15px_rgba(156,124,56,0.05)]"></div>
-                              <div className="absolute inset-0 bg-gradient-to-b from-[#9C7C38]/[0.02] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 rounded-lg"></div>
+                        <div className="mb-6 pb-12 border-b border-[#9C7C38]/30">
+                          {/* Public/Private Toggle Section */}
+                          <section className={sectionClass}>
+                            {/* Background and border effects */}
+                            <div className="absolute inset-0 border border-[#9C7C38]/30 rounded-lg transition-all duration-300 group-hover:border-[#9C7C38]/50 group-hover:shadow-[0_0_15px_rgba(156,124,56,0.05)]"></div>
+                            <div className="absolute inset-0 bg-gradient-to-b from-[#9C7C38]/[0.02] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 rounded-lg"></div>
 
-                              {/* Section Header */}
-                              <div className="flex items-center mb-2 relative z-10">
-                                <div className="w-1.5 h-1.5 rounded-full bg-[#9C7C38]/70 shadow-[0_0_5px_rgba(156,124,56,0.5)] mr-1.5"></div>
-                                <h2 className={styles.header.sub}>Public Access</h2>
-                                <div className="h-[1px] flex-1 ml-2 mr-1 bg-gradient-to-r from-transparent via-[#9C7C38]/20 to-transparent"></div>
+                            {/* Section Header */}
+                            <div className="flex items-center mb-2 relative z-10">
+                              <div className="w-1.5 h-1.5 rounded-full bg-[#9C7C38]/70 shadow-[0_0_5px_rgba(156,124,56,0.5)] mr-1.5"></div>
+                              <h2 className={styles.header.sub}>Public Access</h2>
+                              <div className="h-[1px] flex-1 ml-2 mr-1 bg-gradient-to-r from-transparent via-[#9C7C38]/20 to-transparent"></div>
+                            </div>
+
+                            {/* Toggle control */}
+                            <div className="flex items-center justify-between p-4 bg-[#F5EFE0]/80 backdrop-blur-sm rounded-lg border border-[#9C7C38]/30 hover:border-[#9C7C38]/50 transition-all duration-300 relative z-10">
+                              <div className="flex flex-col">
+                                <div className="flex items-center gap-2">
+                                  {brdge?.shareable ? (
+                                    <>
+                                      <Globe size={18} className="text-[#9C7C38] filter drop-shadow-[0_0_8px_rgba(156,124,56,0.4)]" />
+                                      <h3 className="text-[14px] font-medium text-[#9C7C38]">Public</h3>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Lock size={18} className="text-[#1E2A42]" />
+                                      <h3 className="text-[14px] font-medium text-[#1E2A42]">Private</h3>
+                                    </>
+                                  )}
+                                </div>
+                                <p className="text-[12px] text-[#0A1933]/70 mt-1">
+                                  {brdge?.shareable
+                                    ? "Anyone with the link can view this bridge"
+                                    : "Only you can view this bridge"}
+                                </p>
                               </div>
 
-                              {/* Toggle control */}
-                              <div className="flex items-center justify-between p-4 bg-[#F5EFE0]/80 backdrop-blur-sm rounded-lg border border-[#9C7C38]/30 hover:border-[#9C7C38]/50 transition-all duration-300 relative z-10">
-                                <div className="flex flex-col">
-                                  <div className="flex items-center gap-2">
-                                    {brdge?.shareable ? (
-                                      <>
-                                        <Globe size={18} className="text-[#9C7C38] filter drop-shadow-[0_0_8px_rgba(156,124,56,0.4)]" />
-                                        <h3 className="text-[14px] font-medium text-[#9C7C38]">Public</h3>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Lock size={18} className="text-[#1E2A42]" />
-                                        <h3 className="text-[14px] font-medium text-[#1E2A42]">Private</h3>
-                                      </>
-                                    )}
-                                  </div>
-                                  <p className="text-[12px] text-[#0A1933]/70 mt-1">
-                                    {brdge?.shareable
-                                      ? "Anyone with the link can view this bridge"
-                                      : "Only you can view this bridge"}
-                                  </p>
-                                </div>
-
-                                <div className="flex items-center">
-                                  <label className="relative inline-flex items-center cursor-pointer">
-                                    <input
-                                      type="checkbox"
-                                      checked={brdge?.shareable || false}
-                                      onChange={toggleShareable}
-                                      className="sr-only peer"
-                                    />
-                                    <div className={`
+                              <div className="flex items-center">
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={brdge?.shareable || false}
+                                    onChange={toggleShareable}
+                                    className="sr-only peer"
+                                  />
+                                  <div className={`
                                       w-11 h-6 rounded-full
                                       after:content-[''] after:absolute after:top-[2px] after:left-[2px]
                                       after:bg-white after:rounded-full after:h-5 after:w-5
                                       after:transition-all peer-checked:after:translate-x-full
                                       ${brdge?.shareable
-                                        ? 'bg-[#9C7C38]/30 border-[#9C7C38]/50 after:shadow-[0_0_8px_rgba(156,124,56,0.4)]'
-                                        : 'bg-[#F5EFE0] border-[#9C7C38]/20'}
+                                      ? 'bg-[#9C7C38]/30 border-[#9C7C38]/50 after:shadow-[0_0_8px_rgba(156,124,56,0.4)]'
+                                      : 'bg-[#F5EFE0] border-[#9C7C38]/20'}
                                     border transition-all duration-300
                                   `}></div>
-                                  </label>
-                                </div>
+                                </label>
                               </div>
-                            </section>
+                            </div>
+                          </section>
 
-                            {/* Share Link Section */}
-                            <section className={`${sectionClass} mt-6`}>
-                              {/* Background and border effects */}
-                              <div className="absolute inset-0 border border-[#9C7C38]/30 rounded-lg transition-all duration-300 group-hover:border-[#9C7C38]/50 group-hover:shadow-[0_0_15px_rgba(156,124,56,0.05)]"></div>
-                              <div className="absolute inset-0 bg-gradient-to-b from-[#9C7C38]/[0.02] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 rounded-lg"></div>
+                          {/* Share Link Section */}
+                          <section className={`${sectionClass} mt-6`}>
+                            {/* Background and border effects */}
+                            <div className="absolute inset-0 border border-[#9C7C38]/30 rounded-lg transition-all duration-300 group-hover:border-[#9C7C38]/50 group-hover:shadow-[0_0_15px_rgba(156,124,56,0.05)]"></div>
+                            <div className="absolute inset-0 bg-gradient-to-b from-[#9C7C38]/[0.02] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 rounded-lg"></div>
 
-                              {/* Section Header */}
-                              <div className="flex items-center mb-2 relative z-10">
-                                <div className="w-1.5 h-1.5 rounded-full bg-[#9C7C38]/70 shadow-[0_0_5px_rgba(156,124,56,0.5)] mr-1.5"></div>
-                                <h2 className={styles.header.sub}>Share Link</h2>
-                                <div className="h-[1px] flex-1 ml-2 mr-1 bg-gradient-to-r from-transparent via-[#9C7C38]/20 to-transparent"></div>
-                              </div>
+                            {/* Section Header */}
+                            <div className="flex items-center mb-2 relative z-10">
+                              <div className="w-1.5 h-1.5 rounded-full bg-[#9C7C38]/70 shadow-[0_0_5px_rgba(156,124,56,0.5)] mr-1.5"></div>
+                              <h2 className={styles.header.sub}>Share Link</h2>
+                              <div className="h-[1px] flex-1 ml-2 mr-1 bg-gradient-to-r from-transparent via-[#9C7C38]/20 to-transparent"></div>
+                            </div>
 
-                              {/* Link display and copy button */}
-                              <div className={`
+                            {/* Link display and copy button */}
+                            <div className={`
                                 relative p-4 bg-[#F5EFE0]/80 backdrop-blur-sm rounded-lg
                                 border transition-all duration-300 z-10
                                 ${brdge?.shareable
-                                  ? 'border-[#9C7C38]/30 hover:border-[#9C7C38]/50 hover:shadow-[0_0_15px_rgba(156,124,56,0.1)]'
-                                  : 'border-[#9C7C38]/20 opacity-50'}
+                                ? 'border-[#9C7C38]/30 hover:border-[#9C7C38]/50 hover:shadow-[0_0_15px_rgba(156,124,56,0.1)]'
+                                : 'border-[#9C7C38]/20 opacity-50'}
                               `}>
-                                {brdge?.shareable ? (
-                                  <div className="flex flex-col space-y-3">
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex items-center gap-2">
-                                        <Link size={15} className="text-[#9C7C38]" />
-                                        <span className="text-[13px] text-[#0A1933]">Shareable Link</span>
-                                      </div>
-                                      <a
-                                        href={shareableLink}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex items-center gap-1 text-[11px] text-[#9C7C38] hover:text-[#B89F63] transition-colors"
-                                      >
-                                        <span>Open</span>
-                                        <ExternalLink size={11} />
-                                      </a>
-                                    </div>
-
+                              {brdge?.shareable ? (
+                                <div className="flex flex-col space-y-3">
+                                  <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                      <div className="flex-1 px-3 py-2 bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg text-[13px] text-[#0A1933] truncate">
-                                        {shareableLink}
-                                      </div>
-                                      <button
-                                        onClick={copyLinkToClipboard}
-                                        className={`
+                                      <Link size={15} className="text-[#9C7C38]" />
+                                      <span className="text-[13px] text-[#0A1933]">Shareable Link</span>
+                                    </div>
+                                    <a
+                                      href={shareableLink}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex items-center gap-1 text-[11px] text-[#9C7C38] hover:text-[#B89F63] transition-colors"
+                                    >
+                                      <span>Open</span>
+                                      <ExternalLink size={11} />
+                                    </a>
+                                  </div>
+
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex-1 px-3 py-2 bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg text-[13px] text-[#0A1933] truncate">
+                                      {shareableLink}
+                                    </div>
+                                    <button
+                                      onClick={copyLinkToClipboard}
+                                      className={`
                                           p-2 rounded-lg transition-all duration-300
                                           ${isCopied
-                                            ? 'bg-green-500/10 text-green-600'
-                                            : 'bg-[#9C7C38]/10 text-[#9C7C38] hover:bg-[#9C7C38]/20'}
+                                          ? 'bg-green-500/10 text-green-600'
+                                          : 'bg-[#9C7C38]/10 text-[#9C7C38] hover:bg-[#9C7C38]/20'}
                                         `}
-                                      >
-                                        {isCopied ? <Check size={18} /> : <Copy size={18} />}
-                                      </button>
-                                    </div>
-
-                                    <div className="text-[11px] text-[#1E2A42]/70">
-                                      {isCopied ? (
-                                        <span className="text-green-600">✓ Link copied to clipboard!</span>
-                                      ) : (
-                                        "Share this link with anyone you want to give access to your bridge"
-                                      )}
-                                    </div>
+                                    >
+                                      {isCopied ? <Check size={18} /> : <Copy size={18} />}
+                                    </button>
                                   </div>
-                                ) : (
-                                  <div className="flex flex-col items-center justify-center py-4">
-                                    <Lock size={24} className="text-[#1E2A42]/50 mb-2" />
-                                    <p className="text-[13px] text-[#0A1933]/70 text-center">
-                                      Enable public access to get a shareable link
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                            </section>
 
-                            {/* Privacy Information */}
-                            <section className={`${sectionClass} mt-6`}>
-                              <div className="flex items-start gap-2">
-                                <Info size={14} className="text-[#1E2A42]/70 mt-0.5" />
-                                <div>
-                                  <h4 className="text-[12px] font-medium text-[#0A1933] mb-1">Privacy Information</h4>
-                                  <p className="text-[11px] text-[#1E2A42]/80 leading-relaxed">
-                                    When shared publicly, anyone with the link can view and interact with your bridge.
-                                    You can disable public access at any time by toggling the switch above.
+                                  <div className="text-[11px] text-[#1E2A42]/70">
+                                    {isCopied ? (
+                                      <span className="text-green-600">✓ Link copied to clipboard!</span>
+                                    ) : (
+                                      "Share this link with anyone you want to give access to your bridge"
+                                    )}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex flex-col items-center justify-center py-4">
+                                  <Lock size={24} className="text-[#1E2A42]/50 mb-2" />
+                                  <p className="text-[13px] text-[#0A1933]/70 text-center">
+                                    Enable public access to get a shareable link
                                   </p>
                                 </div>
-                              </div>
-                            </section>
-                          </div>
-                        </div>
-                      )}
-                      {/* Add this new section for the Engagement tab */}
-                      {!isMobile && isEditMode && (
-                        <>
-                          {activeTab === 'engagement' && (
-                            <div className="space-y-6 px-2">
-                              <div className="flex items-center justify-between mb-4">
-                                <h2 className={styles.header.main}>Engagement Opportunities</h2>
-                                <motion.button
-                                  whileHover={{ scale: 1.02 }}
-                                  whileTap={{ scale: 0.98 }}
-                                  onClick={handleAddEngagement}
-                                  className="px-2 py-1 bg-[#9C7C38]/20 text-[#9C7C38] hover:bg-[#9C7C38]/30 
-                                    rounded-lg text-[10px] flex items-center gap-1.5 font-medium
-                                    border border-[#9C7C38]/30 hover:border-[#9C7C38]/40
-                                    shadow-sm hover:shadow
-                                    transition-all duration-200"
-                                >
-                                  <Plus size={10} />
-                                  Add New
-                                </motion.button>
-                              </div>
-
-                              {/* Filter controls with improved spacing */}
-                              <div className="flex flex-wrap gap-2 mb-5 px-1">
-                                <button
-                                  className={`px-3 py-1 text-xs rounded-full transition-all duration-300 ${!selectedEngagement ? 'bg-[#9C7C38]/20 text-[#9C7C38]' : 'bg-[#F5EFE0]/70 text-[#1E2A42] hover:bg-[#F5EFE0]'}`}
-                                  onClick={() => setSelectedEngagement(null)}
-                                >
-                                  All Types
-                                </button>
-                                <button
-                                  className={`px-3 py-1 text-xs rounded-full flex items-center gap-1 transition-all duration-300 ${selectedEngagement === 'quiz' ? 'bg-[#9C7C38]/20 text-[#9C7C38]' : 'bg-[#F5EFE0]/70 text-[#1E2A42] hover:bg-[#F5EFE0]'}`}
-                                  onClick={() => setSelectedEngagement(selectedEngagement === 'quiz' ? null : 'quiz')}
-                                >
-                                  {getEngagementTypeIcon('quiz')}
-                                  Quizzes
-                                </button>
-                                <button
-                                  className={`px-3 py-1 text-xs rounded-full flex items-center gap-1 transition-all duration-300 ${selectedEngagement === 'discussion' ? 'bg-[#9C7C38]/20 text-[#9C7C38]' : 'bg-[#F5EFE0]/70 text-[#1E2A42] hover:bg-[#F5EFE0]'}`}
-                                  onClick={() => setSelectedEngagement(selectedEngagement === 'discussion' ? null : 'discussion')}
-                                >
-                                  {getEngagementTypeIcon('discussion')}
-                                  Discussions
-                                </button>
-                              </div>
-
-                              {/* Debug output for troubleshooting */}
-                              {(!engagementOpportunities || engagementOpportunities.length === 0) && (
-                                <div className="bg-[#F5EFE0]/40 mb-4 p-2 rounded-lg text-xs text-[#1E2A42]">
-                                  Debug: Agent config has engagement_opportunities? {agentConfig.engagement_opportunities ? 'Yes' : 'No'}
-                                </div>
                               )}
+                            </div>
+                          </section>
 
-                              {/* Engagement list with improved container spacing */}
-                              <div className="space-y-4 px-1">
-                                {engagementOpportunities && engagementOpportunities.length > 0 ? (
-                                  engagementOpportunities
-                                    .filter(engagement => !selectedEngagement || engagement.engagement_type === selectedEngagement)
-                                    .map((engagement, index) => (
-                                      <EngagementCard
-                                        key={engagement.id || index}
-                                        engagement={engagement}
-                                        onEdit={handleUpdateEngagement}
-                                        onDelete={handleDeleteEngagement}
-                                      />
-                                    ))
-                                ) : (
-                                  <div className="text-center p-6 bg-[#F5EFE0]/60 rounded-lg border border-[#9C7C38]/30">
-                                    <div className="text-[#0A1933] text-sm">No engagement opportunities found</div>
-                                    <div className="text-[#1E2A42] text-xs mt-1">
-                                      Create new engagement opportunities using the &quot;Add New&quot; button above
-                                    </div>
-                                  </div>
-                                )}
+                          {/* Privacy Information */}
+                          <section className={`${sectionClass} mt-6`}>
+                            <div className="flex items-start gap-2">
+                              <Info size={14} className="text-[#1E2A42]/70 mt-0.5" />
+                              <div>
+                                <h4 className="text-[12px] font-medium text-[#0A1933] mb-1">Privacy Information</h4>
+                                <p className="text-[11px] text-[#1E2A42]/80 leading-relaxed">
+                                  When shared publicly, anyone with the link can view and interact with your bridge.
+                                  You can disable public access at any time by toggling the switch above.
+                                </p>
                               </div>
                             </div>
-                          )}
-                        </>
-                      )}
-                    </>
-                  )}
-                </div>
+                          </section>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
-          </motion.div>
-        )}
+          </div>
+        </motion.div>
       </div>
-
-      {isMobile && <MobileFAB />}
     </div >
   );
 }
