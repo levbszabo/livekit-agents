@@ -22,7 +22,8 @@ import { jwtDecode } from "jwt-decode";
 import { MobileVideoPlayer } from './mobile/MobileVideoPlayer';
 import { MobileProgressBar } from './mobile/MobileProgressBar';
 import { MobileChatTile } from './mobile/MobileChatTile';
-import { MessageSquare, ClipboardList, User, Radio, Share2 } from 'lucide-react';
+import { MessageSquare, ClipboardList, User, Radio, Share2, Square, Send, Mic, MicOff } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // Our EngagementOpportunity interface definition
 interface EngagementQuizItem {
@@ -119,6 +120,47 @@ export default function PlaygroundMobile({
 
     // Add component mount state tracking
     const isMounted = useRef(false);
+
+    // Add state for interrupt button animation
+    const [interruptPressed, setInterruptPressed] = useState(false);
+    const [animateInterrupt, setAnimateInterrupt] = useState(false);
+
+    // Add state for message text input
+    const [messageText, setMessageText] = useState('');
+
+    // Add handleInterruptAgent function
+    const handleInterruptAgent = useCallback(() => {
+        if (roomState !== ConnectionState.Connected || !dataChannel) {
+            console.warn("Cannot interrupt agent: room not connected or dataChannel unavailable");
+            return;
+        }
+
+        try {
+            const interruptMessage = {
+                type: "interrupt",
+                timestamp: Date.now()
+            };
+
+            const payload = new TextEncoder().encode(JSON.stringify(interruptMessage));
+
+            dataChannel.send(payload, {
+                topic: "agent-control",
+                reliable: true
+            });
+
+            // Enhanced visual feedback
+            setInterruptPressed(true);
+            setAnimateInterrupt(true);
+
+            // Reset states after animations complete
+            setTimeout(() => setInterruptPressed(false), 400);
+            setTimeout(() => setAnimateInterrupt(false), 600);
+
+            console.log("Sent interrupt command to agent");
+        } catch (error) {
+            console.error("Failed to send interrupt command:", error);
+        }
+    }, [roomState, dataChannel]);
 
     // Scroll to bottom function for chat
     const scrollToBottom = useCallback(() => {
@@ -399,30 +441,191 @@ export default function PlaygroundMobile({
                 {/* Show chat interface or other tabs based on active tab */}
                 <div className={`absolute inset-0 transition-opacity duration-300 ${activeMobileTab === 'chat' ? 'opacity-100 z-30' : 'opacity-0 z-0 pointer-events-none'
                     }`}>
-                    {/* Render TranscriptionTile when voice assistant has an audio track */}
-                    {voiceAssistant?.audioTrack ? (
-                        <div className="h-full flex flex-col">
-                            <div className="p-3 border-b border-amber-500/20">
-                                <TranscriptionTile
-                                    agentAudioTrack={voiceAssistant.audioTrack}
-                                    accentColor={themeColors[0] || "amber"}
-                                />
-                            </div>
+                    {/* Messages container with transcription or regular messages */}
+                    <div className="h-full flex flex-col">
+                        <div className="flex-1 overflow-y-auto pb-[72px]">
+                            {/* Voice Assistant Transcription */}
+                            {voiceAssistant?.audioTrack ? (
+                                <div className="p-3">
+                                    {/* Using TranscriptionTile for advanced transcription visualization, 
+                                        but hiding its input by setting className to override layout */}
+                                    <div className="transcription-container" style={{ position: 'relative', height: '100%', overflow: 'hidden' }}>
+                                        <TranscriptionTile
+                                            agentAudioTrack={voiceAssistant.audioTrack}
+                                            accentColor={themeColors[0] || "amber"}
+                                        />
+                                        {/* Hide the ChatTile's input by overlaying a div */}
+                                        <div style={{
+                                            position: 'absolute',
+                                            bottom: 0,
+                                            left: 0,
+                                            right: 0,
+                                            height: '60px',
+                                            background: '#F5EFE0',
+                                            zIndex: 10
+                                        }}></div>
+                                    </div>
+                                </div>
+                            ) : (
+                                /* Regular Chat Messages */
+                                <div className="px-4 py-3 space-y-3">
+                                    <AnimatePresence>
+                                        {transcripts.map((message) => (
+                                            <motion.div
+                                                key={message.timestamp}
+                                                initial={{ opacity: 0, y: 5 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, y: -5 }}
+                                                className={`
+                                                    ${message.isSelf ? 'ml-auto bg-[#FAF7ED]/80 border border-[#9C7C38]/15' : 'mr-auto bg-[#F5EFE0]/80 border border-[#9C7C38]/25'} 
+                                                    rounded-lg p-3
+                                                    max-w-[85%] w-auto
+                                                    shadow-sm
+                                                    transition-all duration-300
+                                                    ${message.isError ? 'bg-red-50 border-red-200' : message.isSelf ? 'hover:border-[#9C7C38]/40' : 'hover:border-[#9C7C38]/40'}
+                                                    flex flex-col gap-1
+                                                `}
+                                            >
+                                                <span className="text-[11px] text-[#9C7C38]/90 font-medium">
+                                                    {message.name}
+                                                </span>
+                                                <span className={`
+                                                    text-[13px] leading-relaxed break-words 
+                                                    ${message.isError
+                                                        ? 'text-red-700 font-satoshi'
+                                                        : message.isSelf
+                                                            ? 'text-[#0A1933] font-satoshi'
+                                                            : 'text-[#1E2A42] font-serif'}
+                                                `}>
+                                                    {message.message}
+                                                </span>
+                                            </motion.div>
+                                        ))}
+                                    </AnimatePresence>
+                                </div>
+                            )}
                             <div ref={messagesEndRef} style={{ height: 0 }} /> {/* Invisible element for scrolling */}
                         </div>
-                    ) : (
-                        <MobileChatTile
-                            messages={transcripts}
-                            accentColor="amber"
-                            onSend={handleChatMessage}
-                            isMicEnabled={localParticipant?.isMicrophoneEnabled || false}
-                            onToggleMic={() => {
-                                if (roomState === ConnectionState.Connected && localParticipant) {
-                                    localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
-                                }
+
+                        {/* Single Fixed Chat Input - Always visible regardless of mode */}
+                        <div className="fixed bottom-0 left-0 right-0 z-40 px-3 py-3 
+                            bg-[#F5EFE0]/95 backdrop-blur-sm border-t border-[#9C7C38]/30
+                            after:absolute after:inset-0 after:bg-[url('/textures/parchment.png')] 
+                            after:bg-cover after:opacity-40 after:mix-blend-overlay after:pointer-events-none"
+                            style={{
+                                paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))',
+                                marginBottom: params.agentType === 'edit' ? '3.5rem' : '0'
                             }}
-                        />
-                    )}
+                        >
+                            <div className="relative z-10 flex items-end gap-2">
+                                {/* Stop Button */}
+                                <button
+                                    onClick={handleInterruptAgent}
+                                    className={`
+                                        p-3 rounded-md
+                                        ${interruptPressed
+                                            ? 'bg-[#9C7C38]/30 text-[#9C7C38] shadow-[0_0_8px_rgba(156,124,56,0.3)]'
+                                            : 'bg-[#9C7C38]/15 hover:bg-[#9C7C38]/25 text-[#1E2A42]'}
+                                        ${animateInterrupt ? 'scale-105' : 'scale-100'}
+                                        transition-all duration-200
+                                        flex-shrink-0
+                                        min-w-[44px] min-h-[44px]
+                                        border ${interruptPressed ? 'border-[#9C7C38]/20' : 'border-[#9C7C38]/0'}
+                                    `}
+                                    aria-label="Interrupt agent"
+                                >
+                                    <Square size={16} className={`fill-current ${animateInterrupt ? 'animate-pulse' : ''}`} />
+                                </button>
+
+                                {/* Textarea input with starting height */}
+                                <textarea
+                                    value={messageText}
+                                    onChange={(e) => {
+                                        setMessageText(e.target.value);
+                                        // Auto-resize textarea
+                                        e.target.style.height = '44px'; // Always reset to base height first
+                                        e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                            e.preventDefault();
+                                            handleChatMessage(messageText);
+                                            setMessageText('');
+                                            // Reset textarea height
+                                            if (e.target instanceof HTMLTextAreaElement) {
+                                                e.target.style.height = '44px';
+                                            }
+                                        }
+                                    }}
+                                    placeholder="Write a message..."
+                                    className="
+                                        flex-1 py-3 px-4
+                                        min-h-[44px] max-h-[120px] h-[44px]
+                                        bg-[#FAF7ED]/90 
+                                        text-[14px] text-[#0A1933]
+                                        placeholder:text-[#1E2A42]/40
+                                        rounded-lg resize-none
+                                        border border-[#9C7C38]/30
+                                        focus:outline-none focus:border-[#9C7C38]/50 focus:ring-1 focus:ring-[#9C7C38]/20
+                                        hover:border-[#9C7C38]/40
+                                        transition-all duration-300
+                                        scrollbar-thin scrollbar-track-transparent
+                                        scrollbar-thumb-[#9C7C38]/20
+                                        hover:scrollbar-thumb-[#9C7C38]/30
+                                        font-satoshi
+                                    "
+                                    style={{ height: '44px' }}
+                                />
+
+                                {/* Mic toggle button */}
+                                <button
+                                    onClick={() => {
+                                        if (roomState === ConnectionState.Connected && localParticipant) {
+                                            localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
+                                        }
+                                    }}
+                                    disabled={roomState !== ConnectionState.Connected}
+                                    className={`
+                                        p-3 rounded-md
+                                        ${localParticipant?.isMicrophoneEnabled
+                                            ? 'bg-[#9C7C38]/30 text-[#9C7C38]'
+                                            : 'bg-[#9C7C38]/15 text-[#1E2A42]/70 hover:text-[#9C7C38]'}
+                                        transition-all duration-200
+                                        hover:bg-[#9C7C38]/20
+                                        flex-shrink-0
+                                        min-w-[44px] min-h-[44px]
+                                    `}
+                                >
+                                    {localParticipant?.isMicrophoneEnabled ? <Mic size={20} /> : <MicOff size={20} />}
+                                </button>
+
+                                {/* Send button (quill style) */}
+                                <motion.button
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={() => {
+                                        handleChatMessage(messageText);
+                                        setMessageText('');
+                                        // Reset textarea height
+                                        if (document.activeElement instanceof HTMLTextAreaElement) {
+                                            document.activeElement.style.height = '44px';
+                                        }
+                                    }}
+                                    disabled={!messageText.trim()}
+                                    className={`
+                                        p-3 rounded-md
+                                        ${messageText.trim()
+                                            ? 'bg-[#9C7C38]/20 text-[#9C7C38] hover:bg-[#9C7C38]/30'
+                                            : 'bg-[#9C7C38]/10 text-[#1E2A42]/30'}
+                                        transition-all duration-200
+                                        flex-shrink-0
+                                        min-w-[44px] min-h-[44px]
+                                    `}
+                                >
+                                    <Send size={20} />
+                                </motion.button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Other tab content will be added in future phases */}
