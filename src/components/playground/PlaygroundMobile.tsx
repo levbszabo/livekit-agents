@@ -14,7 +14,7 @@ import {
     useDataChannel,
     useTrackTranscription
 } from "@livekit/components-react";
-import { ConnectionState, DataPacket_Kind, Track } from "livekit-client";
+import { ConnectionState, DataPacket_Kind, Track, RpcInvocationData } from "livekit-client";
 import { ReactNode } from "react";
 import { API_BASE_URL } from '@/config';
 import { api } from '@/api';
@@ -105,6 +105,7 @@ export default function PlaygroundMobile({
     const roomState = useConnectionState();
     const chat = useChat();
     const dataChannel = useDataChannel();
+    const { send: sendVideoTimestamp } = useDataChannel("video-timestamp");
 
     // Reference for auto-scrolling chat
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -398,6 +399,154 @@ export default function PlaygroundMobile({
             }
         };
     }, []); // Empty dependency array means this only runs on mount/unmount
+
+    const lastSentTimestampRef = useRef<number | null>(null);
+
+    useEffect(() => {
+        if (!localParticipant || roomState !== ConnectionState.Connected) {
+            return; // Don't register if not connected or no participant
+        }
+
+        console.log("Registering mobile player-control RPC method");
+
+        const rpcHandler = async (data: RpcInvocationData) => {
+            try {
+                console.log(`Received mobile player control from agent: ${data.payload}`);
+                const command = JSON.parse(data.payload);
+
+                if (videoRef.current) {
+                    if (command.action === 'pause') {
+                        videoRef.current.pause();
+                        setIsPlaying(false); // Update mobile state
+                        console.log("Mobile video paused via RPC");
+                        return JSON.stringify({ success: true, action: 'pause' });
+                    } else if (command.action === 'play') {
+                        await videoRef.current.play(); // Use await for play()
+                        setIsPlaying(true); // Update mobile state
+                        console.log("Mobile video resumed via RPC");
+                        return JSON.stringify({ success: true, action: 'play' });
+                    }
+                }
+                return JSON.stringify({ success: false, error: 'Invalid command or video ref missing' });
+            } catch (error) {
+                console.error('Error handling mobile player control RPC:', error);
+                return JSON.stringify({ success: false, error: String(error) });
+            }
+        };
+
+        // Register the RPC method
+        localParticipant.registerRpcMethod(
+            'controlVideoPlayer', // Keep the same name
+            rpcHandler
+        );
+
+        // Cleanup function
+        return () => {
+            try {
+                // Check if participant still exists before unregistering
+                if (localParticipant) {
+                    localParticipant.unregisterRpcMethod('controlVideoPlayer');
+                    console.log("Unregistered mobile player-control RPC method");
+                }
+            } catch (error) {
+                console.error("Error unregistering mobile RPC method:", error);
+            }
+        };
+    }, [localParticipant, roomState, videoRef, setIsPlaying]); // Use mobile state variables
+
+    const sendTimestamp = useCallback(() => {
+        const currentVideo = videoRef.current;
+        const sendFn = sendVideoTimestamp; // Use the specific send function
+        const currentState = roomState;
+
+        if (!currentVideo) {
+            // console.log("sendTimestamp aborted: Video ref is missing."); // Optional logging
+            return;
+        }
+        if (currentState !== ConnectionState.Connected) {
+            // console.log(`sendTimestamp aborted: Room not connected (State: ${currentState}).`); // Optional logging
+            return;
+        }
+
+        const currentTime = currentVideo.currentTime;
+        const thresholdMet = lastSentTimestampRef.current === null ||
+            Math.abs(currentTime - lastSentTimestampRef.current) >= 0.7; // 700ms threshold
+
+        if (thresholdMet) {
+            const message = JSON.stringify({
+                type: "timestamp",
+                time: currentTime
+            });
+            const payload = new TextEncoder().encode(message);
+
+            try {
+                if (sendFn) {
+                    sendFn(payload, { topic: "video-timestamp", reliable: false });
+                    lastSentTimestampRef.current = currentTime;
+                    // console.log(`Timestamp ${currentTime} sent.`); // Optional logging
+                } else {
+                    // console.log("Cannot send timestamp: send function is not available."); // Optional logging
+                }
+            } catch (err) {
+                console.error(`Failed to send timestamp ${currentTime}:`, err);
+            }
+        }
+    }, [roomState, sendVideoTimestamp]); // Dependencies for useCallback
+
+    const handlePlay = useCallback(() => {
+        console.log("Mobile video play event triggered");
+        sendTimestamp(); // Send initial timestamp on play
+    }, [sendTimestamp]);
+
+    const handleStop = useCallback(() => {
+        // No timestamp action needed on stop/pause/end based on Playground.tsx logic
+        console.log("Mobile video stop/pause/ended event triggered");
+    }, []);
+
+    const handleSeeked = useCallback(() => {
+        console.log("Mobile video seeked event triggered");
+        sendTimestamp(); // Send timestamp immediately after seek
+    }, [sendTimestamp]);
+
+    useEffect(() => {
+        const video = videoRef.current;
+
+        // Only attach listeners if video element exists, room is connected, AND video is ready
+        if (!video || roomState !== ConnectionState.Connected || !isVideoReadyForListeners) {
+            console.log(`Mobile listeners check failed: Video ${video ? 'exists' : 'missing'}, State: ${roomState}, Ready: ${isVideoReadyForListeners}. Not attaching.`);
+            return;
+        }
+
+        console.log("Mobile listeners: Attaching video event listeners.");
+
+        // Define local handlers referencing the stable useCallback versions
+        const onPlay = () => handlePlay();
+        const onPause = () => handleStop();
+        const onEnded = () => handleStop();
+        const onSeeked = () => handleSeeked();
+        const onTimeUpdate = () => sendTimestamp(); // Directly call the stable sendTimestamp
+
+        // Add listeners
+        video.addEventListener("play", onPlay);
+        video.addEventListener("pause", onPause);
+        video.addEventListener("ended", onEnded);
+        video.addEventListener("seeked", onSeeked);
+        video.addEventListener("timeupdate", onTimeUpdate); // Add timeupdate listener
+
+        console.log("Mobile listeners: Event listeners attached.");
+
+        // Cleanup function
+        return () => {
+            console.log("Mobile listeners cleanup: Removing video event listeners.");
+            if (video) {
+                video.removeEventListener("play", onPlay);
+                video.removeEventListener("pause", onPause);
+                video.removeEventListener("ended", onEnded);
+                video.removeEventListener("seeked", onSeeked);
+                video.removeEventListener("timeupdate", onTimeUpdate); // Remove timeupdate listener
+            }
+        };
+    }, [roomState, isVideoReadyForListeners, handlePlay, handleStop, handleSeeked, sendTimestamp]); // Dependencies
 
     return (
         <div className="h-screen flex flex-col bg-[#F5EFE0] relative overflow-hidden">
