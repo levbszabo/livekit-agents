@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ChatMessageType } from "@/components/chat/ChatTile";
+import { TranscriptionTile } from "@/transcriptions/TranscriptionTile";
 // If we need to extend the ChatMessageType for errors, we can define it here:
 interface ExtendedChatMessageType extends ChatMessageType {
     isError?: boolean;
@@ -10,9 +11,10 @@ import {
     useLocalParticipant,
     useVoiceAssistant,
     useChat,
-    useDataChannel
+    useDataChannel,
+    useTrackTranscription
 } from "@livekit/components-react";
-import { ConnectionState, DataPacket_Kind } from "livekit-client";
+import { ConnectionState, DataPacket_Kind, Track } from "livekit-client";
 import { ReactNode } from "react";
 import { API_BASE_URL } from '@/config';
 import { api } from '@/api';
@@ -103,6 +105,9 @@ export default function PlaygroundMobile({
     const chat = useChat();
     const dataChannel = useDataChannel();
 
+    // Reference for auto-scrolling chat
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+
     // Add engagementOpportunities state
     const [engagementOpportunities, setEngagementOpportunities] = useState<EngagementOpportunity[]>([]);
 
@@ -114,6 +119,18 @@ export default function PlaygroundMobile({
 
     // Add component mount state tracking
     const isMounted = useRef(false);
+
+    // Scroll to bottom function for chat
+    const scrollToBottom = useCallback(() => {
+        if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+        }
+    }, []);
+
+    // Auto-scroll when messages change
+    useEffect(() => {
+        scrollToBottom();
+    }, [transcripts, scrollToBottom]);
 
     // URL params handling
     useEffect(() => {
@@ -382,17 +399,30 @@ export default function PlaygroundMobile({
                 {/* Show chat interface or other tabs based on active tab */}
                 <div className={`absolute inset-0 transition-opacity duration-300 ${activeMobileTab === 'chat' ? 'opacity-100 z-30' : 'opacity-0 z-0 pointer-events-none'
                     }`}>
-                    <MobileChatTile
-                        messages={transcripts}
-                        accentColor="cyan"
-                        onSend={handleChatMessage}
-                        isMicEnabled={localParticipant?.isMicrophoneEnabled || false}
-                        onToggleMic={() => {
-                            if (roomState === ConnectionState.Connected && localParticipant) {
-                                localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
-                            }
-                        }}
-                    />
+                    {/* Render TranscriptionTile when voice assistant has an audio track */}
+                    {voiceAssistant?.audioTrack ? (
+                        <div className="h-full flex flex-col">
+                            <div className="p-3 border-b border-amber-500/20">
+                                <TranscriptionTile
+                                    agentAudioTrack={voiceAssistant.audioTrack}
+                                    accentColor={themeColors[0] || "amber"}
+                                />
+                            </div>
+                            <div ref={messagesEndRef} style={{ height: 0 }} /> {/* Invisible element for scrolling */}
+                        </div>
+                    ) : (
+                        <MobileChatTile
+                            messages={transcripts}
+                            accentColor="amber"
+                            onSend={handleChatMessage}
+                            isMicEnabled={localParticipant?.isMicrophoneEnabled || false}
+                            onToggleMic={() => {
+                                if (roomState === ConnectionState.Connected && localParticipant) {
+                                    localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
+                                }
+                            }}
+                        />
+                    )}
                 </div>
 
                 {/* Other tab content will be added in future phases */}
