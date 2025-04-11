@@ -21,7 +21,7 @@ import { api } from '@/api';
 import { jwtDecode } from "jwt-decode";
 import { MobileVideoPlayer } from './mobile/MobileVideoPlayer';
 import { MobileProgressBar } from './mobile/MobileProgressBar';
-import { MessageSquare, ClipboardList, User, Radio, Share2, Square, Send, Mic, MicOff, Plus, Edit2, Trash2, ChevronRight, Save, Info, Lock, Globe, Copy, Check, ExternalLink, Volume2, VolumeX, X } from 'lucide-react';
+import { MessageSquare, ClipboardList, User, Radio, Share2, Square, Send, Mic, MicOff, Plus, Edit2, Trash2, ChevronRight, Save, Info, Lock, Globe, Copy, Check, ExternalLink, Volume2, VolumeX, X, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Our EngagementOpportunity interface definition
@@ -213,6 +213,9 @@ export default function PlaygroundMobile({
     const [phrasesText, setPhrasesText] = useState(''); // For persona phrases
     const [selectedEngagementType, setSelectedEngagementType] = useState<string | null>(null); // For filtering engagements
 
+    // Add initialization state
+    const [isInitializing, setIsInitializing] = useState(true);
+
     // Add handleInterruptAgent function
     const handleInterruptAgent = useCallback(() => {
         if (roomState !== ConnectionState.Connected || !dataChannel) {
@@ -284,15 +287,20 @@ export default function PlaygroundMobile({
         if (!params.brdgeId || !params.apiBaseUrl) return;
 
         try {
-            const response = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/recordings/latest/signed-url`);
+            const headers: HeadersInit = {};
+            if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+            const response = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/recordings/latest/signed-url`, { headers });
             if (!response.ok) throw new Error('Failed to fetch video URL');
 
             const { url } = await response.json();
             setVideoUrl(url);
+            // Consider initialization complete when video URL is fetched (or combine with other fetches)
+            // setIsInitializing(false); // We will set this after Brdge data is also fetched
         } catch (error) {
             console.error('Error fetching video URL:', error);
+            setIsInitializing(false); // Stop loading even on error
         }
-    }, [params.brdgeId, params.apiBaseUrl]);
+    }, [params.brdgeId, params.apiBaseUrl, authToken]);
 
     useEffect(() => {
         fetchVideoUrl();
@@ -636,7 +644,9 @@ export default function PlaygroundMobile({
     const fetchAgentConfig = useCallback(async () => {
         if (!params.brdgeId || !params.apiBaseUrl) return;
         try {
-            const response = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/agent-config`);
+            const headers: HeadersInit = {};
+            if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+            const response = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/agent-config`, { headers });
             if (!response.ok) throw new Error('Failed to fetch agent config');
             const data = await response.json();
             setAgentConfig(data);
@@ -645,7 +655,7 @@ export default function PlaygroundMobile({
         } catch (error) {
             console.error('Error fetching agent config:', error);
         }
-    }, [params.brdgeId, params.apiBaseUrl]);
+    }, [params.brdgeId, params.apiBaseUrl, authToken]);
 
     useEffect(() => {
         fetchAgentConfig();
@@ -653,7 +663,11 @@ export default function PlaygroundMobile({
 
     // Fetch Brdge Data (includes shareable status and voice_id)
     const fetchBrdge = useCallback(async () => {
-        if (!params.brdgeId || !params.apiBaseUrl) return;
+        if (!params.brdgeId || !params.apiBaseUrl) {
+            setIsInitializing(false); // Cannot initialize without these params
+            return;
+        }
+        setIsInitializing(true); // Start loading when fetching brdge
         try {
             const headers: HeadersInit = {};
             if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
@@ -668,8 +682,11 @@ export default function PlaygroundMobile({
                 setSelectedVoice("default");
                 setSelectedVoiceBrdgeId(null);
             }
+            // Now that brdge data is fetched, and assuming video URL is also fetched or fetching initiated, stop initializing
+            setIsInitializing(false);
         } catch (error) {
             console.error('Error fetching brdge:', error);
+            setIsInitializing(false); // Stop loading on error
         }
     }, [params.brdgeId, params.apiBaseUrl, authToken]);
 
@@ -947,7 +964,7 @@ export default function PlaygroundMobile({
                     onChange={(e) => onSelect(e.target.value)}
                     className={`
                         w-full px-3 py-2.5 rounded-lg
-                        font-satoshi text-[14px] text-[#0A1933]
+                        font-satoshi text-base text-[#0A1933]
                         bg-[#FAF7ED]/80 backdrop-blur-sm
                         border border-[#9C7C38]/30
                         appearance-none
@@ -973,6 +990,14 @@ export default function PlaygroundMobile({
 
     return (
         <div className="h-screen flex flex-col bg-[#F5EFE0] relative overflow-hidden">
+            {/* Initial Loading Overlay */}
+            {isInitializing && (
+                <div className="absolute inset-0 bg-[#F5EFE0]/80 backdrop-blur-sm flex flex-col items-center justify-center z-50">
+                    <Loader2 className="animate-spin text-[#9C7C38] mb-4" size={32} />
+                    <p className="text-[#1E2A42] text-sm font-medium">Loading Brdge...</p>
+                </div>
+            )}
+
             {/* Video Section with aspect ratio container */}
             <div className="w-full pb-[56.25%] relative bg-black flex-shrink-0">
                 <div className="absolute inset-0">
@@ -1015,7 +1040,7 @@ export default function PlaygroundMobile({
                     }`}>
                     {/* Messages container with transcription or regular messages */}
                     <div className="h-full flex flex-col">
-                        <div className="flex-1 overflow-y-auto pb-[72px]">
+                        <div className={`flex-1 overflow-y-auto ${voiceAssistant?.audioTrack ? 'pb-4' : 'pb-[72px]'}`}>
                             {/* Voice Assistant Transcription */}
                             {voiceAssistant?.audioTrack ? (
                                 <div className="p-3">
@@ -1134,7 +1159,7 @@ export default function PlaygroundMobile({
                                         flex-1 py-3 px-4
                                         min-h-[44px] max-h-[120px] h-[44px]
                                         bg-[#FAF7ED]/90 
-                                        text-[14px] text-[#0A1933]
+                                        text-base text-[#0A1933]
                                         placeholder:text-[#1E2A42]/40
                                         rounded-lg resize-none
                                         border border-[#9C7C38]/30
@@ -1251,16 +1276,16 @@ export default function PlaygroundMobile({
                                     <div className="border border-[#9C7C38]/30 rounded-lg p-4 bg-[#F5EFE0]/80">
                                         <h3 className="text-sm font-medium text-[#0A1933] mb-2">Instructor Profile</h3>
                                         <label className="block mb-1 text-[13px] font-medium text-[#0A1933]/70">Name</label>
-                                        <input type="text" value={teachingPersona?.instructor_profile?.name || ''} onChange={(e) => updateTeachingPersonaField('instructor_profile.name', e.target.value)} className="w-full bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg px-3 py-2 text-[14px] text-[#0A1933] mb-2" placeholder="Instructor Name" />
+                                        <input type="text" value={teachingPersona?.instructor_profile?.name || ''} onChange={(e) => updateTeachingPersonaField('instructor_profile.name', e.target.value)} className="w-full bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg px-3 py-2 text-base text-[#0A1933] mb-2" placeholder="Instructor Name" />
                                         <div className="text-[11px] text-[#0A1933]/70">Expertise: {teachingPersona?.instructor_profile?.apparent_expertise_level || 'N/A'}</div>
                                     </div>
                                     {/* Communication Style */}
                                     <div className="border border-[#9C7C38]/30 rounded-lg p-4 bg-[#F5EFE0]/80">
                                         <h3 className="text-sm font-medium text-[#0A1933] mb-2">Communication Style</h3>
                                         <label className="block mb-1 text-[13px] font-medium text-[#0A1933]/70">Overall Style</label>
-                                        <input type="text" value={teachingPersona?.communication_patterns?.vocabulary_level || ''} onChange={(e) => updateTeachingPersonaField('communication_patterns.vocabulary_level', e.target.value)} className="w-full bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg px-3 py-2 text-[14px] text-[#0A1933] mb-2" placeholder="e.g., friendly, technical" />
+                                        <input type="text" value={teachingPersona?.communication_patterns?.vocabulary_level || ''} onChange={(e) => updateTeachingPersonaField('communication_patterns.vocabulary_level', e.target.value)} className="w-full bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg px-3 py-2 text-base text-[#0A1933] mb-2" placeholder="e.g., friendly, technical" />
                                         <label className="block mb-1 text-[13px] font-medium text-[#0A1933]/70">Characteristic Phrases (one per line)</label>
-                                        <textarea value={phrasesText} onChange={(e) => setPhrasesText(e.target.value)} onBlur={() => updateRecurringPhrases(phrasesText)} className="w-full bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg px-3 py-2 text-[14px] text-[#0A1933] min-h-[100px]" placeholder="Frequent phrases..." />
+                                        <textarea value={phrasesText} onChange={(e) => setPhrasesText(e.target.value)} onBlur={() => updateRecurringPhrases(phrasesText)} className="w-full bg-[#FAF7ED]/80 border border-[#9C7C38]/30 rounded-lg px-3 py-2 text-base text-[#0A1933] min-h-[100px]" placeholder="Frequent phrases..." />
                                     </div>
                                     {/* Teaching Insights (Display Only) */}
                                     <div className="border border-[#9C7C38]/30 rounded-lg p-4 bg-[#F5EFE0]/80 opacity-70">
