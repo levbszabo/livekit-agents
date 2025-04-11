@@ -3557,7 +3557,31 @@ export default function Playground({
             transform: isRightPanelCollapsed ? 'translateX(360px)' : 'translateX(0)'
           }}
         >
-          {/* Hide collapse button on mobile */}
+          {/* Collapse/Expand Button */}
+          <button
+            onClick={() => setIsRightPanelCollapsed(!isRightPanelCollapsed)}
+            className="absolute -left-8 top-1/2 transform -translate-y-1/2
+              w-8 h-16 bg-[#F5EFE0]/90 backdrop-blur-sm
+              rounded-l-lg flex items-center justify-center
+              text-[#9C7C38] transition-all duration-300
+              border-y border-l border-[#9C7C38]/30
+              outline outline-1 outline-offset-[-3px] outline-[#9C7C38]/20
+              hover:border-[#9C7C38]/40 hover:text-[#9C7C38]
+              hover:shadow-[0_0_10px_rgba(156,124,56,0.1)]
+              group
+            "
+          >
+            <motion.div
+              animate={{ rotate: isRightPanelCollapsed ? 180 : 0 }}
+              transition={{ duration: 0.3 }}
+              className="relative z-10"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </motion.div>
+          </button>
+
           {/* Panel Content - Force chat tab on mobile */}
           <div className={`
             h-full
