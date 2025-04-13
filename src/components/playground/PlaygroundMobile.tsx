@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { ChatMessageType } from "@/components/chat/ChatTile";
 import { TranscriptionTile } from "@/transcriptions/TranscriptionTile";
 // If we need to extend the ChatMessageType for errors, we can define it here:
@@ -12,7 +12,8 @@ import {
     useVoiceAssistant,
     useChat,
     useDataChannel,
-    useTrackTranscription
+    useTrackTranscription,
+    useRoomContext
 } from "@livekit/components-react";
 import { ConnectionState, DataPacket_Kind, Track, RpcInvocationData } from "livekit-client";
 import { ReactNode } from "react";
@@ -160,9 +161,11 @@ export default function PlaygroundMobile({
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
     const [currentTime, setCurrentTime] = useState(0);
     const videoRef = useRef<HTMLVideoElement>(null);
+    const mobileContainerRef = useRef<HTMLDivElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [duration, setDuration] = useState(0);
     const [isVideoReadyForListeners, setIsVideoReadyForListeners] = useState(false);
+    const [hasAudioBeenActivated, setHasAudioBeenActivated] = useState(false);
 
     // Chat state
     const [transcripts, setTranscripts] = useState<ExtendedChatMessageType[]>([]);
@@ -173,6 +176,7 @@ export default function PlaygroundMobile({
     const roomState = useConnectionState();
     const chat = useChat();
     const dataChannel = useDataChannel();
+    const room = useRoomContext();
     const { send: sendVideoTimestamp } = useDataChannel("video-timestamp");
 
     // Reference for auto-scrolling chat
@@ -988,8 +992,50 @@ export default function PlaygroundMobile({
         );
     };
 
+    // <<< Add effect for implicit audio activation >>>
+    useEffect(() => {
+        const activateAudioIfNeeded = () => {
+            if (!hasAudioBeenActivated && room && roomState === ConnectionState.Connected) {
+                console.log("Mobile: Attempting to activate audio due to user interaction...");
+                room.startAudio().then(() => {
+                    console.log("Mobile: Audio activated successfully via user interaction.");
+                    setHasAudioBeenActivated(true);
+                    // Remove listeners once activated
+                    if (mobileContainerRef.current) {
+                        mobileContainerRef.current.removeEventListener('pointerdown', activateAudioIfNeeded);
+                        mobileContainerRef.current.removeEventListener('keydown', activateAudioIfNeeded);
+                    }
+                }).catch(error => {
+                    // Log error but don't prevent future attempts if it fails initially
+                    console.error("Mobile: Error activating audio implicitly:", error);
+                });
+            }
+        };
+
+        const container = mobileContainerRef.current;
+        // Only add listeners if audio isn't activated and the room is connected
+        if (container && !hasAudioBeenActivated && roomState === ConnectionState.Connected) {
+            console.log("Mobile: Attaching audio activation listeners.");
+            container.addEventListener('pointerdown', activateAudioIfNeeded, { once: false, capture: true });
+            container.addEventListener('keydown', activateAudioIfNeeded, { once: false, capture: true });
+
+            // Cleanup function to remove listeners
+            return () => {
+                console.log("Mobile: Cleaning up audio activation listeners.");
+                container.removeEventListener('pointerdown', activateAudioIfNeeded, { capture: true });
+                container.removeEventListener('keydown', activateAudioIfNeeded, { capture: true });
+            };
+        } else if (hasAudioBeenActivated && container) {
+            // Ensure listeners are removed if audio gets activated by other means perhaps
+            console.log("Mobile: Audio already activated, ensuring listeners are removed.");
+            container.removeEventListener('pointerdown', activateAudioIfNeeded, { capture: true });
+            container.removeEventListener('keydown', activateAudioIfNeeded, { capture: true });
+        }
+        // Re-run when activation state or connection state changes
+    }, [hasAudioBeenActivated, room, roomState]);
+
     return (
-        <div className="h-screen flex flex-col bg-[#F5EFE0] relative overflow-hidden">
+        <div ref={mobileContainerRef} className="h-screen flex flex-col bg-[#F5EFE0] relative overflow-hidden">
             {/* Initial Loading Overlay */}
             {isInitializing && (
                 <div className="absolute inset-0 bg-[#F5EFE0]/80 backdrop-blur-sm flex flex-col items-center justify-center z-50">

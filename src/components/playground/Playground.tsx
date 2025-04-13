@@ -7,7 +7,8 @@ import {
   useLocalParticipant,
   useVoiceAssistant,
   useChat,
-  useDataChannel
+  useDataChannel,
+  useRoomContext
 } from "@livekit/components-react";
 import { ConnectionState, LocalParticipant, Track, DataPacket_Kind, RpcInvocationData } from "livekit-client";
 import { ReactNode, useCallback, useEffect, useMemo, useState, useRef } from "react";
@@ -1634,6 +1635,8 @@ export default function Playground({
   const [savedVoices, setSavedVoices] = useState<EnhancedVoice[]>([]);
   const [userVoices, setUserVoices] = useState<EnhancedVoice[]>([]);
   const [isLoadingUserVoices, setIsLoadingUserVoices] = useState(false);
+  const [hasAudioBeenActivated, setHasAudioBeenActivated] = useState(false); // <<< Added state
+  const playgroundContainerRef = useRef<HTMLDivElement>(null); // <<< Added ref
 
   // Move brdge state up here before it's used in the useEffect dependency array
   const [brdge, setBrdge] = useState<Brdge | null>(null);
@@ -1729,6 +1732,7 @@ export default function Playground({
   const roomState = useConnectionState();
   const [transcripts, setTranscripts] = useState<ChatMessageType[]>([]);
   const chat = useChat();
+  const room = useRoomContext(); // <<< Get room context
 
   // Get URL params
   useEffect(() => {
@@ -3333,8 +3337,50 @@ export default function Playground({
     }
   }, [authToken]);
 
+  // <<< Add effect for implicit audio activation >>>
+  useEffect(() => {
+    const activateAudioIfNeeded = () => {
+      if (!hasAudioBeenActivated && room && roomState === ConnectionState.Connected) {
+        console.log("Attempting to activate audio due to user interaction...");
+        room.startAudio().then(() => {
+          console.log("Audio activated successfully via user interaction.");
+          setHasAudioBeenActivated(true);
+          // Remove listeners once activated
+          if (playgroundContainerRef.current) {
+            playgroundContainerRef.current.removeEventListener('pointerdown', activateAudioIfNeeded);
+            playgroundContainerRef.current.removeEventListener('keydown', activateAudioIfNeeded);
+          }
+        }).catch(error => {
+          // Log error but don't prevent future attempts if it fails initially
+          console.error("Error activating audio implicitly:", error);
+        });
+      }
+    };
+
+    const container = playgroundContainerRef.current;
+    // Only add listeners if audio isn't activated and the room is connected
+    if (container && !hasAudioBeenActivated && roomState === ConnectionState.Connected) {
+      console.log("Attaching audio activation listeners.");
+      container.addEventListener('pointerdown', activateAudioIfNeeded, { once: false, capture: true });
+      container.addEventListener('keydown', activateAudioIfNeeded, { once: false, capture: true });
+
+      // Cleanup function to remove listeners
+      return () => {
+        console.log("Cleaning up audio activation listeners.");
+        container.removeEventListener('pointerdown', activateAudioIfNeeded, { capture: true });
+        container.removeEventListener('keydown', activateAudioIfNeeded, { capture: true });
+      };
+    } else if (hasAudioBeenActivated && container) {
+      // Ensure listeners are removed if audio gets activated by other means perhaps
+      console.log("Audio already activated, ensuring listeners are removed.");
+      container.removeEventListener('pointerdown', activateAudioIfNeeded, { capture: true });
+      container.removeEventListener('keydown', activateAudioIfNeeded, { capture: true });
+    }
+    // Re-run when activation state or connection state changes
+  }, [hasAudioBeenActivated, room, roomState]);
+
   return (
-    <div className="h-screen flex flex-col bg-[#F5EFE0] relative overflow-hidden">
+    <div ref={playgroundContainerRef} className="h-screen flex flex-col bg-[#F5EFE0] relative overflow-hidden"> {/* <<< Added ref */}
       {/* Header */}
       <div className="h-[0px] flex items-center px-4 relative">
         {logo}

@@ -1,7 +1,6 @@
 import {
   LiveKitRoom,
   RoomAudioRenderer,
-  StartAudio,
 } from "@livekit/components-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Inter } from "next/font/google";
@@ -334,7 +333,6 @@ export function HomeInner() {
               />
             )}
             <RoomAudioRenderer />
-            <StartAudio label="Click to enable audio playback" />
           </LiveKitRoom>
         ) : (
           <PlaygroundConnect
