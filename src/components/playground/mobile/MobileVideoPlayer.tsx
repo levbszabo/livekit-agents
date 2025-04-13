@@ -159,12 +159,6 @@ export const MobileVideoPlayer: React.FC<MobileVideoPlayerProps> = ({
             )}
 
             {/* Loading/Error Overlays */}
-            {isLoading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10">
-                    <div className="w-10 h-10 border-2 border-red-500/30 border-t-red-500 animate-spin rounded-full" />
-                </div>
-            )}
-
             {playbackError && isVideoReady && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10">
                     <div className="text-red-400 text-sm text-center px-4">

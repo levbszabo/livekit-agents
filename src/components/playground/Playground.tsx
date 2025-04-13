@@ -707,13 +707,6 @@ const VideoPlayer = ({
         </div>
       )}
 
-      {/* Loading Overlay */}
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10">
-          <div className="w-8 h-8 border-2 border-red-500/30 border-t-red-500 animate-spin rounded-full" />
-        </div>
-      )}
-
       {/* Error Overlay */}
       {playbackError && isVideoReady && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10">
@@ -801,7 +794,6 @@ const BrdgeLogo = styled.img`
   width: 36px;
   height: 36px;
   margin-right: 4px;
-  animation: ${glowAnimation} 2s ease-in-out infinite;
 `;
 
 // Add this keyframe animation to your existing keyframes
