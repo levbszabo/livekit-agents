@@ -3417,7 +3417,7 @@ export default function Playground({
         <div
           className={`
             absolute inset-0
-            ${!isRightPanelCollapsed ? 'right-[360px]' : 'right-0'}
+            ${!isRightPanelCollapsed ? 'md:right-[360px] right-[280px]' : 'right-0'}
             transition-all duration-300
           `}
         >
@@ -3581,7 +3581,7 @@ export default function Playground({
         {/* Right Panel */}
         <motion.div
           className={`
-            absolute right-0 top-0 bottom-0 w-[360px] border-l border-[#9C7C38]/30
+            absolute right-0 top-0 bottom-0 md:w-[360px] w-[280px] border-l border-[#9C7C38]/30
               bg-[#C99868]/20 backdrop-blur-sm
               z-30
               transition-transform duration-300 ease-in-out
@@ -3700,7 +3700,9 @@ export default function Playground({
                     >
                       <X size={12} />
                     </button>
-                    Click the mic button to speak or type a message into the chat.
+                    <p className="text-[11px] text-[#0A1933]">
+                      Watch and interact with the lesson. The AI will guide discussions at key moments, or ask questions anytime using voice or text.
+                    </p>
                   </div>
                 </div>
 
