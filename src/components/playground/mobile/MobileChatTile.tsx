@@ -110,11 +110,9 @@ export const MobileChatTile: React.FC<MobileChatTileProps> = ({
                 ref={containerRef}
                 className="
           flex-1 px-4 py-3 overflow-y-auto
-          scrollbar-thin scrollbar-track-transparent
-          scrollbar-thumb-[#9C7C38]/20 hover:scrollbar-thumb-[#9C7C38]/30
-          bg-[#F5EFE0]/90 backdrop-blur-sm
-          after:absolute after:inset-0 after:bg-[url('/textures/parchment.png')] 
-          after:bg-cover after:opacity-20 after:mix-blend-overlay after:pointer-events-none
+          scrollbar-thin scrollbar-track-gray-100
+          scrollbar-thumb-gray-300 hover:scrollbar-thumb-gray-400
+          bg-white backdrop-blur-sm
         "
             >
                 <div className="flex flex-col min-h-full justify-end py-2 space-y-3 relative z-10">
@@ -137,8 +135,8 @@ export const MobileChatTile: React.FC<MobileChatTileProps> = ({
                                 {/* Sender name */}
                                 {!hideName && (
                                     <div className={`
-                    text-[12px] font-serif // Larger text for mobile
-                    ${message.isSelf ? 'text-right mr-2 text-[#9C7C38]/90' : 'ml-2 text-[#9C7C38]/90'}
+                    text-[12px] font-medium
+                    ${message.isSelf ? 'text-right mr-2 text-gray-500' : 'ml-2 text-gray-500'}
                     mb-0.5
                   `}>
                                         {message.name}
@@ -152,12 +150,12 @@ export const MobileChatTile: React.FC<MobileChatTileProps> = ({
                     ${message.isError
                                             ? 'bg-red-50 border border-red-200 px-4 py-2.5 rounded-md flex items-center'
                                             : message.isSelf
-                                                ? 'bg-[#FAF7ED]/80 border border-[#9C7C38]/15 pl-3 pr-4 py-2.5 rounded-md'
-                                                : 'bg-[#F5EFE0]/80 border border-[#9C7C38]/25 px-4 py-2.5 rounded-md'
+                                                ? 'bg-blue-50 border border-blue-200 pl-3 pr-4 py-2.5 rounded-md'
+                                                : 'bg-gray-50 border border-gray-200 px-4 py-2.5 rounded-md'
                                         }
                     shadow-sm
                     transition-all duration-300
-                    ${message.isError ? 'hover:border-red-300' : 'hover:border-[#9C7C38]/40'}
+                    ${message.isError ? 'hover:border-red-300' : (message.isSelf ? 'hover:border-blue-300' : 'hover:border-gray-300')}
                   `}
                                 >
                                     {/* Error icon for error messages */}
@@ -171,8 +169,8 @@ export const MobileChatTile: React.FC<MobileChatTileProps> = ({
                     ${message.isError
                                             ? 'text-red-700 text-[14px] font-satoshi'
                                             : message.isSelf
-                                                ? 'text-[#0A1933] text-[14px] font-satoshi'
-                                                : 'text-[#1E2A42] text-[15px] font-serif'
+                                                ? 'text-gray-800 text-[14px] font-satoshi'
+                                                : 'text-gray-800 text-[15px] font-serif'
                                         }
                     leading-relaxed
                   `}>
@@ -188,9 +186,7 @@ export const MobileChatTile: React.FC<MobileChatTileProps> = ({
             {/* Input area */}
             {onSend && (
                 <div className="sticky bottom-0 left-0 right-0 px-3 py-3 
-          bg-[#F5EFE0]/95 backdrop-blur-sm border-t border-[#9C7C38]/30
-          after:absolute after:inset-0 after:bg-[url('/textures/parchment.png')] 
-          after:bg-cover after:opacity-40 after:mix-blend-overlay after:pointer-events-none
+          bg-white/95 backdrop-blur-sm border-t border-gray-200
         ">
                     <div className="relative z-10 flex items-end gap-2">
                         {/* Textarea input with starting height of 44px (touch friendly) */}
@@ -203,17 +199,17 @@ export const MobileChatTile: React.FC<MobileChatTileProps> = ({
                             className="
                 flex-1 py-3 px-4
                 min-h-[44px] max-h-[120px]
-                bg-[#FAF7ED]/90 
-                text-[14px] text-[#0A1933] // Larger text for mobile
-                placeholder:text-[#1E2A42]/40
+                bg-white
+                text-[14px] text-gray-800
+                placeholder:text-gray-400
                 rounded-lg resize-none
-                border border-[#9C7C38]/30
-                focus:outline-none focus:border-[#9C7C38]/50 focus:ring-1 focus:ring-[#9C7C38]/20
-                hover:border-[#9C7C38]/40
+                border border-gray-300
+                focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-200
+                hover:border-gray-400
                 transition-all duration-300
-                scrollbar-thin scrollbar-track-transparent
-                scrollbar-thumb-[#9C7C38]/20
-                hover:scrollbar-thumb-[#9C7C38]/30
+                scrollbar-thin scrollbar-track-gray-100
+                scrollbar-thumb-gray-300
+                hover:scrollbar-thumb-gray-400
                 font-satoshi
               "
                         />
@@ -225,10 +221,10 @@ export const MobileChatTile: React.FC<MobileChatTileProps> = ({
                                 className={`
                   p-3 rounded-md
                   ${isMicEnabled
-                                        ? 'bg-[#9C7C38]/30 text-[#9C7C38]'
-                                        : 'bg-[#9C7C38]/15 text-[#1E2A42]/70 hover:text-[#9C7C38]'}
+                                        ? 'bg-blue-100 text-blue-600'
+                                        : 'bg-gray-100 text-gray-500 hover:text-gray-700'}
                   transition-all duration-200
-                  hover:bg-[#9C7C38]/20
+                  hover:bg-gray-200
                   min-w-[44px] min-h-[44px] // Touch-friendly size
                 `}
                             >
@@ -244,8 +240,8 @@ export const MobileChatTile: React.FC<MobileChatTileProps> = ({
                             className={`
                 p-3 rounded-md
                 ${messageText.trim()
-                                    ? 'bg-[#9C7C38]/20 text-[#9C7C38] hover:bg-[#9C7C38]/30'
-                                    : 'bg-[#9C7C38]/10 text-[#1E2A42]/30'}
+                                    ? 'bg-blue-500 text-white hover:bg-blue-600'
+                                    : 'bg-gray-200 text-gray-400'}
                 transition-all duration-200
                 min-w-[44px] min-h-[44px] // Touch-friendly size
               `}

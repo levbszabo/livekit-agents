@@ -105,9 +105,9 @@ export const MobileProgressBar: React.FC<MobileProgressBarProps> = ({
     };
 
     return (
-        <div className="px-4 py-3 flex flex-col">
+        <div className="px-4 py-2 flex flex-col">
             {/* Time display */}
-            <div className="flex justify-between text-[11px] text-[#1E2A42] mb-1 px-1">
+            <div className="flex justify-between text-[11px] text-gray-600 mb-1 px-1">
                 <span>{formatTime(currentTime)}</span>
                 <span>{formatTime(duration)}</span>
             </div>
@@ -117,9 +117,9 @@ export const MobileProgressBar: React.FC<MobileProgressBarProps> = ({
                 {/* Main progress bar track */}
                 <div
                     ref={progressBarRef}
-                    className={`h-5 bg-gray-800/70 rounded-full cursor-pointer 
+                    className={`h-3 bg-gray-200 rounded-full cursor-pointer 
             w-full transition-all duration-300 relative
-            ${isHovering || isDragging ? 'bg-gray-700/80 shadow-inner' : ''}`}
+            ${isHovering || isDragging ? 'bg-gray-300 shadow-inner' : ''}`}
                     onMouseDown={handleMouseDown}
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
@@ -134,7 +134,7 @@ export const MobileProgressBar: React.FC<MobileProgressBarProps> = ({
                 >
                     {/* Filled progress */}
                     <div
-                        className="h-full bg-gradient-to-r from-[#7C1D1D] to-[#7C1D1D] rounded-full 
+                        className="h-full bg-blue-300 rounded-full 
               transition-all duration-150 relative"
                         style={{
                             width: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%',
@@ -160,8 +160,8 @@ export const MobileProgressBar: React.FC<MobileProgressBarProps> = ({
                 border-2 border-white
                 transition-all duration-200
                 ${isDragging || isHovering
-                                    ? 'w-7 h-7 bg-[#7C1D1D] border-[#A83838] shadow-[0_0_10px_rgba(124,29,29,0.5)]'
-                                    : 'w-6 h-6 bg-[#7C1D1D] border-[#A83838] shadow-[0_0_6px_rgba(124,29,29,0.3)]'
+                                    ? 'w-5 h-5 bg-blue-600 shadow-[0_0_10px_rgba(59,130,246,0.5)]'
+                                    : 'w-5 h-5 bg-blue-500 shadow-[0_0_6px_rgba(59,130,246,0.3)]'
                                 }`}
                             style={{
                                 left: `${(currentTime / duration) * 100}%`,

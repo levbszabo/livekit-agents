@@ -25,65 +25,39 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       className={`
         group relative
         ${isSelf ? 'ml-auto' : 'mr-auto'}
-        max-w-[80%]
+        max-w-[90%]
         ${isSelf
-          ? 'bg-[#162730]/90'
-          : 'bg-[#2A1F14]/90'
+          ? 'bg-blue-50'
+          : 'bg-gray-100'
         }
-        rounded-md
-        backdrop-blur-sm
-        ${isSelf
-          ? 'border-l border-cyan-600/30'
-          : 'border-l border-amber-700/30'
-        }
+        rounded-lg
+        border border-gray-200
         transition-all duration-300
-        hover:border-opacity-50
+        ${isSelf
+          ? 'hover:bg-blue-100'
+          : 'hover:bg-gray-200'
+        }
       `}
     >
       {/* Message content */}
-      <div className="p-2 relative">
+      <div className="px-3 py-2 relative">
         {/* Sender name */}
         {!hideName && (
           <div className={`
-            text-[10px] font-medium mb-0.5
-            ${isSelf ? 'text-cyan-400/80' : 'text-amber-400/80'}
+            text-[10px] font-medium mb-1
+            ${isSelf ? 'text-blue-700 text-right' : 'text-gray-600'}
           `}>
             {name}
           </div>
         )}
 
-        {/* Message text - with CSS typewriter animation */}
+        {/* Message text - No typewriter animation */}
         <div
-          className="text-[11px] text-gray-300 leading-relaxed font-light whitespace-pre-wrap min-h-[1em] typewriter-text"
-          style={{
-            // Using an animated border with the same color as background creates the typewriter effect
-            // Border width scales with the text content length
-            borderRight: '1px solid transparent',
-            width: 'fit-content',
-            animation: 'typing 2.5s steps(40, end), blink-caret .75s step-end infinite',
-            whiteSpace: 'pre-wrap',
-            overflow: 'hidden',
-          }}
+          className="text-[12px] text-gray-800 leading-relaxed whitespace-pre-wrap min-h-[1em]"
         >
           {message}
         </div>
-
-        {/* Subtle scan effect on hover */}
-        {LightScanEffect && (
-          <div className="absolute inset-0 overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
-            <LightScanEffect color={isSelf ? 'rgba(34,211,238,0.07)' : 'rgba(245,158,11,0.07)'} />
-          </div>
-        )}
       </div>
-
-      {/* Subtle accent line on top */}
-      <div className={`
-        absolute top-0 left-0 right-0 h-[1px]
-        ${isSelf
-          ? 'bg-gradient-to-r from-cyan-500/10 via-cyan-400/5 to-transparent'
-          : 'bg-gradient-to-r from-amber-500/10 via-amber-400/5 to-transparent'
-        }
-      `}></div>
     </div>
   );
 };

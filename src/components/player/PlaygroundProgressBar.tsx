@@ -57,18 +57,18 @@ const PlaygroundProgressBar: React.FC<PlaygroundProgressBarProps> = ({
 
     // Add a CSS class for engagement highlighting
     useEffect(() => {
-        // Add the CSS for the highlight-pulse animation
+        // Add the CSS for the highlight-pulse animation - UPDATED TO BLUE
         const style = document.createElement('style');
         style.textContent = `
       @keyframes highlightPulse {
-        0% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.4); }
-        70% { box-shadow: 0 0 0 10px rgba(34, 211, 238, 0); }
-        100% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }
+        0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); } /* Azure blue */
+        70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); } /* Azure blue */
+        100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); } /* Azure blue */
       }
       .highlight-pulse {
         animation: highlightPulse 1s ease-out;
-        border-color: rgba(34, 211, 238, 0.6) !important;
-        background-color: rgba(34, 211, 238, 0.1) !important;
+        border-color: rgba(59, 130, 246, 0.6) !important; /* Azure blue */
+        background-color: rgba(59, 130, 246, 0.1) !important; /* Azure blue */
       }
     `;
         document.head.appendChild(style);
@@ -87,11 +87,13 @@ const PlaygroundProgressBar: React.FC<PlaygroundProgressBarProps> = ({
         const percentage = Math.max(0, Math.min(1, x / rect.width));
         const newTime = percentage * videoRef.current.duration;
 
+        // Always seek the video on interaction
         videoRef.current.currentTime = newTime;
         setCurrentTime(newTime);
     };
 
     const handleMouseDown = (e: React.MouseEvent) => {
+        // Always start dragging/interaction on mouse down
         setIsDragging(true);
         handleProgressBarInteraction(e);
     };
@@ -122,10 +124,11 @@ const PlaygroundProgressBar: React.FC<PlaygroundProgressBarProps> = ({
         // Find the engagement
         const engagement = engagementOpportunities.find(e => e.id === engagementId);
         if (engagement) {
-            // Set active tab to engagement
-            setActiveTab('engagement');
+            // Set active tab to engagement - COMMENTED OUT
+            // setActiveTab('engagement');
 
-            // Scroll to the engagement element with a short delay to ensure tab switch is complete
+            // Scroll to the engagement element with a short delay to ensure tab switch is complete - COMMENTED OUT
+            /*
             setTimeout(() => {
                 // The ID format used here needs to match the format in the EngagementCard component
                 const engagementElementId = `engagement-card-${engagementId}`;
@@ -143,6 +146,7 @@ const PlaygroundProgressBar: React.FC<PlaygroundProgressBarProps> = ({
                     console.log(`Could not find element with ID ${engagementElementId}`);
                 }
             }, 100);
+            */
 
             // Optionally pause the video
             if (isPlaying && videoRef.current) {
@@ -152,14 +156,27 @@ const PlaygroundProgressBar: React.FC<PlaygroundProgressBarProps> = ({
         }
     };
 
+    // Helper function to convert timestamp (00:00:00) to seconds - needed within this component too
+    const timestampToSeconds = (timestamp: string): number => {
+        if (!timestamp) return 0;
+        const parts = timestamp.split(':');
+        if (parts.length === 3) {
+            return parseInt(parts[0], 10) * 3600 + parseInt(parts[1], 10) * 60 + parseInt(parts[2], 10);
+        } else if (parts.length === 2) {
+            return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+        }
+        return 0;
+    };
+
+
     return (
         <div className="flex-1 relative">
-            {/* Outer bar (full width) */}
+            {/* Outer bar (full width) - Updated background */}
             <div
                 ref={progressBarRef}
-                className={`h-4 bg-gray-800/70 rounded-full cursor-pointer 
+                className={`h-3 bg-gray-200 rounded-full cursor-pointer 
                    transition-all duration-300 relative
-                   ${isHovering || isDragging ? 'bg-gray-700/80 shadow-inner' : ''}`}
+                   ${isHovering || isDragging ? 'bg-gray-300 shadow-inner' : ''}`}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
@@ -169,9 +186,9 @@ const PlaygroundProgressBar: React.FC<PlaygroundProgressBarProps> = ({
                     handleMouseLeave();
                 }}
             >
-                {/* Filled progress */}
+                {/* Filled progress - Updated background to Azure Blue with opacity */}
                 <div
-                    className="h-full bg-gradient-to-r from-[#7C1D1D] to-[#7C1D1D] rounded-full transition-all duration-150 relative"
+                    className="h-full bg-blue-500/70 rounded-full transition-all duration-150 relative"
                     style={{
                         width: duration > 0
                             ? `${(currentTime / duration) * 100}%`
@@ -180,7 +197,7 @@ const PlaygroundProgressBar: React.FC<PlaygroundProgressBarProps> = ({
                 >
                 </div>
 
-                {/* Draggable Thumb */}
+                {/* Draggable Thumb - Updated colors */}
                 {duration > 0 && (
                     <div
                         className={`absolute top-1/2 -translate-y-1/2 
@@ -188,8 +205,10 @@ const PlaygroundProgressBar: React.FC<PlaygroundProgressBarProps> = ({
                            border-2 border-white
                            transition-all duration-200
                            ${isDragging || isHovering
-                                ? 'w-5 h-5 bg-[#7C1D1D] border-[#A83838] shadow-[0_0_10px_rgba(124,29,29,0.5)]'
-                                : 'w-4 h-4 bg-[#7C1D1D] border-[#A83838] shadow-[0_0_6px_rgba(124,29,29,0.3)] opacity-90'}`}
+                                ? 'w-4 h-4 bg-blue-600 border-blue-700 shadow-[0_0_8px_rgba(59,130,246,0.5)]' // Slightly larger/stronger on hover/drag
+                                : 'w-3 h-3 bg-blue-600 border-blue-700 shadow-[0_0_5px_rgba(59,130,246,0.3)] opacity-90'} // Default state
+                           pointer-events-none` // Prevent thumb from blocking marker clicks
+                        }
                         style={{
                             left: `${(currentTime / duration) * 100}%`,
                             transform: 'translate(-50%, -50%)',
@@ -197,7 +216,7 @@ const PlaygroundProgressBar: React.FC<PlaygroundProgressBarProps> = ({
                     />
                 )}
 
-                {/* Timeline Markers */}
+                {/* Timeline Markers Component */}
                 {engagementOpportunities && engagementOpportunities.length > 0 && (
                     <TimelineMarkers
                         engagementOpportunities={engagementOpportunities}

@@ -134,7 +134,7 @@ export const MobileVideoPlayer: React.FC<MobileVideoPlayerProps> = ({
                 </div>
             ) : (
                 <div className="absolute inset-0 flex items-center justify-center bg-black">
-                    <div className="w-8 h-8 border-2 border-red-900/30 border-t-red-900 animate-spin rounded-full" />
+                    <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 animate-spin rounded-full" />
                 </div>
             )}
 
@@ -145,10 +145,10 @@ export const MobileVideoPlayer: React.FC<MobileVideoPlayerProps> = ({
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
                         className="p-5 rounded-full 
-              bg-[#0A1933]/80 
-              border border-[#0A1933]/40
+              bg-blue-600/80 
+              border border-blue-500/40
               backdrop-blur-md
-              shadow-[0_0_25px_rgba(10,25,51,0.3)]"
+              shadow-[0_0_25px_rgba(59,130,246,0.3)]"
                     >
                         <Play
                             size={36} // Larger for mobile
@@ -168,8 +168,8 @@ export const MobileVideoPlayer: React.FC<MobileVideoPlayerProps> = ({
                                 e.stopPropagation();
                                 attemptPlay();
                             }}
-                            className="mt-2 px-3 py-1 bg-cyan-500/20 text-cyan-400 rounded-md text-xs
-                hover:bg-cyan-500/30 transition-all duration-300"
+                            className="mt-2 px-3 py-1 bg-blue-500/20 text-blue-400 rounded-md text-xs
+                hover:bg-blue-500/30 transition-all duration-300"
                         >
                             Try Again
                         </button>

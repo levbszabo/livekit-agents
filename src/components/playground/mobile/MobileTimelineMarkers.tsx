@@ -3,17 +3,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { EngagementOpportunity } from '../PlaygroundMobile';
 
 // Import the logo directly to let webpack handle it
-import stampLogo from '../../../assets/stamp-logo.png';
+// import stampLogo from '../../../assets/stamp-logo.png'; // Removed import
 // Extract the src property for TypeScript compatibility
-const stampLogoPath = stampLogo.src;
+// const stampLogoPath = stampLogo.src; // Removed logo path
 
 // Smaller marker size for mobile view
 const MARKER_SIZE = 16;
 const MARKER_HOVER_SCALE = 1.15;
 
-// Glow effects for markers
-const MARKER_GLOW_ACTIVE = 'shadow-[0_0_10px_rgba(124,29,29,0.8)]';
-const MARKER_GLOW_INACTIVE = 'shadow-[0_0_6px_rgba(124,29,29,0.5)]';
+// Glow effects for markers - Updated to blue
+const MARKER_GLOW_ACTIVE = 'shadow-[0_0_10px_rgba(59,130,246,0.8)]';
+const MARKER_GLOW_INACTIVE = 'shadow-[0_0_6px_rgba(59,130,246,0.5)]';
 
 interface MobileTimelineMarkersProps {
     engagementOpportunities: EngagementOpportunity[];
@@ -132,17 +132,18 @@ export const MobileTimelineMarkers: React.FC<MobileTimelineMarkersProps> = ({
                                 {/* Circular background */}
                                 <div
                                     className={`
-                                        rounded-full bg-[#7C1D1D]/80 p-0 
+                                        rounded-full bg-blue-500/80 p-0
                                         flex items-center justify-center
                                         ${isActive ? MARKER_GLOW_ACTIVE : MARKER_GLOW_INACTIVE}
-                                        ${isActive || isHovered ? 'border-[0.5px] border-[#A83838]' : ''}
+                                        ${isActive || isHovered ? 'border-[0.5px] border-blue-300' : ''}
                                     `}
                                     style={{
                                         width: `${MARKER_SIZE}px`,
                                         height: `${MARKER_SIZE}px`,
                                     }}
                                 >
-                                    {/* Stamp logo image */}
+                                    {/* Stamp logo image - REMOVED */}
+                                    {/* 
                                     <img
                                         src={stampLogoPath}
                                         alt="Marker"
@@ -152,6 +153,7 @@ export const MobileTimelineMarkers: React.FC<MobileTimelineMarkersProps> = ({
                                             filter: `brightness(${isActive || isHovered ? 1.2 : 1})`
                                         }}
                                     />
+                                    */}
                                 </div>
                             </motion.div>
                         </React.Fragment>
