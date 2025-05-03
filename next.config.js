@@ -10,11 +10,11 @@ const nextConfig = {
     assetPrefix: '/playground',
   } : {}),
   images: {
-    domains: ['brdge-ai.com', 'localhost'],
+    domains: ['dotbridge.io', 'localhost'],
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'brdge-ai.com',
+        hostname: 'dotbridge.io',
         pathname: '/api/brdges/**',
       },
       {
@@ -37,7 +37,7 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: process.env.NODE_ENV === 'development'
               ? "frame-ancestors 'self' http://localhost:3000 http://localhost:3001"
-              : "frame-ancestors 'self' https://brdge-ai.com"
+              : "frame-ancestors 'self' https://dotbridge.io"
           },
         ],
       },
