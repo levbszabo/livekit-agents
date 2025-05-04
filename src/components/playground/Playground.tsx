@@ -3884,7 +3884,7 @@ export default function Playground({
                     {activeTab === 'teaching-persona' && (
                       <div className="space-y-6 px-2">
                         <div className="flex items-center justify-between mb-3">
-                          <h2 className="font-medium text-gray-900 text-[15px]">Teaching Persona</h2>
+                          <h2 className="font-medium text-gray-900 text-[15px]">Agent Persona</h2>
                           {/* Update the Save Changes button in Persona tab */}
                           <motion.button
                             whileHover={{ scale: 1.02 }}
@@ -3912,7 +3912,7 @@ export default function Playground({
                           {/* Section header */}
                           <div className="flex items-center mb-2 relative z-10">
                             <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-1.5"></div>
-                            <h3 className="font-medium text-gray-800 text-[13px]">Instructor Profile</h3>
+                            <h3 className="font-medium text-gray-800 text-[13px]">Agent Profile</h3>
                             <div className="h-[1px] flex-1 ml-3 bg-gradient-to-r from-blue-200/60 via-blue-200/30 to-transparent"></div>
                           </div>
 
@@ -4027,7 +4027,7 @@ export default function Playground({
                                 placeholder="Enter phrases the instructor frequently uses (one per line)..."
                               />
                               <div className="mt-0.5 text-[9px] text-gray-500 px-1 italic">
-                                These phrases will be used by the AI to sound more like the actual instructor
+                                These phrases will be used by the AI to sound more like the actual speaker
                               </div>
                             </div>
 
@@ -4040,7 +4040,7 @@ export default function Playground({
                           {/* Section header */}
                           <div className="flex items-center mb-2 relative z-10">
                             <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-1.5"></div>
-                            <h3 className="font-medium text-gray-800 text-[13px]">Teaching Insights</h3>
+                            <h3 className="font-medium text-gray-800 text-[13px]">Insights</h3>
                             <span className="ml-2 text-[9px] px-2 py-0.5 bg-blue-50 rounded-full text-blue-600 font-medium">Auto-Extracted</span>
                           </div>
 
@@ -4062,7 +4062,7 @@ export default function Playground({
                             {/* Pedagogical Approach Card */}
                             <div className="p-2.5 bg-gray-50 rounded-lg border border-gray-200">
                               <div className="flex justify-between items-center">
-                                <h3 className="text-[12px] font-medium text-blue-600">Teaching Approach</h3>
+                                <h3 className="text-[12px] font-medium text-blue-600">Conversational Approach</h3>
                               </div>
                               <div className="mt-1 space-y-1">
                                 {teachingPersona?.pedagogical_approach?.explanation_techniques?.map((technique: any, idx: number) => (
