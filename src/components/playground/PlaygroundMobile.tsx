@@ -22,7 +22,7 @@ import { api } from '@/api';
 import { jwtDecode } from "jwt-decode";
 import { MobileVideoPlayer } from './mobile/MobileVideoPlayer';
 import { MobileProgressBar } from './mobile/MobileProgressBar';
-import { MessageSquare, ClipboardList, User, Radio, Share2, Square, Send, Mic, MicOff, Plus, Edit2, Trash2, ChevronRight, Save, Info, Lock, Globe, Copy, Check, ExternalLink, Volume2, VolumeX, X, Loader2 } from 'lucide-react';
+import { MessageSquare, ClipboardList, User, Radio, Share2, Square, Send, Mic, MicOff, Plus, Edit2, Trash2, ChevronRight, Save, Info, Lock, Globe, Copy, Check, ExternalLink, Volume2, VolumeX, X, Loader2, MessageCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Our EngagementOpportunity interface definition
@@ -40,15 +40,38 @@ interface EngagementQuizItem {
     alternative_phrasings?: string[];
 }
 
-export interface EngagementOpportunity {
+// Add interfaces for the new Guided Conversation type (copied from Playground.tsx)
+interface ConversationFlowUserResponse {
+    type: string;
+    agent_followup_strategy: string;
+}
+
+interface ConversationFlow {
+    goal: string;
+    agent_initiator: string;
+    user_responses: ConversationFlowUserResponse[];
+    fallback: string;
+}
+
+// Update the EngagementOpportunity interface to use a discriminated union (copied from Playground.tsx)
+export type EngagementOpportunity = {
     id: string;
     rationale: string;
     timestamp: string;
-    quiz_items: EngagementQuizItem[];
     section_id: string;
-    engagement_type: 'quiz' | 'discussion';
     concepts_addressed: string[];
-}
+} & (
+        | {
+            engagement_type: 'quiz' | 'discussion';
+            quiz_items: EngagementQuizItem[];
+            conversation_flow?: never; // Ensure conversation_flow is not present
+        }
+        | {
+            engagement_type: 'guided_conversation';
+            conversation_flow: ConversationFlow;
+            quiz_items?: never; // Ensure quiz_items is not present
+        }
+    );
 
 // Keep these interfaces as they are essential
 export interface PlaygroundProps {
@@ -107,6 +130,7 @@ const getEngagementTypeIcon = (type: string) => {
     switch (type) {
         case 'quiz': return <ClipboardList size={16} className="text-blue-500" />;
         case 'discussion': return <MessageSquare size={16} className="text-green-500" />;
+        case 'guided_conversation': return <MessageCircle size={16} className="text-purple-500" />; // Use MessageCircle for guided convo
         default: return null;
     }
 };
@@ -914,7 +938,16 @@ export default function PlaygroundMobile({
     // --- Engagement Card Component (Inline for now) ---
     const EngagementCard: React.FC<{ engagement: EngagementOpportunity; onEdit: Function; onDelete: Function }> = ({ engagement, onEdit, onDelete }) => {
         const [isExpanded, setIsExpanded] = useState(false);
-        // Simplified: Just display info, no inline editing for now
+        // Helper to get display name
+        const getTypeName = (type: EngagementOpportunity['engagement_type']) => {
+            switch (type) {
+                case 'quiz': return 'Quiz';
+                case 'discussion': return 'Discussion';
+                case 'guided_conversation': return 'Guided Conversation';
+                default: return 'Engagement';
+            }
+        }
+
         return (
             <div className="border border-gray-200 rounded-lg overflow-hidden bg-white mb-3">
                 <div
@@ -924,33 +957,80 @@ export default function PlaygroundMobile({
                     <div className="flex items-center gap-2">
                         {getEngagementTypeIcon(engagement.engagement_type)}
                         <span className="text-[14px] font-medium text-gray-800">
-                            {engagement.engagement_type === 'quiz' ? 'Quiz' : 'Discussion'} @ {formatVideoTime(engagement.timestamp)}
+                            {/* Use helper to display correct type name */}
+                            {getTypeName(engagement.engagement_type)} @ {formatVideoTime(engagement.timestamp)}
                         </span>
                     </div>
                     <div className="flex items-center gap-1">
-                        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete?')) { onDelete(engagement.id); } }} className="p-1.5 rounded-md text-gray-500 hover:text-red-500"><Trash2 size={16} /></button>
+                        {/* Simplified Delete for Mobile */}
+                        <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this engagement?')) { onDelete(engagement.id); } }} className="p-1.5 rounded-md text-gray-500 hover:text-red-500"><Trash2 size={16} /></button>
                         <motion.div animate={{ rotate: isExpanded ? 90 : 0 }} transition={{ duration: 0.2 }} className="ml-1">
                             <ChevronRight size={16} className="text-gray-500" />
                         </motion.div>
                     </div>
                 </div>
                 {isExpanded && (
-                    <div className="px-4 pb-3 space-y-2 border-t border-gray-200 pt-2">
-                        <div className="text-[11px] text-gray-500">Rationale:</div>
-                        <div className="text-[12px] text-gray-800">{engagement.rationale}</div>
-                        <div className="text-[11px] text-gray-500 mt-1">Concepts:</div>
-                        <div className="text-[12px] text-gray-800">{engagement.concepts_addressed.join(', ')}</div>
-                        {engagement.quiz_items.map((item, idx) => (
-                            <div key={idx} className="mt-2 pt-2 border-t border-dashed border-gray-200">
-                                <div className="text-[11px] text-gray-500">Question {idx + 1} ({item.question_type}):</div>
-                                <div className="text-[12px] text-gray-800">{item.question}</div>
-                                {item.options && (
-                                    <ul className="list-disc pl-5 mt-1 space-y-0.5">
-                                        {item.options.map((opt, i) => <li key={i} className={`text-[12px] ${opt === item.correct_option ? 'text-green-700 font-medium' : 'text-gray-800'}`}>{opt}</li>)}
-                                    </ul>
-                                )}
+                    <div className="px-4 pb-3 space-y-3 border-t border-gray-200 pt-3">
+                        {/* Rationale */}
+                        <div>
+                            <div className="text-[11px] text-gray-500 font-medium">Rationale:</div>
+                            <div className="text-[12px] text-gray-700 mt-0.5">{engagement.rationale}</div>
+                        </div>
+                        {/* Concepts */}
+                        <div>
+                            <div className="text-[11px] text-gray-500 font-medium">Concepts:</div>
+                            <div className="text-[12px] text-gray-700 mt-0.5">{engagement.concepts_addressed.join(', ')}</div>
+                        </div>
+
+                        {/* Conditional Display for Quiz/Discussion vs Guided Conversation */}
+                        {engagement.engagement_type === 'guided_conversation' ? (
+                            // Display Guided Conversation Details
+                            <div className="mt-2 pt-2 border-t border-dashed border-gray-200 space-y-2">
+                                <div>
+                                    <div className="text-[11px] text-gray-500 font-medium">Goal:</div>
+                                    <div className="text-[12px] text-gray-700 mt-0.5">{engagement.conversation_flow.goal}</div>
+                                </div>
+                                <div>
+                                    <div className="text-[11px] text-gray-500 font-medium">Agent Initiator:</div>
+                                    <div className="text-[12px] text-gray-700 mt-0.5">{engagement.conversation_flow.agent_initiator}</div>
+                                </div>
+                                <div>
+                                    <div className="text-[11px] text-gray-500 font-medium">User Response Paths:</div>
+                                    {engagement.conversation_flow.user_responses.map((resp, idx) => (
+                                        <div key={idx} className="pl-2 mt-1 border-l-2 border-gray-200 ml-1">
+                                            <div className="text-[11px] text-gray-600 font-medium">Path {idx + 1}: {resp.type}</div>
+                                            <div className="text-[12px] text-gray-700 mt-0.5">{resp.agent_followup_strategy}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div>
+                                    <div className="text-[11px] text-gray-500 font-medium">Fallback:</div>
+                                    <div className="text-[12px] text-gray-700 mt-0.5">{engagement.conversation_flow.fallback}</div>
+                                </div>
                             </div>
-                        ))}
+                        ) : (
+                            // Display Quiz/Discussion Items
+                            engagement.quiz_items.map((item, idx) => (
+                                <div key={idx} className="mt-2 pt-2 border-t border-dashed border-gray-200">
+                                    <div className="flex items-center gap-2 text-[11px] text-gray-500 font-medium">
+                                        {getQuestionTypeIcon(item.question_type)}
+                                        Question {idx + 1} ({item.question_type})
+                                    </div>
+                                    <div className="text-[12px] text-gray-800 mt-1">{item.question}</div>
+                                    {item.options && (
+                                        <ul className="list-disc pl-5 mt-1 space-y-0.5">
+                                            {item.options.map((opt, i) => <li key={i} className={`text-[12px] ${opt === item.correct_option ? 'text-green-700 font-medium' : 'text-gray-700'}`}>{opt}</li>)}
+                                        </ul>
+                                    )}
+                                    {item.explanation && (
+                                        <div>
+                                            <div className="text-[11px] text-gray-500 font-medium mt-1">Explanation:</div>
+                                            <div className="text-[12px] text-gray-700 mt-0.5">{item.explanation}</div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))
+                        )}
                     </div>
                 )}
             </div>
@@ -1284,6 +1364,7 @@ export default function PlaygroundMobile({
                                 <button onClick={() => setSelectedEngagementType(null)} className={`px-3 py-1.5 rounded-full min-w-[80px] text-[13px] border ${!selectedEngagementType ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}>All</button>
                                 <button onClick={() => setSelectedEngagementType('quiz')} className={`px-3 py-1.5 rounded-full min-w-[80px] text-[13px] flex items-center gap-1.5 border ${selectedEngagementType === 'quiz' ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}>{getEngagementTypeIcon('quiz')}Quizzes</button>
                                 <button onClick={() => setSelectedEngagementType('discussion')} className={`px-3 py-1.5 rounded-full min-w-[80px] text-[13px] flex items-center gap-1.5 border ${selectedEngagementType === 'discussion' ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}>{getEngagementTypeIcon('discussion')}Discussions</button>
+                                <button onClick={() => setSelectedEngagementType('guided_conversation')} className={`px-3 py-1.5 rounded-full min-w-[120px] text-[13px] flex items-center gap-1.5 border ${selectedEngagementType === 'guided_conversation' ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}>{getEngagementTypeIcon('guided_conversation')}Guided Convo</button>
                             </div>
                             {/* Engagement List */}
                             {engagementOpportunities && engagementOpportunities.length > 0 ? (
