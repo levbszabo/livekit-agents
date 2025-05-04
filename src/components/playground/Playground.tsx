@@ -195,16 +195,39 @@ interface EngagementQuizItem {
   alternative_phrasings?: string[];
 }
 
+// Add interfaces for the new Guided Conversation type
+interface ConversationFlowUserResponse {
+  type: string;
+  agent_followup_strategy: string;
+}
+
+interface ConversationFlow {
+  goal: string;
+  agent_initiator: string;
+  user_responses: ConversationFlowUserResponse[];
+  fallback: string;
+}
+
 // Export the interface so we can import it in other components
-export interface EngagementOpportunity {
+// Update the EngagementOpportunity interface to use a discriminated union
+export type EngagementOpportunity = {
   id: string;
   rationale: string;
   timestamp: string;
-  quiz_items: EngagementQuizItem[];
   section_id: string;
-  engagement_type: 'quiz' | 'discussion';
   concepts_addressed: string[];
-}
+} & (
+    | {
+      engagement_type: 'quiz' | 'discussion';
+      quiz_items: EngagementQuizItem[];
+      conversation_flow?: never; // Ensure conversation_flow is not present
+    }
+    | {
+      engagement_type: 'guided_conversation';
+      conversation_flow: ConversationFlow;
+      quiz_items?: never; // Ensure quiz_items is not present
+    }
+  );
 
 // Update the AgentConfig interface to use our new type
 interface AgentConfig {
@@ -990,6 +1013,8 @@ const getEngagementTypeIcon = (type: string) => {
         <path d="M8 12H8.01M12 12H12.01M16 12H16.01M21 12C21 16.4183 16.9706 20 12 20C10.4607 20 9.01172 19.6565 7.74467 19.0511L3 20L4.39499 16.28C3.51156 15.0423 3 13.5743 3 12C3 7.58172 7.02944 4 12 4C16.9706 4 21 7.58172 21 12Z"
           stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>;
+    case 'guided_conversation': // Add icon for guided conversation
+      return <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M17 8L3 8M17 12L3 12M17 16L3 16M21 12C21 14.7614 19.7614 17 17 17L17 8C19.7614 8 21 10.2386 21 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
     default:
       return null;
   }
@@ -1027,24 +1052,37 @@ interface EngagementCardProps {
 
 const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onDelete }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [expandedQuiz, setExpandedQuiz] = useState<string | null>(null);
+  const [expandedQuiz, setExpandedQuiz] = useState<string | null>(null); // For expanding quiz items
+  const [expandedUserResponse, setExpandedUserResponse] = useState<string | null>(null); // For expanding user responses
   const [isEditing, setIsEditing] = useState(false);
   const [editedEngagement, setEditedEngagement] = useState<EngagementOpportunity>({ ...engagement });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  // Reset temporary expansion states when main card expansion changes
+  useEffect(() => {
+    if (!isExpanded) {
+      setExpandedQuiz(null);
+      setExpandedUserResponse(null);
+    }
+  }, [isExpanded]);
+
+  // Initialize edited state when edit mode starts
+  useEffect(() => {
+    if (isEditing) {
+      setEditedEngagement({ ...engagement });
+    }
+  }, [isEditing, engagement]);
+
   const handleToggleExpand = () => {
     if (isEditing) return; // Don't collapse while editing
     setIsExpanded(!isExpanded);
-    if (isExpanded) {
-      setExpandedQuiz(null);
-    }
   };
 
   const handleStartEdit = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsEditing(true);
     setIsExpanded(true); // Always expand when editing
-    setEditedEngagement({ ...engagement });
+    setEditedEngagement({ ...engagement }); // Re-initialize with current engagement
   };
 
   const handleSaveEdit = (e: React.MouseEvent) => {
@@ -1055,35 +1093,56 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
 
   const handleCancelEdit = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setEditedEngagement({ ...engagement });
+    setEditedEngagement({ ...engagement }); // Reset changes
     setIsEditing(false);
   };
 
+  // Handler for top-level fields (rationale, timestamp, concepts, type)
+  const handleUpdateField = (field: keyof EngagementOpportunity, value: any) => {
+    setEditedEngagement((prev) => {
+      const updated = { ...prev, [field]: value };
+
+      // Handle type change: Initialize the correct data structure
+      if (field === 'engagement_type') {
+        if (value === 'guided_conversation') {
+          updated.quiz_items = undefined;
+          updated.conversation_flow = updated.conversation_flow || { // Keep existing if switching back, else initialize
+            goal: "New goal",
+            agent_initiator: "Initial agent message",
+            user_responses: [{ type: "User response type", agent_followup_strategy: "Agent follow-up" }],
+            fallback: "Fallback message"
+          };
+        } else { // Switching to quiz or discussion
+          updated.conversation_flow = undefined;
+          updated.quiz_items = updated.quiz_items || [{ // Keep existing if switching back, else initialize
+            question: "New question",
+            question_type: value === 'discussion' ? 'discussion' : 'multiple_choice',
+            options: value === 'quiz' ? ['Option 1', 'Option 2'] : undefined,
+            correct_option: value === 'quiz' ? 'Option 1' : null,
+            explanation: "Explanation",
+          }];
+        }
+      }
+      return updated;
+    });
+  };
+
+  // --- Quiz Item Handlers ---
   const handleDeleteQuiz = (quizIndex: number) => {
+    if (editedEngagement.engagement_type === 'guided_conversation' || !editedEngagement.quiz_items) return;
     const updatedQuizItems = [...editedEngagement.quiz_items];
     updatedQuizItems.splice(quizIndex, 1);
     setEditedEngagement({
       ...editedEngagement,
       quiz_items: updatedQuizItems
     });
-    // If we're in edit mode, we'll wait for save to propagate these changes
-    // If not in edit mode, we'll immediately save the changes
-    if (!isEditing) {
-      onEdit({
-        ...editedEngagement,
-        quiz_items: updatedQuizItems
-      });
+    if (!isEditing) { // Apply immediately if not in edit mode (though unlikely scenario now)
+      onEdit({ ...engagement, engagement_type: editedEngagement.engagement_type, quiz_items: updatedQuizItems });
     }
   };
 
-  const handleUpdateField = (field: keyof EngagementOpportunity, value: any) => {
-    setEditedEngagement({
-      ...editedEngagement,
-      [field]: value
-    });
-  };
-
   const handleUpdateQuizField = (quizIndex: number, field: keyof EngagementQuizItem, value: any) => {
+    if (editedEngagement.engagement_type === 'guided_conversation' || !editedEngagement.quiz_items) return;
     const updatedQuizItems = [...editedEngagement.quiz_items];
     updatedQuizItems[quizIndex] = {
       ...updatedQuizItems[quizIndex],
@@ -1095,8 +1154,8 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
     });
   };
 
-  // Function to update options for multiple choice questions
   const handleUpdateOptions = (quizIndex: number, options: string[]) => {
+    if (editedEngagement.engagement_type === 'guided_conversation' || !editedEngagement.quiz_items) return;
     const updatedQuizItems = [...editedEngagement.quiz_items];
     updatedQuizItems[quizIndex] = {
       ...updatedQuizItems[quizIndex],
@@ -1108,8 +1167,8 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
     });
   };
 
-  // Function to add a new option to a multiple choice question
   const handleAddOption = (quizIndex: number) => {
+    if (editedEngagement.engagement_type === 'guided_conversation' || !editedEngagement.quiz_items) return;
     const quiz = editedEngagement.quiz_items[quizIndex];
     if (quiz.question_type !== 'multiple_choice') return;
 
@@ -1125,19 +1184,11 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
     });
   };
 
-  // Function to update concepts addressed
-  const handleUpdateConcepts = (concepts: string[]) => {
-    setEditedEngagement({
-      ...editedEngagement,
-      concepts_addressed: concepts
-    });
-  };
-
-  // Function to add a new quiz item
   const handleAddQuizItem = () => {
+    if (editedEngagement.engagement_type === 'guided_conversation' || !editedEngagement.quiz_items) return;
     const newQuizItem: EngagementQuizItem = {
       question: "New question",
-      question_type: editedEngagement.engagement_type === 'quiz' ? 'multiple_choice' : 'discussion',
+      question_type: editedEngagement.engagement_type === 'discussion' ? 'discussion' : 'multiple_choice',
       options: editedEngagement.engagement_type === 'quiz' ? ['Option 1', 'Option 2'] : undefined,
       correct_option: editedEngagement.engagement_type === 'quiz' ? 'Option 1' : null,
       explanation: "Explanation for this question",
@@ -1151,6 +1202,83 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
       ...editedEngagement,
       quiz_items: [...editedEngagement.quiz_items, newQuizItem]
     });
+  };
+
+  // --- Conversation Flow Handlers ---
+  const handleUpdateConversationField = (field: keyof ConversationFlow, value: any) => {
+    if (editedEngagement.engagement_type !== 'guided_conversation' || !editedEngagement.conversation_flow) return;
+    setEditedEngagement({
+      ...editedEngagement,
+      conversation_flow: {
+        ...editedEngagement.conversation_flow,
+        [field]: value
+      }
+    });
+  };
+
+  const handleUpdateUserResponseField = (index: number, field: keyof ConversationFlowUserResponse, value: string) => {
+    if (editedEngagement.engagement_type !== 'guided_conversation' || !editedEngagement.conversation_flow) return;
+    const updatedResponses = [...editedEngagement.conversation_flow.user_responses];
+    updatedResponses[index] = {
+      ...updatedResponses[index],
+      [field]: value
+    };
+    setEditedEngagement({
+      ...editedEngagement,
+      conversation_flow: {
+        ...editedEngagement.conversation_flow,
+        user_responses: updatedResponses
+      }
+    });
+  };
+
+  const handleAddUserResponse = () => {
+    if (editedEngagement.engagement_type !== 'guided_conversation' || !editedEngagement.conversation_flow) return;
+    const newUserResponse: ConversationFlowUserResponse = {
+      type: "New response type",
+      agent_followup_strategy: "New follow-up strategy"
+    };
+    setEditedEngagement({
+      ...editedEngagement,
+      conversation_flow: {
+        ...editedEngagement.conversation_flow,
+        user_responses: [...editedEngagement.conversation_flow.user_responses, newUserResponse]
+      }
+    });
+  };
+
+  const handleDeleteUserResponse = (index: number) => {
+    if (editedEngagement.engagement_type !== 'guided_conversation' || !editedEngagement.conversation_flow) return;
+    const updatedResponses = [...editedEngagement.conversation_flow.user_responses];
+    updatedResponses.splice(index, 1);
+    setEditedEngagement({
+      ...editedEngagement,
+      conversation_flow: {
+        ...editedEngagement.conversation_flow,
+        user_responses: updatedResponses
+      }
+    });
+    if (!isEditing) { // Apply immediately if not in edit mode (unlikely)
+      onEdit({ ...engagement, engagement_type: editedEngagement.engagement_type, conversation_flow: { ...editedEngagement.conversation_flow, user_responses: updatedResponses } });
+    }
+  };
+
+  // --- Shared Handlers ---
+  const handleUpdateConcepts = (concepts: string[]) => {
+    setEditedEngagement({
+      ...editedEngagement,
+      concepts_addressed: concepts
+    });
+  };
+
+  // Helper to get display name for engagement type
+  const getEngagementTypeName = (type: EngagementOpportunity['engagement_type']) => {
+    switch (type) {
+      case 'quiz': return 'Quiz';
+      case 'discussion': return 'Discussion';
+      case 'guided_conversation': return 'Guided Conversation';
+      default: return 'Engagement';
+    }
   };
 
   return (
@@ -1174,15 +1302,12 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
           <div className="flex items-center gap-2">
             {getEngagementTypeIcon(engagement.engagement_type)}
             <span className={`text-[13px] font-medium ${isExpanded ? 'text-blue-600' : 'text-gray-800'}`}>
-              {engagement.engagement_type === 'quiz' ? 'Quiz' : 'Discussion'}
-              {engagement.quiz_items?.length > 1 ? ` (${engagement.quiz_items.length} questions)` : ''}
+              {getEngagementTypeName(engagement.engagement_type)}
+              {engagement.engagement_type !== 'guided_conversation' && engagement.quiz_items?.length > 1 ? ` (${engagement.quiz_items.length} questions)` : ''}
             </span>
             {engagement.timestamp && (
               <div className="px-1.5 py-0.5 bg-gray-100 rounded text-[10px] text-gray-600 flex items-center gap-1">
-                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 8V12L15 15M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z"
-                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 8V12L15 15M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 {formatVideoTime(engagement.timestamp)}
               </div>
             )}
@@ -1192,93 +1317,50 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
           <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
             {isEditing ? (
               <>
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleSaveEdit}
-                  className="p-1.5 rounded-md text-blue-600 hover:bg-blue-50 transition-all duration-200"
-                >
-                  <Save size={14} />
-                </motion.button>
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleCancelEdit}
-                  className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 transition-all duration-200"
-                >
-                  <X size={14} />
-                </motion.button>
+                <motion.button whileTap={{ scale: 0.95 }} onClick={handleSaveEdit} className="p-1.5 rounded-md text-blue-600 hover:bg-blue-50 transition-all duration-200"><Save size={14} /></motion.button>
+                <motion.button whileTap={{ scale: 0.95 }} onClick={handleCancelEdit} className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 transition-all duration-200"><X size={14} /></motion.button>
               </>
             ) : (
               <>
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleStartEdit}
-                  className="p-1.5 rounded-md text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200"
-                >
-                  <Edit2 size={14} />
-                </motion.button>
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowDeleteConfirm(true);
-                  }}
-                  className="p-1.5 rounded-md text-gray-500 hover:text-red-500 hover:bg-red-50 transition-all duration-200"
-                >
-                  <Trash2 size={14} />
-                </motion.button>
+                <motion.button whileTap={{ scale: 0.95 }} onClick={handleStartEdit} className="p-1.5 rounded-md text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200"><Edit2 size={14} /></motion.button>
+                <motion.button whileTap={{ scale: 0.95 }} onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(true); }} className="p-1.5 rounded-md text-gray-500 hover:text-red-500 hover:bg-red-50 transition-all duration-200"><Trash2 size={14} /></motion.button>
               </>
             )}
-            <motion.div
-              animate={{ rotate: isExpanded ? 90 : 0 }}
-              transition={{ duration: 0.2 }}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!isEditing) handleToggleExpand();
-              }}
-            >
+            <motion.div animate={{ rotate: isExpanded ? 90 : 0 }} transition={{ duration: 0.2 }} onClick={(e) => { e.stopPropagation(); if (!isEditing) handleToggleExpand(); }}>
               <ChevronRight size={14} className={`${isExpanded ? 'text-blue-600' : 'text-gray-500'}`} />
             </motion.div>
           </div>
         </div>
 
-        {/* Concepts */}
+        {/* Concepts & Edit Fields */}
         {isEditing ? (
-          <div className="mt-2 bg-white p-2 rounded border border-gray-200">
-            <div className="text-[11px] text-gray-500 mb-1">Engagement Type:</div>
-            <select
-              value={editedEngagement.engagement_type}
-              onChange={(e) => handleUpdateField('engagement_type', e.target.value)}
-              className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-[13px] text-gray-800 focus:border-blue-400 focus:ring-1 focus:ring-blue-300"
-            >
-              <option value="quiz">Quiz</option>
-              <option value="discussion">Discussion</option>
-            </select>
-
-            <div className="text-[11px] text-gray-500 mt-2 mb-1">Timestamp (format: 00:MM:SS):</div>
-            <input
-              type="text"
-              value={editedEngagement.timestamp}
-              onChange={(e) => handleUpdateField('timestamp', e.target.value)}
-              className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-[13px] text-gray-800 focus:border-blue-400 focus:ring-1 focus:ring-blue-300"
-              placeholder="00:00:00"
-            />
-
-            <div className="text-[11px] text-gray-500 mt-2 mb-1">Concepts (comma separated):</div>
-            <input
-              type="text"
-              value={editedEngagement.concepts_addressed.join(', ')}
-              onChange={(e) => handleUpdateConcepts(e.target.value.split(',').map(c => c.trim()))}
-              className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-[13px] text-gray-800 focus:border-blue-400 focus:ring-1 focus:ring-blue-300"
-              placeholder="Concept 1, Concept 2"
-            />
+          <div className="mt-2 bg-white p-2 rounded border border-gray-200 space-y-2">
+            <div>
+              <div className="text-[11px] text-gray-500 mb-1">Engagement Type:</div>
+              <select
+                value={editedEngagement.engagement_type}
+                onChange={(e) => handleUpdateField('engagement_type', e.target.value)}
+                className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-[13px] text-gray-800 focus:border-blue-400 focus:ring-1 focus:ring-blue-300"
+              >
+                <option value="quiz">Quiz</option>
+                <option value="discussion">Discussion</option>
+                <option value="guided_conversation">Guided Conversation</option> {/* Add new type */}
+              </select>
+            </div>
+            <div>
+              <div className="text-[11px] text-gray-500 mb-1">Timestamp (format: 00:MM:SS):</div>
+              <input type="text" value={editedEngagement.timestamp} onChange={(e) => handleUpdateField('timestamp', e.target.value)} className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-[13px] text-gray-800 focus:border-blue-400 focus:ring-1 focus:ring-blue-300" placeholder="00:00:00" />
+            </div>
+            <div>
+              <div className="text-[11px] text-gray-500 mb-1">Concepts (comma separated):</div>
+              <input type="text" value={editedEngagement.concepts_addressed.join(', ')} onChange={(e) => handleUpdateConcepts(e.target.value.split(',').map(c => c.trim()))} className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-[13px] text-gray-800 focus:border-blue-400 focus:ring-1 focus:ring-blue-300" placeholder="Concept 1, Concept 2" />
+            </div>
           </div>
         ) : (
           engagement.concepts_addressed && engagement.concepts_addressed.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">
               {engagement.concepts_addressed.map((concept, idx) => (
-                <div key={idx} className="px-1.5 py-0.5 bg-gray-100 rounded-sm text-[9px] text-gray-600">
-                  {concept}
-                </div>
+                <div key={idx} className="px-1.5 py-0.5 bg-gray-100 rounded-sm text-[9px] text-gray-600">{concept}</div>
               ))}
             </div>
           )
@@ -1293,123 +1375,138 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
+            className="overflow-hidden" // Add overflow hidden to prevent content spill during animation
           >
             <div className="px-3 pb-3 space-y-3">
-              {/* Rationale */}
-              {isEditing ? (
-                <div className="bg-white p-2 rounded border border-gray-200">
-                  <div className="text-[11px] text-gray-500 mb-1">Rationale:</div>
-                  <textarea
-                    value={editedEngagement.rationale}
-                    onChange={(e) => handleUpdateField('rationale', e.target.value)}
-                    className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-[13px] text-gray-800 min-h-[80px] focus:border-blue-400 focus:ring-1 focus:ring-blue-300"
-                    placeholder="Enter rationale..."
-                  />
-                </div>
-              ) : (
-                engagement.rationale && (
-                  <div className="bg-white p-2 rounded border border-gray-200">
-                    <div className="text-[11px] text-gray-500 mb-1">Rationale:</div>
-                    <div className="text-[12px] text-gray-800">{engagement.rationale}</div>
-                  </div>
-                )
-              )}
+              {/* Rationale (Editable/Display) */}
+              <div className="bg-white p-2 rounded border border-gray-200">
+                <div className="text-[11px] text-gray-500 mb-1">Rationale:</div>
+                {isEditing ? (
+                  <textarea value={editedEngagement.rationale} onChange={(e) => handleUpdateField('rationale', e.target.value)} className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-[13px] text-gray-800 min-h-[80px] focus:border-blue-400 focus:ring-1 focus:ring-blue-300" placeholder="Enter rationale..." />
+                ) : (
+                  <div className="text-[12px] text-gray-800">{engagement.rationale || 'No rationale provided.'}</div>
+                )}
+              </div>
 
-              {/* Quiz items */}
-              {editedEngagement.quiz_items && (
+              {/* --- Conditional Rendering based on Engagement Type --- */}
+
+              {/* Quiz/Discussion Items */}
+              {editedEngagement.engagement_type !== 'guided_conversation' && editedEngagement.quiz_items && (
                 <div className="space-y-3">
                   {editedEngagement.quiz_items.map((quiz, quizIndex) => (
-                    <div
-                      key={quizIndex}
-                      className={`
-                        rounded border transition-all duration-300
-                        ${expandedQuiz === `${quizIndex}`
-                          ? 'bg-blue-50 border-blue-200 shadow-sm'
-                          : 'bg-white border-gray-200 hover:border-blue-200'}
-                      `}
-                    >
+                    <div key={quizIndex} className={`rounded border transition-all duration-300 ${expandedQuiz === `${quizIndex}` ? 'bg-blue-50 border-blue-200 shadow-sm' : 'bg-white border-gray-200 hover:border-blue-200'}`}>
                       {/* Quiz header */}
-                      <div
-                        className="p-2 cursor-pointer flex items-start justify-between"
-                        onClick={() => !isEditing && setExpandedQuiz(expandedQuiz === `${quizIndex}` ? null : `${quizIndex}`)}
-                      >
+                      <div className="p-2 cursor-pointer flex items-start justify-between" onClick={() => !isEditing && setExpandedQuiz(expandedQuiz === `${quizIndex}` ? null : `${quizIndex}`)}>
                         <div className="flex items-center gap-2">
                           {getQuestionTypeIcon(quiz.question_type)}
                           <div className={`text-[12px] ${expandedQuiz === `${quizIndex}` ? 'text-blue-600' : 'text-gray-700'}`}>
                             {isEditing ? (
-                              <select
-                                value={quiz.question_type}
-                                onChange={(e) => handleUpdateQuizField(quizIndex, 'question_type', e.target.value)}
-                                onClick={(e) => e.stopPropagation()}
-                                className="bg-white border border-gray-300 rounded-lg px-2 py-1 text-[12px] text-gray-800 focus:border-blue-400 focus:ring-1 focus:ring-blue-300"
-                              >
+                              <select value={quiz.question_type} onChange={(e) => handleUpdateQuizField(quizIndex, 'question_type', e.target.value)} onClick={(e) => e.stopPropagation()} className="bg-white border border-gray-300 rounded-lg px-2 py-1 text-[12px] text-gray-800 focus:border-blue-400 focus:ring-1 focus:ring-blue-300">
                                 <option value="multiple_choice">Multiple Choice</option>
                                 <option value="short_answer">Short Answer</option>
                                 <option value="discussion">Discussion</option>
                               </select>
                             ) : (
-                              quiz.question_type === 'multiple_choice'
-                                ? 'Multiple Choice'
-                                : quiz.question_type === 'short_answer'
-                                  ? 'Short Answer'
-                                  : 'Discussion'
+                              quiz.question_type === 'multiple_choice' ? 'Multiple Choice' : quiz.question_type === 'short_answer' ? 'Short Answer' : 'Discussion'
                             )}
                           </div>
                         </div>
-
                         {isEditing ? (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteQuiz(quizIndex);
-                            }}
-                            className="p-1 rounded-md text-gray-500 hover:text-red-500 hover:bg-red-50 transition-all duration-200"
-                          >
-                            <Trash2 size={12} />
-                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); handleDeleteQuiz(quizIndex); }} className="p-1 rounded-md text-gray-500 hover:text-red-500 hover:bg-red-50 transition-all duration-200"><Trash2 size={12} /></button>
                         ) : (
-                          <motion.div
-                            animate={{ rotate: expandedQuiz === `${quizIndex}` ? 90 : 0 }}
-                            transition={{ duration: 0.2 }}
-                          >
-                            <ChevronRight size={12} className="text-gray-500" />
-                          </motion.div>
+                          <motion.div animate={{ rotate: expandedQuiz === `${quizIndex}` ? 90 : 0 }} transition={{ duration: 0.2 }}><ChevronRight size={12} className="text-gray-500" /></motion.div>
                         )}
                       </div>
 
-                      {/* Expanded quiz content - always show in edit mode */}
+                      {/* Expanded quiz content */}
                       <AnimatePresence>
                         {(expandedQuiz === `${quizIndex}` || isEditing) && (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.2 }}
-                          >
+                          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}>
                             <div className="px-2 pb-2 space-y-2">
                               {/* Question */}
                               <div className="bg-white p-2 rounded border border-gray-200">
                                 <div className="text-[11px] text-gray-500 mb-1">Question:</div>
                                 {isEditing ? (
-                                  <textarea
-                                    value={quiz.question}
-                                    onChange={(e) => handleUpdateQuizField(quizIndex, 'question', e.target.value)}
-                                    className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-[13px] text-gray-800 min-h-[60px] focus:border-blue-400 focus:ring-1 focus:ring-blue-300"
-                                    placeholder="Enter question..."
-                                  />
+                                  <textarea value={quiz.question} onChange={(e) => handleUpdateQuizField(quizIndex, 'question', e.target.value)} className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-[13px] text-gray-800 min-h-[60px] focus:border-blue-400 focus:ring-1 focus:ring-blue-300" placeholder="Enter question..." />
                                 ) : (
                                   <div className="text-[12px] text-gray-800">{quiz.question}</div>
                                 )}
                               </div>
 
-                              {/* Add quiz item button in edit mode */}
-                              {isEditing && (
-                                <button
-                                  onClick={handleAddQuizItem}
-                                  className="w-full py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-[12px] transition-colors duration-200"
-                                >
-                                  + Add Question
-                                </button>
+                              {/* Options (for multiple choice) */}
+                              {quiz.question_type === 'multiple_choice' && (
+                                <div className="bg-white p-2 rounded border border-gray-200 space-y-1">
+                                  <div className="flex justify-between items-center mb-1">
+                                    <div className="text-[11px] text-gray-500">Options:</div>
+                                    {isEditing && <button onClick={() => handleAddOption(quizIndex)} className="text-[10px] text-blue-600 hover:underline">+ Add Option</button>}
+                                  </div>
+                                  {(quiz.options || []).map((option, optionIndex) => (
+                                    <div key={optionIndex} className="flex items-center">
+                                      {isEditing ? (
+                                        <>
+                                          <input type="text" value={option} onChange={(e) => { const newOptions = [...(quiz.options || [])]; newOptions[optionIndex] = e.target.value; handleUpdateOptions(quizIndex, newOptions); }} className="flex-1 bg-gray-50 border border-gray-300 rounded px-2 py-1 text-[12px] text-gray-800 mr-1" />
+                                          <button onClick={() => { const newOptions = [...(quiz.options || [])]; newOptions.splice(optionIndex, 1); handleUpdateOptions(quizIndex, newOptions); }} className="p-0.5 text-red-500 hover:text-red-700"><X size={10} /></button>
+                                        </>
+                                      ) : (
+                                        <div className="text-[12px] text-gray-800">{option}</div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Correct Option (for multiple choice) */}
+                              {quiz.question_type === 'multiple_choice' && (
+                                <div className="bg-white p-2 rounded border border-gray-200">
+                                  <div className="text-[11px] text-gray-500 mb-1">Correct Option:</div>
+                                  {isEditing ? (
+                                    <select value={quiz.correct_option || ''} onChange={(e) => handleUpdateQuizField(quizIndex, 'correct_option', e.target.value)} className="w-full bg-white border border-gray-300 rounded-lg px-2 py-1 text-[12px] text-gray-800 focus:border-blue-400 focus:ring-1 focus:ring-blue-300">
+                                      <option value="">Select correct option</option>
+                                      {(quiz.options || []).map((opt, idx) => <option key={idx} value={opt}>{opt}</option>)}
+                                    </select>
+                                  ) : (
+                                    <div className="text-[12px] text-gray-800">{quiz.correct_option || 'Not set'}</div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Expected Answer (for short answer) */}
+                              {quiz.question_type === 'short_answer' && (
+                                <div className="bg-white p-2 rounded border border-gray-200">
+                                  <div className="text-[11px] text-gray-500 mb-1">Expected Answer:</div>
+                                  {isEditing ? (
+                                    <textarea value={quiz.expected_answer || ''} onChange={(e) => handleUpdateQuizField(quizIndex, 'expected_answer', e.target.value)} className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-[13px] text-gray-800 min-h-[40px] focus:border-blue-400 focus:ring-1 focus:ring-blue-300" placeholder="Enter expected answer..." />
+                                  ) : (
+                                    <div className="text-[12px] text-gray-800">{quiz.expected_answer || 'Not set'}</div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Explanation */}
+                              <div className="bg-white p-2 rounded border border-gray-200">
+                                <div className="text-[11px] text-gray-500 mb-1">Explanation:</div>
+                                {isEditing ? (
+                                  <textarea value={quiz.explanation || ''} onChange={(e) => handleUpdateQuizField(quizIndex, 'explanation', e.target.value)} className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-[13px] text-gray-800 min-h-[60px] focus:border-blue-400 focus:ring-1 focus:ring-blue-300" placeholder="Enter explanation..." />
+                                ) : (
+                                  <div className="text-[12px] text-gray-800">{quiz.explanation || 'No explanation provided.'}</div>
+                                )}
+                              </div>
+                              {/* Follow-up */}
+                              {(quiz.question_type === 'multiple_choice' || quiz.question_type === 'short_answer') && (
+                                <div className="bg-white p-2 rounded border border-gray-200 space-y-1">
+                                  <div className="text-[11px] text-gray-500 mb-1">Follow-up:</div>
+                                  {isEditing ? (
+                                    <>
+                                      <input type="text" value={quiz.follow_up?.if_correct || ''} onChange={(e) => handleUpdateQuizField(quizIndex, 'follow_up', { ...quiz.follow_up, if_correct: e.target.value })} placeholder="If correct..." className="w-full bg-gray-50 border border-gray-300 rounded px-2 py-1 text-[12px] text-gray-800 mb-1" />
+                                      <input type="text" value={quiz.follow_up?.if_incorrect || ''} onChange={(e) => handleUpdateQuizField(quizIndex, 'follow_up', { ...quiz.follow_up, if_incorrect: e.target.value })} placeholder="If incorrect..." className="w-full bg-gray-50 border border-gray-300 rounded px-2 py-1 text-[12px] text-gray-800" />
+                                    </>
+                                  ) : (
+                                    <>
+                                      <div className="text-[12px] text-gray-800">Correct: {quiz.follow_up?.if_correct || 'None'}</div>
+                                      <div className="text-[12px] text-gray-800">Incorrect: {quiz.follow_up?.if_incorrect || 'None'}</div>
+                                    </>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </motion.div>
@@ -1417,6 +1514,91 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
                       </AnimatePresence>
                     </div>
                   ))}
+                  {/* Add quiz item button */}
+                  {isEditing && (
+                    <button onClick={handleAddQuizItem} className="w-full mt-3 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-[12px] transition-colors duration-200">+ Add Question</button>
+                  )}
+                </div>
+              )}
+
+              {/* Guided Conversation Flow */}
+              {editedEngagement.engagement_type === 'guided_conversation' && editedEngagement.conversation_flow && (
+                <div className="space-y-3">
+                  {/* Goal */}
+                  <div className="bg-white p-2 rounded border border-gray-200">
+                    <div className="text-[11px] text-gray-500 mb-1">Goal:</div>
+                    {isEditing ? (
+                      <textarea value={editedEngagement.conversation_flow.goal} onChange={(e) => handleUpdateConversationField('goal', e.target.value)} className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-[13px] text-gray-800 min-h-[60px] focus:border-blue-400 focus:ring-1 focus:ring-blue-300" placeholder="Enter conversation goal..." />
+                    ) : (
+                      <div className="text-[12px] text-gray-800">{editedEngagement.conversation_flow.goal}</div>
+                    )}
+                  </div>
+
+                  {/* Agent Initiator */}
+                  <div className="bg-white p-2 rounded border border-gray-200">
+                    <div className="text-[11px] text-gray-500 mb-1">Agent Initiator Message:</div>
+                    {isEditing ? (
+                      <textarea value={editedEngagement.conversation_flow.agent_initiator} onChange={(e) => handleUpdateConversationField('agent_initiator', e.target.value)} className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-[13px] text-gray-800 min-h-[60px] focus:border-blue-400 focus:ring-1 focus:ring-blue-300" placeholder="Enter initial agent message..." />
+                    ) : (
+                      <div className="text-[12px] text-gray-800">{editedEngagement.conversation_flow.agent_initiator}</div>
+                    )}
+                  </div>
+
+                  {/* User Responses */}
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <div className="text-[12px] text-gray-600 font-medium">User Response Paths:</div>
+                      {isEditing && <button onClick={handleAddUserResponse} className="text-[10px] text-blue-600 hover:underline">+ Add Response Path</button>}
+                    </div>
+                    {editedEngagement.conversation_flow.user_responses.map((response, index) => (
+                      <div key={index} className={`rounded border transition-all duration-300 ${expandedUserResponse === `${index}` ? 'bg-blue-50 border-blue-200 shadow-sm' : 'bg-white border-gray-200 hover:border-blue-200'}`}>
+                        <div className="p-2 cursor-pointer flex items-center justify-between" onClick={() => !isEditing && setExpandedUserResponse(expandedUserResponse === `${index}` ? null : `${index}`)}>
+                          <div className={`text-[12px] truncate ${expandedUserResponse === `${index}` ? 'text-blue-600' : 'text-gray-700'}`}>
+                            Path {index + 1}: {isEditing ? 'Edit Details' : response.type}
+                          </div>
+                          {isEditing ? (
+                            <button onClick={(e) => { e.stopPropagation(); handleDeleteUserResponse(index); }} className="p-1 rounded-md text-gray-500 hover:text-red-500 hover:bg-red-50 transition-all duration-200"><Trash2 size={12} /></button>
+                          ) : (
+                            <motion.div animate={{ rotate: expandedUserResponse === `${index}` ? 90 : 0 }} transition={{ duration: 0.2 }}><ChevronRight size={12} className="text-gray-500" /></motion.div>
+                          )}
+                        </div>
+                        <AnimatePresence>
+                          {(expandedUserResponse === `${index}` || isEditing) && (
+                            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}>
+                              <div className="px-2 pb-2 space-y-2">
+                                <div className="bg-white p-2 rounded border border-gray-200">
+                                  <div className="text-[11px] text-gray-500 mb-1">User Response Type (Keyword):</div>
+                                  {isEditing ? (
+                                    <input type="text" value={response.type} onChange={(e) => handleUpdateUserResponseField(index, 'type', e.target.value)} className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-[13px] text-gray-800 focus:border-blue-400 focus:ring-1 focus:ring-blue-300" placeholder="e.g., positive_interest, objection" />
+                                  ) : (
+                                    <div className="text-[12px] text-gray-800">{response.type}</div>
+                                  )}
+                                </div>
+                                <div className="bg-white p-2 rounded border border-gray-200">
+                                  <div className="text-[11px] text-gray-500 mb-1">Agent Follow-up Strategy:</div>
+                                  {isEditing ? (
+                                    <textarea value={response.agent_followup_strategy} onChange={(e) => handleUpdateUserResponseField(index, 'agent_followup_strategy', e.target.value)} className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-[13px] text-gray-800 min-h-[60px] focus:border-blue-400 focus:ring-1 focus:ring-blue-300" placeholder="Enter agent follow-up message/strategy..." />
+                                  ) : (
+                                    <div className="text-[12px] text-gray-800">{response.agent_followup_strategy}</div>
+                                  )}
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Fallback */}
+                  <div className="bg-white p-2 rounded border border-gray-200">
+                    <div className="text-[11px] text-gray-500 mb-1">Fallback Message:</div>
+                    {isEditing ? (
+                      <textarea value={editedEngagement.conversation_flow.fallback} onChange={(e) => handleUpdateConversationField('fallback', e.target.value)} className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-[13px] text-gray-800 min-h-[60px] focus:border-blue-400 focus:ring-1 focus:ring-blue-300" placeholder="Enter fallback message..." />
+                    ) : (
+                      <div className="text-[12px] text-gray-800">{editedEngagement.conversation_flow.fallback}</div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -2635,6 +2817,8 @@ export default function Playground({
           <path d="M8 12H8.01M12 12H12.01M16 12H16.01M21 12C21 16.4183 16.9706 20 12 20C10.4607 20 9.01172 19.6565 7.74467 19.0511L3 20L4.39499 16.28C3.51156 15.0423 3 13.5743 3 12C3 7.58172 7.02944 4 12 4C16.9706 4 21 7.58172 21 12Z"
             stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>;
+      case 'guided_conversation': // Add icon for guided conversation
+        return <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M17 8L3 8M17 12L3 12M17 16L3 16M21 12C21 14.7614 19.7614 17 17 17L17 8C19.7614 8 21 10.2386 21 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
       default:
         return null;
     }
@@ -2694,12 +2878,13 @@ export default function Playground({
     // Generate a unique ID
     const newId = `engagement-${Date.now()}`;
 
-    // Create a new engagement opportunity
+    // Create a new default 'quiz' engagement opportunity
     const newEngagement: EngagementOpportunity = {
       id: newId,
       rationale: "Add your rationale here",
       timestamp: "00:00:00",
-      quiz_items: [
+      engagement_type: "quiz", // Default to quiz
+      quiz_items: [ // Initialize with default quiz structure
         {
           question: "Add your question here",
           question_type: "multiple_choice",
@@ -2712,8 +2897,8 @@ export default function Playground({
           }
         }
       ],
+      // conversation_flow is implicitly undefined here due to the discriminated union
       section_id: "section-1", // Default section
-      engagement_type: "quiz",
       concepts_addressed: ["New Concept"]
     };
 
@@ -3955,6 +4140,14 @@ export default function Playground({
                             {getEngagementTypeIcon('discussion')}
                             Discussions
                           </button>
+                          {/* Add Filter for Guided Conversation */}
+                          <button
+                            className={`px-3 py-1 text-xs rounded-full flex items-center gap-1 transition-all duration-300 ${selectedEngagement === 'guided_conversation' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                            onClick={() => setSelectedEngagement(selectedEngagement === 'guided_conversation' ? null : 'guided_conversation')}
+                          >
+                            {getEngagementTypeIcon('guided_conversation')}
+                            Guided Convo
+                          </button>
                         </div>
 
                         {/* Debug output for troubleshooting */}
@@ -3971,13 +4164,14 @@ export default function Playground({
                               .filter(engagement => !selectedEngagement || engagement.engagement_type === selectedEngagement)
                               .map((engagement, index) => (
                                 <EngagementCard
-                                  key={engagement.id || index}
+                                  key={engagement.id || index} // Use ID if available, fallback to index
                                   engagement={engagement}
                                   onEdit={handleUpdateEngagement}
                                   onDelete={handleDeleteEngagement}
                                 />
                               ))
                           ) : (
+                            // ... No opportunities message ...
                             <div className="text-center p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
                               <div className="text-gray-800 text-sm">No engagement opportunities found</div>
                               <div className="text-gray-500 text-xs mt-1">
