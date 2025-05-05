@@ -1137,7 +1137,20 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
       quiz_items: updatedQuizItems
     });
     if (!isEditing) { // Apply immediately if not in edit mode (though unlikely scenario now)
-      onEdit({ ...engagement, engagement_type: editedEngagement.engagement_type, quiz_items: updatedQuizItems });
+      // Construct a valid object for the 'quiz' or 'discussion' type
+      const updatedOpportunity: EngagementOpportunity = {
+        // Base properties from original engagement
+        id: engagement.id,
+        rationale: engagement.rationale,
+        timestamp: engagement.timestamp,
+        section_id: engagement.section_id,
+        concepts_addressed: engagement.concepts_addressed,
+        // Explicitly set type and quiz_items
+        engagement_type: editedEngagement.engagement_type, // Known to be 'quiz' or 'discussion' here
+        quiz_items: updatedQuizItems,
+        // conversation_flow is implicitly undefined, satisfying the union type
+      };
+      onEdit(updatedOpportunity);
     }
   };
 
@@ -1259,7 +1272,23 @@ const EngagementCard: React.FC<EngagementCardProps> = ({ engagement, onEdit, onD
       }
     });
     if (!isEditing) { // Apply immediately if not in edit mode (unlikely)
-      onEdit({ ...engagement, engagement_type: editedEngagement.engagement_type, conversation_flow: { ...editedEngagement.conversation_flow, user_responses: updatedResponses } });
+      // Construct a valid object for the 'guided_conversation' type
+      const updatedOpportunity: EngagementOpportunity = {
+        // Base properties from original engagement
+        id: engagement.id,
+        rationale: engagement.rationale,
+        timestamp: engagement.timestamp,
+        section_id: engagement.section_id,
+        concepts_addressed: engagement.concepts_addressed,
+        // Explicitly set type and conversation_flow
+        engagement_type: 'guided_conversation', // Known to be this type here
+        conversation_flow: { // Use the updated conversation flow
+          ...editedEngagement.conversation_flow,
+          user_responses: updatedResponses
+        },
+        // quiz_items is implicitly undefined, satisfying the union type
+      };
+      onEdit(updatedOpportunity);
     }
   };
 
