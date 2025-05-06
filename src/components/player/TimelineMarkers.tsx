@@ -192,7 +192,7 @@ const TimelineMarkers: React.FC<TimelineMarkersProps> = ({
                             <AnimatePresence>
                                 {isHovered && (
                                     <motion.div
-                                        className="absolute bg-white/95 backdrop-blur-sm text-[10px] px-2.5 py-1.5
+                                        className="absolute bg-white/95 backdrop-blur-sm text-[10px] px-2.5 py-1.5 
                                         rounded-md border border-blue-200 shadow-lg z-30"
                                         style={{
                                             top: tooltipPosition.top,
