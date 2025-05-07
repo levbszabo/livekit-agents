@@ -102,7 +102,7 @@ export const MobileVideoPlayer: React.FC<MobileVideoPlayerProps> = ({
                     <div className="w-full h-full relative flex items-center justify-center">
                         <video
                             ref={videoRef}
-                            className="w-full h-full max-h-full"
+                            className="w-full h-full"
                             style={{
                                 objectFit: 'contain',
                                 objectPosition: 'center'

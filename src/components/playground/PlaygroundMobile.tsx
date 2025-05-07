@@ -1113,8 +1113,13 @@ export default function PlaygroundMobile({
         // Re-run when activation state or connection state changes
     }, [hasAudioBeenActivated, room, roomState]);
 
+    // TODO: Replace 'h-14' with the actual height of your header if different
+    const HEADER_HEIGHT_CLASS = 'pt-14'; // Example: Tailwind class for padding-top: 3.5rem (56px)
+
     return (
-        <div ref={mobileContainerRef} className="h-screen flex flex-col bg-white relative overflow-hidden">
+        <div
+            ref={mobileContainerRef}
+            className={`h-screen flex flex-col bg-white relative overflow-hidden ${HEADER_HEIGHT_CLASS}`}>
             {/* Initial Loading Overlay */}
             {isInitializing && (
                 <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center z-50">
