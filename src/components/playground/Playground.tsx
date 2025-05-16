@@ -2495,6 +2495,12 @@ export default function Playground({
 
   // Add this state for upload status
   const [isUploading, setIsUploading] = useState(false);
+  const [showChatLinkPopup, setShowChatLinkPopup] = useState(true);
+
+  // <<< New state for agent-triggered popup >>>
+  const [agentTriggeredPopupData, setAgentTriggeredPopupData] = useState<{ url: string; message: string | null } | null>(null);
+  const [showAgentTriggeredPopup, setShowAgentTriggeredPopup] = useState(false);
+
 
   // Update the handlePresentationUpload function
   const handlePresentationUpload = async (file: File) => {
@@ -3328,16 +3334,43 @@ export default function Playground({
       }
     );
 
+    // <<< Register new RPC method for triggering link popup >>>
+    localParticipant.registerRpcMethod(
+      'triggerLinkPopup',
+      async (data: RpcInvocationData) => {
+        try {
+          console.log(`Received triggerLinkPopup from agent: ${data.payload}`);
+          const command = JSON.parse(data.payload);
+
+          if (command.action === 'show_link' && command.url) {
+            setAgentTriggeredPopupData({
+              url: command.url,
+              message: command.message || null,
+            });
+            setShowAgentTriggeredPopup(true);
+            console.log("Agent triggered link popup:", command);
+            return JSON.stringify({ success: true, action: 'show_link' });
+          }
+
+          return JSON.stringify({ success: false, error: 'Invalid link popup command' });
+        } catch (error) {
+          console.error('Error handling triggerLinkPopup RPC:', error);
+          return JSON.stringify({ success: false, error: String(error) });
+        }
+      }
+    );
+
     // Clean up the RPC method when component unmounts
     return () => {
       try {
         localParticipant.unregisterRpcMethod('controlVideoPlayer');
-        console.log("Unregistered player-control RPC method");
+        localParticipant.unregisterRpcMethod('triggerLinkPopup'); // <<< Unregister new RPC method
+        console.log("Unregistered RPC methods");
       } catch (error) {
         console.error("Error unregistering RPC method:", error);
       }
     };
-  }, [localParticipant, roomState, videoRef]);
+  }, [localParticipant, roomState, videoRef]); // Ensure all dependencies are listed
 
   // Add roomState as a dependency to the useEffect
   useEffect(() => {
@@ -3903,9 +3936,45 @@ export default function Playground({
                           </div>
                         ))}
                       </div>
-                    </div>
-                  </div>
-                </div>
+
+
+                      {/* Agent Triggered Link Popup */}
+                      {showAgentTriggeredPopup && agentTriggeredPopupData && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 20 }}
+                          className="sticky bottom-2 left-2 right-2 mx-2 p-3 bg-white border border-green-300 rounded-lg shadow-lg z-20"
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs text-green-700 font-medium">Agent Suggestion:</span>
+                            <button
+                              onClick={() => setShowAgentTriggeredPopup(false)}
+                              className="p-1 rounded-md text-gray-500 hover:bg-gray-100 transition-all duration-200"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                          {agentTriggeredPopupData.message && (
+                            <p className="text-sm text-gray-700 mb-2">{agentTriggeredPopupData.message}</p>
+                          )}
+                          <a
+                            href={agentTriggeredPopupData.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-blue-600 hover:underline font-medium flex items-center gap-1"
+                          >
+                            <Link size={14} />
+                            Open Link
+                          </a>
+                          <p className="text-xs text-gray-500 mt-1 truncate hover:text-clip hover:overflow-visible transition-all duration-300">
+                            {agentTriggeredPopupData.url}
+                          </p>
+                        </motion.div>
+                      )}
+                    </div> {/* This closes the scrollable chat content div */}
+                  </div> {/* This closes the h-full flex flex-col div */}
+                </div> {/* This closes the absolute inset-0 div for the chat tab */}
 
                 {/* Only render AI Agent and Voice Clone tabs in edit mode */}
                 {params.agentType !== 'view' && (
@@ -4789,7 +4858,7 @@ export default function Playground({
             </div>
           </div>
         </motion.div>
-      </div>
+      </div >
     </div >
   );
 }

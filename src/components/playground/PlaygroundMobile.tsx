@@ -22,7 +22,7 @@ import { api } from '@/api';
 import { jwtDecode } from "jwt-decode";
 import { MobileVideoPlayer } from './mobile/MobileVideoPlayer';
 import { MobileProgressBar } from './mobile/MobileProgressBar';
-import { MessageSquare, ClipboardList, User, Radio, Share2, Square, Send, Mic, MicOff, Plus, Edit2, Trash2, ChevronRight, Save, Info, Lock, Globe, Copy, Check, ExternalLink, Volume2, VolumeX, X, Loader2, MessageCircle } from 'lucide-react';
+import { MessageSquare, ClipboardList, User, Radio, Share2, Square, Send, Mic, MicOff, Plus, Edit2, Trash2, ChevronRight, Save, Info, Lock, Globe, Copy, Check, ExternalLink, Volume2, VolumeX, X, Loader2, MessageCircle, Link } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Our EngagementOpportunity interface definition
@@ -243,6 +243,10 @@ export default function PlaygroundMobile({
 
     // Add initialization state
     const [isInitializing, setIsInitializing] = useState(true);
+
+    // Add state for agent-triggered popup
+    const [agentTriggeredPopupData, setAgentTriggeredPopupData] = useState<{ url: string; message: string | null } | null>(null);
+    const [showAgentTriggeredPopup, setShowAgentTriggeredPopup] = useState(false);
 
     // Add handleInterruptAgent function
     const handleInterruptAgent = useCallback(() => {
@@ -527,9 +531,9 @@ export default function PlaygroundMobile({
             return; // Don't register if not connected or no participant
         }
 
-        console.log("Registering mobile player-control RPC method");
+        console.log("Registering mobile RPC methods");
 
-        const rpcHandler = async (data: RpcInvocationData) => {
+        const playerControlRpcHandler = async (data: RpcInvocationData) => {
             try {
                 console.log(`Received mobile player control from agent: ${data.payload}`);
                 const command = JSON.parse(data.payload);
@@ -554,10 +558,38 @@ export default function PlaygroundMobile({
             }
         };
 
-        // Register the RPC method
+        // Register the RPC method for player control
         localParticipant.registerRpcMethod(
-            'controlVideoPlayer', // Keep the same name
-            rpcHandler
+            'controlVideoPlayer',
+            playerControlRpcHandler
+        );
+
+        // Register new RPC method for triggering link popup
+        const linkPopupRpcHandler = async (data: RpcInvocationData) => {
+            try {
+                console.log(`Mobile: Received triggerLinkPopup from agent: ${data.payload}`);
+                const command = JSON.parse(data.payload);
+
+                if (command.action === 'show_link' && command.url) {
+                    setAgentTriggeredPopupData({
+                        url: command.url,
+                        message: command.message || null,
+                    });
+                    setShowAgentTriggeredPopup(true);
+                    console.log("Mobile: Agent triggered link popup:", command);
+                    return JSON.stringify({ success: true, action: 'show_link' });
+                }
+
+                return JSON.stringify({ success: false, error: 'Invalid link popup command' });
+            } catch (error) {
+                console.error('Mobile: Error handling triggerLinkPopup RPC:', error);
+                return JSON.stringify({ success: false, error: String(error) });
+            }
+        };
+
+        localParticipant.registerRpcMethod(
+            'triggerLinkPopup',
+            linkPopupRpcHandler
         );
 
         // Cleanup function
@@ -566,10 +598,11 @@ export default function PlaygroundMobile({
                 // Check if participant still exists before unregistering
                 if (localParticipant) {
                     localParticipant.unregisterRpcMethod('controlVideoPlayer');
-                    console.log("Unregistered mobile player-control RPC method");
+                    localParticipant.unregisterRpcMethod('triggerLinkPopup');
+                    console.log("Unregistered mobile RPC methods");
                 }
             } catch (error) {
-                console.error("Error unregistering mobile RPC method:", error);
+                console.error("Error unregistering mobile RPC methods:", error);
             }
         };
     }, [localParticipant, roomState, videoRef, setIsPlaying]); // Use mobile state variables
@@ -1232,6 +1265,43 @@ export default function PlaygroundMobile({
                                 </div>
                             )}
                             <div ref={messagesEndRef} style={{ height: 0 }} /> {/* Invisible element for scrolling */}
+
+                            {/* Agent Triggered Link Popup - Placed inside scrollable chat content but sticky */}
+                            {showAgentTriggeredPopup && agentTriggeredPopupData && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: 20 }}
+                                    // className="sticky bottom-2 left-2 right-2 mx-3 p-3 bg-white border border-green-400 rounded-lg shadow-xl z-30 mb-16 md:mb-2"
+                                    className="sticky bottom-2 left-0 right-0 mx-3 p-3 bg-white border border-green-400 rounded-lg shadow-xl z-30"
+                                    style={{ marginBottom: params.agentType === 'edit' ? 'calc(3.5rem + 0.5rem)' : '0.5rem' }} // Adjust bottom margin based on tab bar
+                                >
+                                    <div className="flex items-center justify-between mb-1">
+                                        <span className="text-xs text-green-700 font-medium">Agent Suggestion:</span>
+                                        <button
+                                            onClick={() => setShowAgentTriggeredPopup(false)}
+                                            className="p-1 rounded-md text-gray-500 hover:bg-gray-100 transition-all duration-200"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                    {agentTriggeredPopupData.message && (
+                                        <p className="text-sm text-gray-700 mb-2">{agentTriggeredPopupData.message}</p>
+                                    )}
+                                    <a
+                                        href={agentTriggeredPopupData.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-sm text-blue-600 hover:underline font-medium flex items-center gap-1"
+                                    >
+                                        <Link size={14} />
+                                        Open Link
+                                    </a>
+                                    <p className="text-xs text-gray-500 mt-1 truncate hover:text-clip hover:overflow-visible transition-all duration-300">
+                                        {agentTriggeredPopupData.url}
+                                    </p>
+                                </motion.div>
+                            )}
                         </div>
 
                         {/* Single Fixed Chat Input - Always visible regardless of mode */}
