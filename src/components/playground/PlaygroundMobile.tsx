@@ -3,9 +3,9 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { ChatMessageType } from "@/components/chat/ChatTile";
 import { TranscriptionTile } from "@/transcriptions/TranscriptionTile";
 // If we need to extend the ChatMessageType for errors, we can define it here:
-interface ExtendedChatMessageType extends ChatMessageType {
-    isError?: boolean;
-}
+// interface ExtendedChatMessageType extends ChatMessageType { // Keep this commented or remove if not used after changes
+//     isError?: boolean;
+// }
 import {
     useConnectionState,
     useLocalParticipant,
@@ -15,7 +15,8 @@ import {
     useTrackTranscription,
     useRoomContext
 } from "@livekit/components-react";
-import { ConnectionState, DataPacket_Kind, Track, RpcInvocationData } from "livekit-client";
+import { ConnectionState, DataPacket_Kind, Track, RpcInvocationData /*, ChatMessage*/ } from "livekit-client"; // Comment out direct ChatMessage from livekit-client
+import { ReceivedChatMessage } from "@livekit/components-core"; // Import ReceivedChatMessage
 import { ReactNode } from "react";
 import { API_BASE_URL } from '@/config';
 import { api } from '@/api';
@@ -191,17 +192,18 @@ export default function PlaygroundMobile({
     const [isVideoReadyForListeners, setIsVideoReadyForListeners] = useState(false);
     const [hasAudioBeenActivated, setHasAudioBeenActivated] = useState(false);
 
-    // Chat state
-    const [transcripts, setTranscripts] = useState<ExtendedChatMessageType[]>([]);
+    // Chat state - To be replaced by useChat().chatMessages
+    // const [transcripts, setTranscripts] = useState<ExtendedChatMessageType[]>([]); 
 
     // LiveKit integrations
     const { localParticipant } = useLocalParticipant();
     const voiceAssistant = useVoiceAssistant();
     const roomState = useConnectionState();
-    const chat = useChat();
-    const dataChannel = useDataChannel();
+    const { chatMessages, send: sendChatMessage, isSending } = useChat(); // Get chatMessages and send function
+    const dataChannel = useDataChannel(); // Keep for other topics if needed
     const room = useRoomContext();
     const { send: sendVideoTimestamp } = useDataChannel("video-timestamp");
+    const { send: sendQuizAnswer } = useDataChannel("quiz_answer"); // For sending quiz answers
 
     // Reference for auto-scrolling chat
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -248,6 +250,21 @@ export default function PlaygroundMobile({
     const [agentTriggeredPopupData, setAgentTriggeredPopupData] = useState<{ url: string; message: string | null } | null>(null);
     const [showAgentTriggeredPopup, setShowAgentTriggeredPopup] = useState(false);
 
+    // Interface for versatile popups (links or quizzes)
+    interface ActivePopupData {
+        quiz_id?: string;
+        question?: string;
+        options?: string[];
+        message?: string | null;
+        url?: string | null;
+        type: 'link' | 'quiz';
+    }
+
+    // State for the active popup (link or quiz)
+    const [activePopupData, setActivePopupData] = useState<ActivePopupData | null>(null);
+    // State for UI feedback on quiz option click
+    const [clickedOption, setClickedOption] = useState<string | null>(null);
+
     // Add handleInterruptAgent function
     const handleInterruptAgent = useCallback(() => {
         if (roomState !== ConnectionState.Connected || !dataChannel) {
@@ -292,7 +309,7 @@ export default function PlaygroundMobile({
     // Auto-scroll when messages change
     useEffect(() => {
         scrollToBottom();
-    }, [transcripts, scrollToBottom]);
+    }, [chatMessages, scrollToBottom]); // Depend on chatMessages now
 
     // URL params handling
     useEffect(() => {
@@ -381,48 +398,26 @@ export default function PlaygroundMobile({
 
             const decodedText = new TextDecoder().decode(msg.payload);
             if (!decodedText) {
-                console.warn("Empty decoded text from message payload");
-                return;
+                // console.warn("Received empty decoded text from message payload");
+                // return;
             }
 
-            let decoded;
-            try {
-                decoded = JSON.parse(decodedText);
-            } catch (e) {
-                console.error("Failed to parse message JSON:", e);
-                return;
-            }
+            // Removed manual handling of msg.topic === "chat"
+            // The `decoded` variable and its parsing are removed as they were primarily for chat.
+            // If other topics use it, their logic should handle parsing `decodedText`.
 
-            console.log("Received message:", msg.topic, decoded);
-
-            if (msg.topic === "transcription") {
-                const timestamp = decoded.timestamp > 0 ? decoded.timestamp : Date.now();
-
-                setTranscripts(prev => [...prev, {
-                    name: "You",
-                    message: decoded.text,
-                    timestamp: timestamp,
-                    isSelf: true,
-                } as ExtendedChatMessageType]);
-            } else if (msg.topic === "chat") {
-                setTranscripts(prev => [...prev, {
-                    name: "Assistant",
-                    message: decoded.message || decoded.text || "No message content", // Handle different message formats
-                    timestamp: Date.now(),
-                    isSelf: false,
-                } as ExtendedChatMessageType]);
-            }
         } catch (error) {
             console.error("Error processing message:", error);
         }
     }, []);
 
     // Use the dataChannel hook directly with the callback
+    // This will now only handle non-chat topics if any are defined in onDataReceived
     useDataChannel(onDataReceived);
 
     // Chat message handling
     const handleChatMessage = async (message: string) => {
-        if (!chat) {
+        if (!sendChatMessage) { // Use sendChatMessage from useChat
             console.warn("Chat functionality not available");
             return;
         }
@@ -432,29 +427,23 @@ export default function PlaygroundMobile({
             return;
         }
 
-        const newMessage: ExtendedChatMessageType = {
-            name: "You",
-            message,
-            isSelf: true,
-            timestamp: Date.now(),
-        };
-
-        setTranscripts(prev => [...prev, newMessage]);
+        // No longer manually adding to a local transcript array for user messages
+        // const newMessage: ExtendedChatMessageType = {
+        //     name: "You",
+        //     message,
+        //     isSelf: true,
+        //     timestamp: Date.now(),
+        // };
+        // setTranscripts(prev => [...prev, newMessage]);
 
         try {
-            await chat.send(message);
+            await sendChatMessage(message); // Use sendChatMessage from useChat
             console.log("Chat message sent:", message);
         } catch (error) {
             console.error("Error sending chat message:", error);
-
-            // Now using ExtendedChatMessageType for error messages
-            setTranscripts(prev => [...prev, {
-                name: "System",
-                message: "Failed to send message. Please try again.",
-                isSelf: false,
-                timestamp: Date.now(),
-                isError: true,
-            } as ExtendedChatMessageType]);
+            // Error handling for failed sends might need a different approach
+            // as we are removing the local `transcripts` state for chat display.
+            // For now, relying on console error.
         }
     };
 
@@ -564,18 +553,18 @@ export default function PlaygroundMobile({
             playerControlRpcHandler
         );
 
-        // Register new RPC method for triggering link popup
+        // Updated RPC method for triggering link popup (now uses setActivePopupData)
         const linkPopupRpcHandler = async (data: RpcInvocationData) => {
             try {
                 console.log(`Mobile: Received triggerLinkPopup from agent: ${data.payload}`);
                 const command = JSON.parse(data.payload);
 
                 if (command.action === 'show_link' && command.url) {
-                    setAgentTriggeredPopupData({
+                    setActivePopupData({
+                        type: 'link',
                         url: command.url,
                         message: command.message || null,
                     });
-                    setShowAgentTriggeredPopup(true);
                     console.log("Mobile: Agent triggered link popup:", command);
                     return JSON.stringify({ success: true, action: 'show_link' });
                 }
@@ -592,6 +581,35 @@ export default function PlaygroundMobile({
             linkPopupRpcHandler
         );
 
+        // Register new RPC method for displaying multiple choice quiz
+        const quizPopupRpcHandler = async (data: RpcInvocationData) => {
+            try {
+                console.log(`Mobile: Received displayMultipleChoiceQuiz from agent: ${data.payload}`);
+                const command = JSON.parse(data.payload);
+
+                if (command.action === 'show_multiple_choice_quiz' && command.quiz_id && command.question && command.options) {
+                    setActivePopupData({
+                        type: 'quiz',
+                        quiz_id: command.quiz_id,
+                        question: command.question,
+                        options: command.options,
+                        message: command.message || null,
+                    });
+                    console.log("Mobile: Agent triggered quiz popup:", command);
+                    return JSON.stringify({ success: true, action: 'displayMultipleChoiceQuiz' });
+                }
+                return JSON.stringify({ success: false, error: 'Invalid quiz display command' });
+            } catch (error) {
+                console.error('Mobile: Error handling displayMultipleChoiceQuiz RPC:', error);
+                return JSON.stringify({ success: false, error: String(error) });
+            }
+        };
+
+        localParticipant.registerRpcMethod(
+            'displayMultipleChoiceQuiz',
+            quizPopupRpcHandler
+        );
+
         // Cleanup function
         return () => {
             try {
@@ -599,6 +617,7 @@ export default function PlaygroundMobile({
                 if (localParticipant) {
                     localParticipant.unregisterRpcMethod('controlVideoPlayer');
                     localParticipant.unregisterRpcMethod('triggerLinkPopup');
+                    localParticipant.unregisterRpcMethod('displayMultipleChoiceQuiz'); // Unregister new RPC method
                     console.log("Unregistered mobile RPC methods");
                 }
             } catch (error) {
@@ -1230,76 +1249,133 @@ export default function PlaygroundMobile({
                                 /* Regular Chat Messages */
                                 <div className="px-4 py-3 space-y-3">
                                     <AnimatePresence>
-                                        {transcripts.map((message) => (
-                                            <motion.div
-                                                key={message.timestamp}
-                                                initial={{ opacity: 0, y: 5 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                exit={{ opacity: 0, y: -5 }}
-                                                className={`
-                                                    ${message.isSelf ? 'ml-auto bg-blue-50 border border-blue-200' : 'mr-auto bg-gray-50 border border-gray-200'} 
-                                                    rounded-lg p-3
-                                                    max-w-[85%] w-auto
-                                                    shadow-sm
-                                                    transition-all duration-300
-                                                    ${message.isError ? 'bg-red-50 border-red-200' : message.isSelf ? 'hover:border-blue-300' : 'hover:border-gray-300'}
-                                                    flex flex-col gap-1
-                                                `}
-                                            >
-                                                <span className="text-[11px] text-gray-500 font-medium">
-                                                    {message.name}
-                                                </span>
-                                                <span className={`
-                                                    text-[13px] leading-relaxed break-words 
-                                                    ${message.isError
-                                                        ? 'text-red-700 font-satoshi'
-                                                        : message.isSelf
+                                        {chatMessages.map((message: ReceivedChatMessage) => { // Use ReceivedChatMessage type
+                                            // Accessing .from with a type assertion as a workaround for potential linter/type issue
+                                            const msgFrom = message.from; // Direct access, as ReceivedChatMessage defines it
+                                            const isSelf = msgFrom?.isLocal || false;
+                                            const name = isSelf ? "You" : msgFrom?.identity || "Agent";
+                                            // isError is not part of LiveKit ChatMessage, handled differently if needed.
+
+                                            return (
+                                                <motion.div
+                                                    key={message.id || message.timestamp} // Use message.id from ChatMessage if available
+                                                    initial={{ opacity: 0, y: 5 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    exit={{ opacity: 0, y: -5 }}
+                                                    className={`
+                                                        ${isSelf ? 'ml-auto bg-blue-50 border border-blue-200' : 'mr-auto bg-gray-50 border border-gray-200'} 
+                                                        rounded-lg p-3
+                                                        max-w-[85%] w-auto
+                                                        shadow-sm
+                                                        transition-all duration-300
+                                                        ${isSelf ? 'hover:border-blue-300' : 'hover:border-gray-300'} // Simplified error styling for now
+                                                        flex flex-col gap-1
+                                                    `}
+                                                >
+                                                    <span className="text-[11px] text-gray-500 font-medium">
+                                                        {name}
+                                                    </span>
+                                                    <span className={`
+                                                        text-[13px] leading-relaxed break-words 
+                                                        ${isSelf
                                                             ? 'text-gray-800 font-satoshi'
-                                                            : 'text-gray-800 font-serif'}
-                                                `}>
-                                                    {message.message}
-                                                </span>
-                                            </motion.div>
-                                        ))}
+                                                            : 'text-gray-800 font-serif'} // Simplified error styling for now
+                                                    `}>
+                                                        {message.message}
+                                                    </span>
+                                                </motion.div>
+                                            );
+                                        })}
                                     </AnimatePresence>
                                 </div>
                             )}
                             <div ref={messagesEndRef} style={{ height: 0 }} /> {/* Invisible element for scrolling */}
 
-                            {/* Agent Triggered Link Popup - Placed inside scrollable chat content but sticky */}
-                            {showAgentTriggeredPopup && agentTriggeredPopupData && (
+                            {/* Agent Triggered Popup (Link or Quiz) */}
+                            {activePopupData && (
                                 <motion.div
                                     initial={{ opacity: 0, y: 20 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: 20 }}
-                                    // className="sticky bottom-2 left-2 right-2 mx-3 p-3 bg-white border border-green-400 rounded-lg shadow-xl z-30 mb-16 md:mb-2"
-                                    className="sticky bottom-2 left-0 right-0 mx-3 p-3 bg-white border border-green-400 rounded-lg shadow-xl z-30"
-                                    style={{ marginBottom: params.agentType === 'edit' ? 'calc(3.5rem + 0.5rem)' : '0.5rem' }} // Adjust bottom margin based on tab bar
+                                    className="sticky bottom-2 left-0 right-0 mx-3 p-3 bg-white border rounded-lg shadow-xl z-30"
+                                    style={{
+                                        borderColor: activePopupData.type === 'quiz' ? 'purple' : 'green', // Example: purple for quiz, green for link
+                                        marginBottom: params.agentType === 'edit' ? 'calc(3.5rem + 0.5rem)' : '0.5rem'
+                                    }}
                                 >
                                     <div className="flex items-center justify-between mb-1">
-                                        <span className="text-xs text-green-700 font-medium">Agent Suggestion:</span>
+                                        <span className="text-xs font-medium"
+                                            style={{ color: activePopupData.type === 'quiz' ? 'purple' : 'green' }}
+                                        >
+                                            {activePopupData.type === 'quiz' ? 'Quiz Question:' : 'Agent Suggestion:'}
+                                        </span>
                                         <button
-                                            onClick={() => setShowAgentTriggeredPopup(false)}
+                                            onClick={() => setActivePopupData(null)}
                                             className="p-1 rounded-md text-gray-500 hover:bg-gray-100 transition-all duration-200"
                                         >
                                             <X size={14} />
                                         </button>
                                     </div>
-                                    {agentTriggeredPopupData.message && (
-                                        <p className="text-sm text-gray-700 mb-2">{agentTriggeredPopupData.message}</p>
+
+                                    {/* Popup Message (if any) - but not for quiz type */}
+                                    {activePopupData.type !== 'quiz' && activePopupData.message && (
+                                        <p className="text-sm text-gray-700 mb-2">{activePopupData.message}</p>
                                     )}
-                                    <a
-                                        href={agentTriggeredPopupData.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-sm text-blue-600 hover:underline font-medium flex items-center gap-1"
-                                    >
-                                        <Link size={14} />
-                                        Open Link
-                                    </a>
-                                    <p className="text-xs text-gray-500 mt-1 truncate hover:text-clip hover:overflow-visible transition-all duration-300">
-                                        {agentTriggeredPopupData.url}
-                                    </p>
+
+                                    {/* Link Specific Content */}
+                                    {activePopupData.type === 'link' && activePopupData.url && (
+                                        <>
+                                            <a
+                                                href={activePopupData.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-sm text-blue-600 hover:underline font-medium flex items-center gap-1"
+                                            >
+                                                <Link size={14} />
+                                                Open Link
+                                            </a>
+                                            <p className="text-xs text-gray-500 mt-1 truncate hover:text-clip hover:overflow-visible transition-all duration-300">
+                                                {activePopupData.url}
+                                            </p>
+                                        </>
+                                    )}
+
+                                    {/* Quiz Specific Content */}
+                                    {activePopupData.type === 'quiz' && activePopupData.quiz_id && activePopupData.question && activePopupData.options && (
+                                        <div className="mt-2 space-y-2">
+                                            <p className="text-sm text-gray-800 font-semibold mb-2">{activePopupData.question}</p>
+                                            {activePopupData.options.map((option, index) => (
+                                                <button
+                                                    key={index}
+                                                    onClick={() => {
+                                                        setClickedOption(option);
+                                                        setTimeout(() => {
+                                                            if (sendQuizAnswer && activePopupData.quiz_id) {
+                                                                const answerPayload = {
+                                                                    quiz_id: activePopupData.quiz_id,
+                                                                    selected_option: option,
+                                                                };
+                                                                const encodedPayload = new TextEncoder().encode(JSON.stringify(answerPayload));
+                                                                sendQuizAnswer(encodedPayload, { reliable: true }); // topic is implicitly handled by useDataChannel("quiz_answer")
+                                                                console.log('Mobile: Sent quiz answer:', answerPayload);
+                                                            }
+                                                            setActivePopupData(null);
+                                                            setClickedOption(null);
+                                                        }, 300); // Delay for feedback
+                                                    }}
+                                                    className={`
+                                                        w-full text-left px-3 py-2 rounded-md transition-all duration-200 text-sm font-medium
+                                                        ${clickedOption === option
+                                                            ? 'bg-green-500 text-white ring-2 ring-green-300' // Feedback for clicked option
+                                                            : 'bg-blue-500 text-white hover:bg-blue-600' // Default option style
+                                                        }
+                                                    `}
+                                                >
+                                                    {option}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
                                 </motion.div>
                             )}
                         </div>

@@ -2501,6 +2501,19 @@ export default function Playground({
   const [agentTriggeredPopupData, setAgentTriggeredPopupData] = useState<{ url: string; message: string | null } | null>(null);
   const [showAgentTriggeredPopup, setShowAgentTriggeredPopup] = useState(false);
 
+  // <<< New state for agent-triggered popup / quiz >>>
+  interface ActivePopupData {
+    quiz_id?: string; // Optional: only for quiz type
+    question?: string; // Optional: only for quiz type
+    options?: string[]; // Optional: only for quiz type
+    message?: string | null;
+    url?: string | null; // Optional: only for link type
+    type: 'link' | 'quiz';
+  }
+  const [activePopupData, setActivePopupData] = useState<ActivePopupData | null>(null);
+
+  // <<< New state for click feedback on quiz options >>>
+  const [clickedOption, setClickedOption] = useState<string | null>(null);
 
   // Update the handlePresentationUpload function
   const handlePresentationUpload = async (file: File) => {
@@ -3294,7 +3307,7 @@ export default function Playground({
       return;
     }
 
-    console.log("Registering player-control RPC method");
+    console.log("Registering RPC methods");
 
     // Register an RPC method for controlling the video player
     localParticipant.registerRpcMethod(
@@ -3311,9 +3324,6 @@ export default function Playground({
             videoRef.current.pause();
             setIsPlaying(false);
             console.log("Video paused via RPC");
-
-            // You could add a notification here
-            // setShowEngagementNotice(true);
 
             return JSON.stringify({ success: true, action: 'pause' });
           }
@@ -3343,11 +3353,11 @@ export default function Playground({
           const command = JSON.parse(data.payload);
 
           if (command.action === 'show_link' && command.url) {
-            setAgentTriggeredPopupData({
+            setActivePopupData({
+              type: 'link',
               url: command.url,
               message: command.message || null,
             });
-            setShowAgentTriggeredPopup(true);
             console.log("Agent triggered link popup:", command);
             return JSON.stringify({ success: true, action: 'show_link' });
           }
@@ -3360,12 +3370,43 @@ export default function Playground({
       }
     );
 
+    // <<< Register new RPC method for displaying multiple choice quiz >>>
+    localParticipant.registerRpcMethod(
+      'displayMultipleChoiceQuiz',
+      async (data: RpcInvocationData) => {
+        try {
+          console.log(`Received displayMultipleChoiceQuiz from agent: ${data.payload}`);
+          const command = JSON.parse(data.payload);
+
+          if (command.action === 'show_multiple_choice_quiz' && command.quiz_id && command.question && command.options) {
+            setActivePopupData({
+              type: 'quiz',
+              quiz_id: command.quiz_id,
+              question: command.question,
+              options: command.options,
+              message: command.message || null, // Optional introductory message for the quiz popup
+            });
+            console.log("Agent triggered multiple choice quiz popup:", command);
+            return JSON.stringify({ success: true, action: 'displayMultipleChoiceQuiz' });
+          }
+
+          return JSON.stringify({ success: false, error: 'Invalid quiz display command' });
+        } catch (error) {
+          console.error('Error handling displayMultipleChoiceQuiz RPC:', error);
+          return JSON.stringify({ success: false, error: String(error) });
+        }
+      }
+    );
+
     // Clean up the RPC method when component unmounts
     return () => {
       try {
-        localParticipant.unregisterRpcMethod('controlVideoPlayer');
-        localParticipant.unregisterRpcMethod('triggerLinkPopup'); // <<< Unregister new RPC method
-        console.log("Unregistered RPC methods");
+        if (localParticipant) { // Add a check for localParticipant
+          localParticipant.unregisterRpcMethod('controlVideoPlayer');
+          localParticipant.unregisterRpcMethod('triggerLinkPopup');
+          localParticipant.unregisterRpcMethod('displayMultipleChoiceQuiz'); // <<< Unregister new RPC method
+          console.log("Unregistered RPC methods");
+        }
       } catch (error) {
         console.error("Error unregistering RPC method:", error);
       }
@@ -3938,8 +3979,8 @@ export default function Playground({
                       </div>
 
 
-                      {/* Agent Triggered Link Popup */}
-                      {showAgentTriggeredPopup && agentTriggeredPopupData && (
+                      {/* Agent Triggered Link or Quiz Popup */}
+                      {activePopupData && (
                         <motion.div
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -3947,29 +3988,78 @@ export default function Playground({
                           className="sticky bottom-2 left-2 right-2 mx-2 p-3 bg-white border border-green-300 rounded-lg shadow-lg z-20"
                         >
                           <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs text-green-700 font-medium">Agent Suggestion:</span>
+                            <span className="text-xs text-green-700 font-medium">
+                              {activePopupData.type === 'quiz' ? 'Quiz Question:' : 'Agent Suggestion:'}
+                            </span>
                             <button
-                              onClick={() => setShowAgentTriggeredPopup(false)}
+                              onClick={() => setActivePopupData(null)}
                               className="p-1 rounded-md text-gray-500 hover:bg-gray-100 transition-all duration-200"
                             >
                               <X size={14} />
                             </button>
                           </div>
-                          {agentTriggeredPopupData.message && (
-                            <p className="text-sm text-gray-700 mb-2">{agentTriggeredPopupData.message}</p>
+
+                          {/* Display introductory message if present (for both link and quiz) */}
+                          {activePopupData.message && (
+                            <p className="text-sm text-gray-700 mb-2">{activePopupData.message}</p>
                           )}
-                          <a
-                            href={agentTriggeredPopupData.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-blue-600 hover:underline font-medium flex items-center gap-1"
-                          >
-                            <Link size={14} />
-                            Open Link
-                          </a>
-                          <p className="text-xs text-gray-500 mt-1 truncate hover:text-clip hover:overflow-visible transition-all duration-300">
-                            {agentTriggeredPopupData.url}
-                          </p>
+
+                          {/* Conditional rendering for Quiz Options */}
+                          {activePopupData.type === 'quiz' && activePopupData.quiz_id && activePopupData.question && activePopupData.options && (
+                            <div className="mt-2 space-y-2">
+                              {/* Question is now part of the generic message or could be displayed here explicitly if needed */}
+                              {/* <p className="text-sm text-gray-800 font-semibold mb-2">{activePopupData.question}</p> */}
+                              {activePopupData.options.map((option, index) => (
+                                <button
+                                  key={index}
+                                  onClick={() => {
+                                    setClickedOption(option); // Set clicked option for feedback
+                                    // Delay sending and closing to allow feedback to be visible
+                                    setTimeout(() => {
+                                      if (send && activePopupData.quiz_id) {
+                                        const answerPayload = {
+                                          quiz_id: activePopupData.quiz_id,
+                                          selected_option: option,
+                                        };
+                                        const encodedPayload = new TextEncoder().encode(JSON.stringify(answerPayload));
+                                        send(encodedPayload, { topic: "quiz_answer", reliable: true });
+                                        console.log('Sent quiz answer:', answerPayload);
+                                      }
+                                      setActivePopupData(null); // Hide popup after selection
+                                      setClickedOption(null); // Reset clicked option state
+                                    }, 300); // 300ms delay for feedback visibility
+                                  }}
+                                  className={`
+                                    w-full text-left px-3 py-2 rounded-md transition-all duration-200 text-sm
+                                    ${clickedOption === option
+                                      ? 'bg-green-600 text-white ring-2 ring-green-400'
+                                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                                    }
+                                  `}
+                                >
+                                  {option}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Conditional rendering for Links (existing logic) */}
+                          {activePopupData.type === 'link' && activePopupData.url && (
+                            <>
+                              <a
+                                href={activePopupData.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-blue-600 hover:underline font-medium flex items-center gap-1"
+                              >
+                                <Link size={14} />
+                                Open Link
+                              </a>
+                              <p className="text-xs text-gray-500 mt-1 truncate hover:text-clip hover:overflow-visible transition-all duration-300">
+                                {activePopupData.url}
+                              </p>
+                            </>
+                          )}
                         </motion.div>
                       )}
                     </div> {/* This closes the scrollable chat content div */}
