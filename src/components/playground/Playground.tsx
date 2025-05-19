@@ -683,7 +683,7 @@ const VideoPlayer = ({
               playsInline
               webkit-playsinline="true"
               x-webkit-airplay="allow"
-              preload="metadata"
+              preload="auto" // Changed from "metadata"
               controls={false}
               autoPlay={false}
             >

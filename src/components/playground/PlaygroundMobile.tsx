@@ -1218,7 +1218,11 @@ export default function PlaygroundMobile({
             {/* Content Section */}
             <div className="flex-1 overflow-hidden relative">
                 {/* Show chat interface or other tabs based on active tab */}
-                <div className={`absolute inset-0 transition-opacity duration-300 ${activeMobileTab === 'chat' ? 'opacity-100 z-30' : 'opacity-0 z-0 pointer-events-none'
+                <div className={`absolute inset-0 transition-opacity duration-300 ${activeMobileTab === 'chat'
+                    ? activePopupData
+                        ? 'opacity-100 z-41' // Higher z-index when popup is active
+                        : 'opacity-100 z-30'
+                    : 'opacity-0 z-0 pointer-events-none'
                     }`}>
                     {/* Messages container with transcription or regular messages */}
                     <div className="h-full flex flex-col">
@@ -1381,8 +1385,8 @@ export default function PlaygroundMobile({
                         </div>
 
                         {/* Single Fixed Chat Input - Always visible regardless of mode */}
-                        <div className="fixed bottom-0 left-0 right-0 z-40 px-3 py-3 
-                            bg-white/95 backdrop-blur-sm border-t border-gray-200"
+                        <div className={`fixed bottom-0 left-0 right-0 ${activePopupData ? 'z-35' : 'z-40'} px-3 py-3 
+                            bg-white/95 backdrop-blur-sm border-t border-gray-200`}
                             style={{
                                 paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))',
                                 marginBottom: params.agentType === 'edit' ? '3.5rem' : '0'
@@ -1394,14 +1398,14 @@ export default function PlaygroundMobile({
                                     onClick={handleInterruptAgent}
                                     className={`
                                         p-3 rounded-md
-                                        ${interruptPressed
+                            ${interruptPressed
                                             ? 'bg-blue-100 text-blue-600 shadow-[0_0_8px_rgba(59,130,246,0.3)]'
                                             : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}
-                                        ${animateInterrupt ? 'scale-105' : 'scale-100'}
-                                        transition-all duration-200
-                                        flex-shrink-0
-                                        min-w-[44px] min-h-[44px]
-                                        border ${interruptPressed ? 'border-blue-200' : 'border-gray-200'}
+                            ${animateInterrupt ? 'scale-105' : 'scale-100'}
+                            transition-all duration-200
+                            flex-shrink-0
+                            min-w-[44px] min-h-[44px]
+                        border ${interruptPressed ? 'border-blue-200' : 'border-gray-200'}
                                     `}
                                     aria-label="Interrupt agent"
                                 >
@@ -1497,209 +1501,213 @@ export default function PlaygroundMobile({
                             </div>
                         </div>
                     </div>
-                </div>
+                </div >
 
                 {/* Other tab content will be added in future phases */}
-                {params.agentType === 'edit' && (
-                    <>
-                        {/* Engagement Tab Content */}
-                        <div className={`absolute inset-0 transition-opacity duration-300 overflow-y-auto p-4 ${activeMobileTab === 'engagement' ? 'opacity-100 z-30' : 'opacity-0 z-0 pointer-events-none'}`}>
-                            <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-lg font-semibold text-gray-800">Engagement</h2>
-                                <button onClick={handleAddEngagement} className="p-2 rounded-lg bg-blue-500 text-white flex items-center gap-1.5 text-sm hover:bg-blue-600">
-                                    <Plus size={16} /> Add New
-                                </button>
-                            </div>
-                            {/* Filter buttons */}
-                            <div className="flex items-center gap-2 mb-4 pb-2 overflow-x-auto scrollbar-none">
-                                <button onClick={() => setSelectedEngagementType(null)} className={`px-3 py-1.5 rounded-full min-w-[80px] text-[13px] border ${!selectedEngagementType ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}>All</button>
-                                <button onClick={() => setSelectedEngagementType('quiz')} className={`px-3 py-1.5 rounded-full min-w-[80px] text-[13px] flex items-center gap-1.5 border ${selectedEngagementType === 'quiz' ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}>{getEngagementTypeIcon('quiz')}Quizzes</button>
-                                <button onClick={() => setSelectedEngagementType('discussion')} className={`px-3 py-1.5 rounded-full min-w-[80px] text-[13px] flex items-center gap-1.5 border ${selectedEngagementType === 'discussion' ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}>{getEngagementTypeIcon('discussion')}Discussions</button>
-                                <button onClick={() => setSelectedEngagementType('guided_conversation')} className={`px-3 py-1.5 rounded-full min-w-[120px] text-[13px] flex items-center gap-1.5 border ${selectedEngagementType === 'guided_conversation' ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}>{getEngagementTypeIcon('guided_conversation')}Guided Convo</button>
-                            </div>
-                            {/* Engagement List */}
-                            {engagementOpportunities && engagementOpportunities.length > 0 ? (
-                                engagementOpportunities
-                                    .filter(e => !selectedEngagementType || e.engagement_type === selectedEngagementType)
-                                    .map((engagement) => (
-                                        <EngagementCard
-                                            key={engagement.id}
-                                            engagement={engagement}
-                                            onEdit={handleUpdateEngagement}
-                                            onDelete={handleDeleteEngagement}
-                                        />
-                                    ))
-                            ) : (
-                                <div className="text-center p-6 bg-gray-50 rounded-lg border border-gray-200 text-sm text-gray-500">
-                                    No engagement opportunities yet.
+                {
+                    params.agentType === 'edit' && (
+                        <>
+                            {/* Engagement Tab Content */}
+                            <div className={`absolute inset-0 transition-opacity duration-300 overflow-y-auto p-4 ${activeMobileTab === 'engagement' ? 'opacity-100 z-30' : 'opacity-0 z-0 pointer-events-none'}`}>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h2 className="text-lg font-semibold text-gray-800">Engagement</h2>
+                                    <button onClick={handleAddEngagement} className="p-2 rounded-lg bg-blue-500 text-white flex items-center gap-1.5 text-sm hover:bg-blue-600">
+                                        <Plus size={16} /> Add New
+                                    </button>
                                 </div>
-                            )}
-                            <div className="h-20"></div> {/* Add padding at the bottom */}
-                        </div>
-
-                        {/* Persona Tab Content */}
-                        <div className={`absolute inset-0 transition-opacity duration-300 overflow-y-auto p-4 ${activeMobileTab === 'teaching-persona' ? 'opacity-100 z-30' : 'opacity-0 z-0 pointer-events-none'}`}>
-                            <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-lg font-semibold text-gray-800">Teaching Persona</h2>
-                                <button onClick={() => updateAgentConfigBackend(agentConfig)} disabled={isSaving} className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-sm ${saveSuccess ? 'bg-green-500/10 text-green-600 border-green-500/30' : 'bg-blue-500 text-white hover:bg-blue-600 border-blue-500'} border transition-all`}>
-                                    <Save size={14} /> {isSaving ? 'Saving...' : (saveSuccess ? 'Saved!' : 'Save')}
-                                </button>
+                                {/* Filter buttons */}
+                                <div className="flex items-center gap-2 mb-4 pb-2 overflow-x-auto scrollbar-none">
+                                    <button onClick={() => setSelectedEngagementType(null)} className={`px-3 py-1.5 rounded-full min-w-[80px] text-[13px] border ${!selectedEngagementType ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}>All</button>
+                                    <button onClick={() => setSelectedEngagementType('quiz')} className={`px-3 py-1.5 rounded-full min-w-[80px] text-[13px] flex items-center gap-1.5 border ${selectedEngagementType === 'quiz' ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}>{getEngagementTypeIcon('quiz')}Quizzes</button>
+                                    <button onClick={() => setSelectedEngagementType('discussion')} className={`px-3 py-1.5 rounded-full min-w-[80px] text-[13px] flex items-center gap-1.5 border ${selectedEngagementType === 'discussion' ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}>{getEngagementTypeIcon('discussion')}Discussions</button>
+                                    <button onClick={() => setSelectedEngagementType('guided_conversation')} className={`px-3 py-1.5 rounded-full min-w-[120px] text-[13px] flex items-center gap-1.5 border ${selectedEngagementType === 'guided_conversation' ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}>{getEngagementTypeIcon('guided_conversation')}Guided Convo</button>
+                                </div>
+                                {/* Engagement List */}
+                                {engagementOpportunities && engagementOpportunities.length > 0 ? (
+                                    engagementOpportunities
+                                        .filter(e => !selectedEngagementType || e.engagement_type === selectedEngagementType)
+                                        .map((engagement) => (
+                                            <EngagementCard
+                                                key={engagement.id}
+                                                engagement={engagement}
+                                                onEdit={handleUpdateEngagement}
+                                                onDelete={handleDeleteEngagement}
+                                            />
+                                        ))
+                                ) : (
+                                    <div className="text-center p-6 bg-gray-50 rounded-lg border border-gray-200 text-sm text-gray-500">
+                                        No engagement opportunities yet.
+                                    </div>
+                                )}
+                                <div className="h-20"></div> {/* Add padding at the bottom */}
                             </div>
-                            {teachingPersona ? (
+
+                            {/* Persona Tab Content */}
+                            <div className={`absolute inset-0 transition-opacity duration-300 overflow-y-auto p-4 ${activeMobileTab === 'teaching-persona' ? 'opacity-100 z-30' : 'opacity-0 z-0 pointer-events-none'}`}>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h2 className="text-lg font-semibold text-gray-800">Teaching Persona</h2>
+                                    <button onClick={() => updateAgentConfigBackend(agentConfig)} disabled={isSaving} className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-sm ${saveSuccess ? 'bg-green-500/10 text-green-600 border-green-500/30' : 'bg-blue-500 text-white hover:bg-blue-600 border-blue-500'} border transition-all`}>
+                                        <Save size={14} /> {isSaving ? 'Saving...' : (saveSuccess ? 'Saved!' : 'Save')}
+                                    </button>
+                                </div>
+                                {teachingPersona ? (
+                                    <div className="space-y-4">
+                                        {/* Instructor Profile */}
+                                        <div className="border border-gray-200 rounded-lg p-4 bg-white">
+                                            <h3 className="text-sm font-medium text-gray-800 mb-2">Instructor Profile</h3>
+                                            <label className="block mb-1 text-[13px] font-medium text-gray-600">Name</label>
+                                            <input type="text" value={teachingPersona?.instructor_profile?.name || ''} onChange={(e) => updateTeachingPersonaField('instructor_profile.name', e.target.value)} className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-base text-gray-800 mb-2 focus:border-blue-400 focus:ring-1 focus:ring-blue-200" placeholder="Instructor Name" />
+                                            <div className="text-[11px] text-gray-500">Expertise: {teachingPersona?.instructor_profile?.apparent_expertise_level || 'N/A'}</div>
+                                        </div>
+                                        {/* Communication Style */}
+                                        <div className="border border-gray-200 rounded-lg p-4 bg-white">
+                                            <h3 className="text-sm font-medium text-gray-800 mb-2">Communication Style</h3>
+                                            <label className="block mb-1 text-[13px] font-medium text-gray-600">Overall Style</label>
+                                            <input type="text" value={teachingPersona?.communication_patterns?.vocabulary_level || ''} onChange={(e) => updateTeachingPersonaField('communication_patterns.vocabulary_level', e.target.value)} className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-base text-gray-800 mb-2 focus:border-blue-400 focus:ring-1 focus:ring-blue-200" placeholder="e.g., friendly, technical" />
+                                            <label className="block mb-1 text-[13px] font-medium text-gray-600">Characteristic Phrases (one per line)</label>
+                                            <textarea value={phrasesText} onChange={(e) => setPhrasesText(e.target.value)} onBlur={() => updateRecurringPhrases(phrasesText)} className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-base text-gray-800 min-h-[100px] focus:border-blue-400 focus:ring-1 focus:ring-blue-200" placeholder="Frequent phrases..." />
+                                        </div>
+                                        {/* Teaching Insights (Display Only) */}
+                                        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 opacity-70">
+                                            <h3 className="text-sm font-medium text-gray-800 mb-2">Teaching Insights (Auto-Extracted)</h3>
+                                            <p className="text-[12px] text-gray-700">Speech Style: {teachingPersona?.speech_characteristics?.accent?.type || 'N/A'} ({teachingPersona?.speech_characteristics?.accent?.cadence || 'N/A'})</p>
+                                            {/* Add more display fields if needed */}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="text-center p-6 bg-gray-50 rounded-lg border border-gray-200 text-sm text-gray-500">
+                                        Loading Persona...
+                                    </div>
+                                )}
+                                <div className="h-20"></div> {/* Add padding at the bottom */}
+                            </div>
+
+                            {/* Voice Tab Content */}
+                            <div className={`absolute inset-0 transition-opacity duration-300 overflow-y-auto p-4 ${activeMobileTab === 'voice-clone' ? 'opacity-100 z-30' : 'opacity-0 z-0 pointer-events-none'}`}>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h2 className="text-lg font-semibold text-gray-800">Voice</h2>
+                                    {/* Add Create Voice button later if needed */}
+                                </div>
                                 <div className="space-y-4">
-                                    {/* Instructor Profile */}
-                                    <div className="border border-gray-200 rounded-lg p-4 bg-white">
-                                        <h3 className="text-sm font-medium text-gray-800 mb-2">Instructor Profile</h3>
-                                        <label className="block mb-1 text-[13px] font-medium text-gray-600">Name</label>
-                                        <input type="text" value={teachingPersona?.instructor_profile?.name || ''} onChange={(e) => updateTeachingPersonaField('instructor_profile.name', e.target.value)} className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-base text-gray-800 mb-2 focus:border-blue-400 focus:ring-1 focus:ring-blue-200" placeholder="Instructor Name" />
-                                        <div className="text-[11px] text-gray-500">Expertise: {teachingPersona?.instructor_profile?.apparent_expertise_level || 'N/A'}</div>
-                                    </div>
-                                    {/* Communication Style */}
-                                    <div className="border border-gray-200 rounded-lg p-4 bg-white">
-                                        <h3 className="text-sm font-medium text-gray-800 mb-2">Communication Style</h3>
-                                        <label className="block mb-1 text-[13px] font-medium text-gray-600">Overall Style</label>
-                                        <input type="text" value={teachingPersona?.communication_patterns?.vocabulary_level || ''} onChange={(e) => updateTeachingPersonaField('communication_patterns.vocabulary_level', e.target.value)} className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-base text-gray-800 mb-2 focus:border-blue-400 focus:ring-1 focus:ring-blue-200" placeholder="e.g., friendly, technical" />
-                                        <label className="block mb-1 text-[13px] font-medium text-gray-600">Characteristic Phrases (one per line)</label>
-                                        <textarea value={phrasesText} onChange={(e) => setPhrasesText(e.target.value)} onBlur={() => updateRecurringPhrases(phrasesText)} className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-base text-gray-800 min-h-[100px] focus:border-blue-400 focus:ring-1 focus:ring-blue-200" placeholder="Frequent phrases..." />
-                                    </div>
-                                    {/* Teaching Insights (Display Only) */}
-                                    <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 opacity-70">
-                                        <h3 className="text-sm font-medium text-gray-800 mb-2">Teaching Insights (Auto-Extracted)</h3>
-                                        <p className="text-[12px] text-gray-700">Speech Style: {teachingPersona?.speech_characteristics?.accent?.type || 'N/A'} ({teachingPersona?.speech_characteristics?.accent?.cadence || 'N/A'})</p>
-                                        {/* Add more display fields if needed */}
-                                    </div>
+                                    <VoiceSelector voices={savedVoices} selectedVoice={selectedVoice} onSelect={handleSelectVoice} />
+                                    {/* TODO: Add voice creation UI here when isCreatingVoice is true */}
                                 </div>
-                            ) : (
-                                <div className="text-center p-6 bg-gray-50 rounded-lg border border-gray-200 text-sm text-gray-500">
-                                    Loading Persona...
-                                </div>
-                            )}
-                            <div className="h-20"></div> {/* Add padding at the bottom */}
-                        </div>
-
-                        {/* Voice Tab Content */}
-                        <div className={`absolute inset-0 transition-opacity duration-300 overflow-y-auto p-4 ${activeMobileTab === 'voice-clone' ? 'opacity-100 z-30' : 'opacity-0 z-0 pointer-events-none'}`}>
-                            <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-lg font-semibold text-gray-800">Voice</h2>
-                                {/* Add Create Voice button later if needed */}
+                                <div className="h-20"></div> {/* Add padding at the bottom */}
                             </div>
-                            <div className="space-y-4">
-                                <VoiceSelector voices={savedVoices} selectedVoice={selectedVoice} onSelect={handleSelectVoice} />
-                                {/* TODO: Add voice creation UI here when isCreatingVoice is true */}
-                            </div>
-                            <div className="h-20"></div> {/* Add padding at the bottom */}
-                        </div>
 
-                        {/* Share Tab Content */}
-                        <div className={`absolute inset-0 transition-opacity duration-300 overflow-y-auto p-4 ${activeMobileTab === 'share' ? 'opacity-100 z-30' : 'opacity-0 z-0 pointer-events-none'}`}>
-                            <h2 className="text-lg font-semibold text-gray-800 mb-4">Share</h2>
-                            <div className="space-y-6">
-                                {/* Public Access Toggle */}
-                                <div className="border border-gray-200 rounded-lg p-4 bg-white">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            {brdge?.shareable ? <Globe size={18} className="text-blue-500" /> : <Lock size={18} className="text-gray-600" />}
-                                            <h3 className="text-[14px] font-medium text-gray-800">{brdge?.shareable ? 'Public' : 'Private'}</h3>
-                                        </div>
-                                        <label className="relative inline-flex items-center cursor-pointer">
-                                            <input type="checkbox" checked={brdge?.shareable || false} onChange={toggleShareable} className="sr-only peer" />
-                                            <div className={`w-11 h-6 rounded-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full ${brdge?.shareable ? 'bg-blue-500 border-blue-500' : 'bg-gray-200 border-gray-300'} border`}></div>
-                                        </label>
-                                    </div>
-                                    <p className="text-[12px] text-gray-600 mt-1">{brdge?.shareable ? "Anyone with the link can view" : "Only you can view"}</p>
-                                </div>
-                                {/* Share Link */}
-                                <div className={`border rounded-lg p-4 bg-white ${brdge?.shareable ? 'border-gray-200' : 'border-gray-200 opacity-50'}`}>
-                                    <h3 className="text-sm font-medium text-gray-800 mb-2">Share Link</h3>
-                                    {brdge?.shareable ? (
-                                        <div className="space-y-2">
+                            {/* Share Tab Content */}
+                            <div className={`absolute inset-0 transition-opacity duration-300 overflow-y-auto p-4 ${activeMobileTab === 'share' ? 'opacity-100 z-30' : 'opacity-0 z-0 pointer-events-none'}`}>
+                                <h2 className="text-lg font-semibold text-gray-800 mb-4">Share</h2>
+                                <div className="space-y-6">
+                                    {/* Public Access Toggle */}
+                                    <div className="border border-gray-200 rounded-lg p-4 bg-white">
+                                        <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
-                                                <div className="flex-1 px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-[13px] text-gray-800 truncate">{shareableLink}</div>
-                                                <button onClick={copyLinkToClipboard} className={`p-2 rounded-lg transition-all ${isCopied ? 'bg-green-100 text-green-600 border border-green-200' : 'bg-blue-100 text-blue-600 hover:bg-blue-200 border border-blue-200'}`}>
-                                                    {isCopied ? <Check size={18} /> : <Copy size={18} />}
-                                                </button>
+                                                {brdge?.shareable ? <Globe size={18} className="text-blue-500" /> : <Lock size={18} className="text-gray-600" />}
+                                                <h3 className="text-[14px] font-medium text-gray-800">{brdge?.shareable ? 'Public' : 'Private'}</h3>
                                             </div>
-                                            <a href={shareableLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-[11px] text-blue-600 hover:underline"><ExternalLink size={12} /> Open Link</a>
-                                            {isCopied && <p className="text-[11px] text-green-600">Link copied!</p>}
+                                            <label className="relative inline-flex items-center cursor-pointer">
+                                                <input type="checkbox" checked={brdge?.shareable || false} onChange={toggleShareable} className="sr-only peer" />
+                                                <div className={`w-11 h-6 rounded-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full ${brdge?.shareable ? 'bg-blue-500 border-blue-500' : 'bg-gray-200 border-gray-300'} border`}></div>
+                                            </label>
                                         </div>
-                                    ) : (
-                                        <p className="text-[13px] text-gray-500 text-center py-2">Enable public access to get link</p>
-                                    )}
+                                        <p className="text-[12px] text-gray-600 mt-1">{brdge?.shareable ? "Anyone with the link can view" : "Only you can view"}</p>
+                                    </div>
+                                    {/* Share Link */}
+                                    <div className={`border rounded-lg p-4 bg-white ${brdge?.shareable ? 'border-gray-200' : 'border-gray-200 opacity-50'}`}>
+                                        <h3 className="text-sm font-medium text-gray-800 mb-2">Share Link</h3>
+                                        {brdge?.shareable ? (
+                                            <div className="space-y-2">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="flex-1 px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-[13px] text-gray-800 truncate">{shareableLink}</div>
+                                                    <button onClick={copyLinkToClipboard} className={`p-2 rounded-lg transition-all ${isCopied ? 'bg-green-100 text-green-600 border border-green-200' : 'bg-blue-100 text-blue-600 hover:bg-blue-200 border border-blue-200'}`}>
+                                                        {isCopied ? <Check size={18} /> : <Copy size={18} />}
+                                                    </button>
+                                                </div>
+                                                <a href={shareableLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-[11px] text-blue-600 hover:underline"><ExternalLink size={12} /> Open Link</a>
+                                                {isCopied && <p className="text-[11px] text-green-600">Link copied!</p>}
+                                            </div>
+                                        ) : (
+                                            <p className="text-[13px] text-gray-500 text-center py-2">Enable public access to get link</p>
+                                        )}
+                                    </div>
                                 </div>
+                                <div className="h-20"></div> {/* Add padding at the bottom */}
                             </div>
-                            <div className="h-20"></div> {/* Add padding at the bottom */}
-                        </div>
-                    </>
-                )}
-            </div>
+                        </>
+                    )
+                }
+            </div >
 
             {/* Bottom Tab Bar (only in edit mode) */}
-            {params.agentType === 'edit' && (
-                <div className="h-14 bg-white border-t border-gray-200 flex-shrink-0">
-                    <div className="h-full flex items-center justify-around px-2">
-                        <button
-                            className={`relative flex flex-col items-center justify-center px-3 py-1 
+            {
+                params.agentType === 'edit' && (
+                    <div className="h-14 bg-white border-t border-gray-200 flex-shrink-0">
+                        <div className="h-full flex items-center justify-around px-2">
+                            <button
+                                className={`relative flex flex-col items-center justify-center px-3 py-1 
                                 ${activeMobileTab === 'chat' ? 'text-blue-600' : 'text-gray-500'}`}
-                            onClick={() => setActiveMobileTab('chat')}
-                        >
-                            {activeMobileTab === 'chat' && (
-                                <div className="absolute -top-[1px] left-1/2 -translate-x-1/2 w-6 h-[2px] rounded-full 
+                                onClick={() => setActiveMobileTab('chat')}
+                            >
+                                {activeMobileTab === 'chat' && (
+                                    <div className="absolute -top-[1px] left-1/2 -translate-x-1/2 w-6 h-[2px] rounded-full 
                                     bg-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.5)]" />
-                            )}
-                            <MessageSquare size={18} className="mb-1" />
-                            <div className="text-xs">Chat</div>
-                        </button>
-                        <button
-                            className={`relative flex flex-col items-center justify-center px-3 py-1 
+                                )}
+                                <MessageSquare size={18} className="mb-1" />
+                                <div className="text-xs">Chat</div>
+                            </button>
+                            <button
+                                className={`relative flex flex-col items-center justify-center px-3 py-1 
                                 ${activeMobileTab === 'engagement' ? 'text-blue-600' : 'text-gray-500'}`}
-                            onClick={() => setActiveMobileTab('engagement')}
-                        >
-                            {activeMobileTab === 'engagement' && (
-                                <div className="absolute -top-[1px] left-1/2 -translate-x-1/2 w-6 h-[2px] rounded-full 
+                                onClick={() => setActiveMobileTab('engagement')}
+                            >
+                                {activeMobileTab === 'engagement' && (
+                                    <div className="absolute -top-[1px] left-1/2 -translate-x-1/2 w-6 h-[2px] rounded-full 
                                     bg-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.5)]" />
-                            )}
-                            <ClipboardList size={18} className="mb-1" />
-                            <div className="text-xs">Engage</div>
-                        </button>
-                        <button
-                            className={`relative flex flex-col items-center justify-center px-3 py-1 
+                                )}
+                                <ClipboardList size={18} className="mb-1" />
+                                <div className="text-xs">Engage</div>
+                            </button>
+                            <button
+                                className={`relative flex flex-col items-center justify-center px-3 py-1 
                                 ${activeMobileTab === 'teaching-persona' ? 'text-blue-600' : 'text-gray-500'}`}
-                            onClick={() => setActiveMobileTab('teaching-persona')}
-                        >
-                            {activeMobileTab === 'teaching-persona' && (
-                                <div className="absolute -top-[1px] left-1/2 -translate-x-1/2 w-6 h-[2px] rounded-full 
+                                onClick={() => setActiveMobileTab('teaching-persona')}
+                            >
+                                {activeMobileTab === 'teaching-persona' && (
+                                    <div className="absolute -top-[1px] left-1/2 -translate-x-1/2 w-6 h-[2px] rounded-full 
                                     bg-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.5)]" />
-                            )}
-                            <User size={18} className="mb-1" />
-                            <div className="text-xs">Persona</div>
-                        </button>
-                        <button
-                            className={`relative flex flex-col items-center justify-center px-3 py-1 
+                                )}
+                                <User size={18} className="mb-1" />
+                                <div className="text-xs">Persona</div>
+                            </button>
+                            <button
+                                className={`relative flex flex-col items-center justify-center px-3 py-1 
                                 ${activeMobileTab === 'voice-clone' ? 'text-blue-600' : 'text-gray-500'}`}
-                            onClick={() => setActiveMobileTab('voice-clone')}
-                        >
-                            {activeMobileTab === 'voice-clone' && (
-                                <div className="absolute -top-[1px] left-1/2 -translate-x-1/2 w-6 h-[2px] rounded-full 
+                                onClick={() => setActiveMobileTab('voice-clone')}
+                            >
+                                {activeMobileTab === 'voice-clone' && (
+                                    <div className="absolute -top-[1px] left-1/2 -translate-x-1/2 w-6 h-[2px] rounded-full 
                                     bg-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.5)]" />
-                            )}
-                            <Radio size={18} className="mb-1" />
-                            <div className="text-xs">Voice</div>
-                        </button>
-                        <button
-                            className={`relative flex flex-col items-center justify-center px-3 py-1 
+                                )}
+                                <Radio size={18} className="mb-1" />
+                                <div className="text-xs">Voice</div>
+                            </button>
+                            <button
+                                className={`relative flex flex-col items-center justify-center px-3 py-1 
                                 ${activeMobileTab === 'share' ? 'text-blue-600' : 'text-gray-500'}`}
-                            onClick={() => setActiveMobileTab('share')}
-                        >
-                            {activeMobileTab === 'share' && (
-                                <div className="absolute -top-[1px] left-1/2 -translate-x-1/2 w-6 h-[2px] rounded-full 
+                                onClick={() => setActiveMobileTab('share')}
+                            >
+                                {activeMobileTab === 'share' && (
+                                    <div className="absolute -top-[1px] left-1/2 -translate-x-1/2 w-6 h-[2px] rounded-full 
                                     bg-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.5)]" />
-                            )}
-                            <Share2 size={18} className="mb-1" />
-                            <div className="text-xs">Share</div>
-                        </button>
+                                )}
+                                <Share2 size={18} className="mb-1" />
+                                <div className="text-xs">Share</div>
+                            </button>
+                        </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }

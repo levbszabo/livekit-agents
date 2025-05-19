@@ -121,7 +121,7 @@ export const MobileVideoPlayer: React.FC<MobileVideoPlayerProps> = ({
                             playsInline
                             webkit-playsinline="true"
                             x-webkit-airplay="allow"
-                            preload="metadata"
+                            preload="auto"
                             controls={false}
                             autoPlay={false}
                         >
