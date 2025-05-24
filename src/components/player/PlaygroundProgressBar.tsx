@@ -3,7 +3,7 @@ import { EngagementOpportunity } from '../playground/Playground';
 import TimelineMarkers from './TimelineMarkers';
 
 // Get the ConfigTab type from the same source as Playground.tsx
-type ConfigTab = 'teaching-persona' | 'voice-clone' | 'chat' | 'share' | 'engagement';
+type ConfigTab = 'teaching-persona' | 'models' | 'chat' | 'share' | 'engagement';
 
 interface PlaygroundProgressBarProps {
     currentTime: number;

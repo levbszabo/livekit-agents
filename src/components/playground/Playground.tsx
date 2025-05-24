@@ -74,7 +74,7 @@ interface SavedVoice {
 }
 
 type MobileTab = 'chat' | 'script' | 'voice' | 'info';
-type ConfigTab = 'teaching-persona' | 'voice-clone' | 'chat' | 'share' | 'engagement';
+type ConfigTab = 'teaching-persona' | 'models' | 'chat' | 'share' | 'engagement';
 
 interface DataChannelMessage {
   payload: Uint8Array;
@@ -2398,7 +2398,7 @@ export default function Playground({
     { id: 'chat', label: 'Chat' },
     { id: 'engagement', label: 'Engagement' },
     { id: 'teaching-persona', label: 'Persona' },
-    { id: 'voice-clone', label: 'Voice' },
+    { id: 'models', label: 'Models' },
     { id: 'share', label: 'Share' }
   ];
 
@@ -2749,6 +2749,15 @@ export default function Playground({
   // Add state for teaching persona
   const [teachingPersona, setTeachingPersona] = useState<any>(null);
   const [speakingPaceValue, setSpeakingPaceValue] = useState(3); // 1-5 scale
+
+  // Add state for model configuration
+  const [modelMode, setModelMode] = useState<'standard' | 'realtime'>('standard');
+  const [standardModel, setStandardModel] = useState<'gpt-4.1' | 'gemini-2.0-flash' | 'gemini-2.5-pro' | 'gemini-2.5-flash'>('gpt-4.1');
+  const [realtimeModel, setRealtimeModel] = useState<'gemini-2.0-flash-live-001'>('gemini-2.0-flash-live-001');
+
+  // Feature gates
+  const REALTIME_MODELS_ENABLED = false; // Set to false to disable realtime models
+  const [modelConfig, setModelConfig] = useState<any>(null);
 
   // Function to load teaching persona from script
   useEffect(() => {
@@ -3461,6 +3470,84 @@ export default function Playground({
       delete api.defaults.headers.common['Authorization'];
     }
   }, [authToken]);
+
+  // Fetch model configuration
+  const fetchModelConfig = useCallback(async () => {
+    if (!params.brdgeId || !params.apiBaseUrl) return;
+
+    try {
+      const headers: HeadersInit = {};
+      if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+      const response = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/model-config`, {
+        headers,
+        credentials: 'omit'
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setModelConfig(data);
+        // Force standard mode if realtime is disabled
+        const fetchedMode = data.mode || 'standard';
+        const finalMode = REALTIME_MODELS_ENABLED ? fetchedMode : 'standard';
+        setModelMode(finalMode);
+        setStandardModel(data.standard_model || 'gpt-4.1');
+        setRealtimeModel(data.realtime_model || 'gemini-2.0-flash-live-001');
+
+        // If we forced to standard mode, update the backend
+        if (!REALTIME_MODELS_ENABLED && fetchedMode === 'realtime') {
+          updateModelConfig({
+            mode: 'standard',
+            standard_model: data.standard_model || 'gpt-4.1',
+            realtime_model: data.realtime_model || 'gemini-2.0-flash-live-001',
+            voice_id: data.voice_id
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching model config:', error);
+    }
+  }, [params.brdgeId, params.apiBaseUrl, authToken]);
+
+  // Update model configuration
+  const updateModelConfig = useCallback(async (config: any) => {
+    if (!params.brdgeId || !params.apiBaseUrl) return;
+
+    try {
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+      const response = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/model-config`, {
+        method: 'PUT',
+        headers,
+        credentials: 'omit',
+        body: JSON.stringify(config)
+      });
+
+      if (response.ok) {
+        console.log('Model configuration updated successfully');
+        setModelConfig(config); // Update local state immediately
+
+        // Also update the brdge voice_id if it was changed
+        if (config.voice_id !== undefined && config.voice_id !== brdge?.voice_id) {
+          setBrdge(prev => prev ? { ...prev, voice_id: config.voice_id } : null);
+        }
+
+        fetchModelConfig(); // Refresh config from server
+      } else {
+        console.error('Failed to update model configuration');
+      }
+    } catch (error) {
+      console.error('Error updating model config:', error);
+    }
+  }, [params.brdgeId, params.apiBaseUrl, authToken, fetchModelConfig, brdge?.voice_id]);
+
+  // Fetch model config when component mounts
+  useEffect(() => {
+    fetchModelConfig();
+  }, [fetchModelConfig]);
 
   // <<< Add effect for implicit audio activation >>>
   useEffect(() => {
@@ -4371,174 +4458,277 @@ export default function Playground({
                       </div>
                     )}
 
-                    {activeTab === 'voice-clone' && (
+                    {activeTab === 'models' && (
                       <div className={`
                           h-full pt-0 overflow-y-auto
-                          ${activeTab === 'voice-clone' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}
+                          ${activeTab === 'models' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}
                           transition-opacity duration-300
                         `}>
                         <div className="mb-3 border-b border-gray-200 pb-3">
                           <div className="flex items-center justify-between mb-1">
-                            <h2 className="font-medium text-gray-900 text-[15px]">Voice Configuration</h2>
+                            <h2 className="font-medium text-gray-900 text-[15px]">AI Model Configuration</h2>
                             <div className="h-[1px] flex-1 mx-4 bg-gradient-to-r from-transparent via-blue-200/30 to-transparent" />
                           </div>
 
-                          {/* Default voice and voice selector section */}
+                          {/* Mode Selection Toggle */}
                           <div className="mb-6">
-                            <VoiceSelector
-                              voices={allVoices}
-                              selectedVoice={selectedVoice}
-                              selectedVoiceBrdgeId={selectedVoiceBrdgeId} // Add this prop
-                              defaultVoiceId="default"
-                              currentBrdgeId={params.brdgeId}
-                              onSelectVoice={async (voiceId, fromBrdgeId) => {
-                                // Update the brdge's voice_id first - this is the only necessary step
-                                if (params.brdgeId && params.apiBaseUrl) {
-                                  try {
-                                    // If default voice is selected, set voice_id to null
-                                    const voice_id = voiceId === "default" ? null : voiceId;
-
-                                    // Log what we're about to do
-                                    console.log(`Updating voice_id for brdge ${params.brdgeId} to:`, voice_id);
-
-                                    // Update the brdge's voice_id in the database
-                                    const updateResponse = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/update-voice`, {
-                                      method: 'POST',
-                                      headers: {
-                                        'Content-Type': 'application/json',
-                                        // Use authToken prop instead of localStorage
-                                        ...(authToken ? {
-                                          'Authorization': `Bearer ${authToken}`
-                                        } : {})
-                                      },
-                                      body: JSON.stringify({ voice_id }),
-                                      credentials: 'omit'
+                            <label className="block text-gray-600 text-[12px] font-medium mb-3">AI Mode</label>
+                            <div className="bg-gray-100 p-1 rounded-lg">
+                              <div className="grid grid-cols-2 gap-1">
+                                <button
+                                  onClick={() => {
+                                    setModelMode('standard');
+                                    updateModelConfig({
+                                      mode: 'standard',
+                                      standard_model: standardModel,
+                                      realtime_model: realtimeModel,
+                                      voice_id: selectedVoice === 'default' ? null : selectedVoice
                                     });
-
-                                    // Log the full response for debugging
-                                    const responseData = await updateResponse.json();
-                                    console.log('Update voice response:', responseData);
-
-                                    if (!updateResponse.ok) {
-                                      console.error('Failed to update brdge voice_id:', updateResponse.status, updateResponse.statusText);
-                                    } else {
-                                      console.log('Successfully updated brdge voice_id to:', voice_id);
-
-                                      // No need to call voice/activate, just update UI state directly
-                                      if (voiceId === "default") {
-                                        // If default voice selected, update local state
-                                        setSavedVoices(prev => prev.map(v => ({
-                                          ...v,
-                                          status: 'inactive'
-                                        })));
-                                        setSelectedVoice("default");
-                                        setSelectedVoiceBrdgeId(null);
-                                      } else {
-                                        // If custom voice selected, update UI state to show it as selected
-                                        setSelectedVoice(voiceId);
-                                        setSelectedVoiceBrdgeId(fromBrdgeId as string);
-
-                                        // Update the "status" field in the savedVoices array to show the correct one as active
-                                        // This is just UI state, not affecting the backend
-                                        setSavedVoices(prev => prev.map(v => ({
-                                          ...v,
-                                          status: v.id === voiceId ? 'active' : 'inactive'
-                                        })));
-                                      }
-
-                                      // Refresh the brdge data after updating voice_id
-                                      const brdgeResponse = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}`);
-                                      if (brdgeResponse.ok) {
-                                        const brdgeData = await brdgeResponse.json();
-                                        console.log('Refreshed brdge data:', brdgeData);
-                                        console.log('Brdge voice_id after update:', brdgeData.voice_id);
-                                        setBrdge(brdgeData);
-                                      }
-
-                                      // Refresh the voice list to update UI
-                                      if (params.brdgeId) {
-                                        const voicesResponse = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/voices`);
-                                        if (voicesResponse.ok) {
-                                          const voicesData = await voicesResponse.json();
-                                          if (voicesData.voices) {
-                                            setSavedVoices(voicesData.voices);
-                                          }
-                                        }
-                                      }
+                                  }}
+                                  className={`
+                                    px-3 py-2 rounded-md text-[12px] font-medium transition-all duration-200
+                                    ${modelMode === 'standard'
+                                      ? 'bg-white text-blue-600 shadow-sm border border-blue-200'
+                                      : 'text-gray-600 hover:text-gray-700'}
+                                  `}
+                                >
+                                  Standard
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (REALTIME_MODELS_ENABLED) {
+                                      setModelMode('realtime');
+                                      updateModelConfig({
+                                        mode: 'realtime',
+                                        standard_model: standardModel,
+                                        realtime_model: realtimeModel,
+                                        voice_id: selectedVoice === 'default' ? null : selectedVoice
+                                      });
                                     }
-                                  } catch (error) {
-                                    console.error('Error updating brdge voice_id:', error);
-                                  }
-                                }
-                              }}
-                              isLoading={isLoadingUserVoices}
-                            />
-                          </div>
-
-                          {/* Voice information card */}
-                          <div className="bg-white rounded-lg p-4 border border-gray-200 mb-6 shadow-sm">
-                            <div className="flex items-center justify-between mb-3">
-                              <h3 className="text-gray-800 text-[13px] font-medium">Current Voice</h3>
-                              <div className={`px-2 py-0.5 rounded-md border text-[10px]
-                                  ${selectedVoice === "default" || !selectedVoice
-                                  ? "bg-gray-100 border-gray-200 text-gray-600"
-                                  : selectedVoiceBrdgeId === params.brdgeId
-                                    ? "bg-blue-50 border-blue-200 text-blue-600"
-                                    : "bg-amber-50 border-amber-200 text-amber-600"
-                                }`}
-                              >
-                                {selectedVoice === "default" || !selectedVoice
-                                  ? "Default"
-                                  : selectedVoiceBrdgeId === params.brdgeId
-                                    ? "Custom"
-                                    : "From Other Project"
-                                }
+                                  }}
+                                  disabled={!REALTIME_MODELS_ENABLED}
+                                  className={`
+                                    px-3 py-2 rounded-md text-[12px] font-medium transition-all duration-200 relative
+                                    ${!REALTIME_MODELS_ENABLED
+                                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
+                                      : modelMode === 'realtime'
+                                        ? 'bg-white text-blue-600 shadow-sm border border-blue-200'
+                                        : 'text-gray-600 hover:text-gray-700'}
+                                  `}
+                                >
+                                  <div className="flex items-center gap-1.5">
+                                    {!REALTIME_MODELS_ENABLED && (
+                                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                                      </svg>
+                                    )}
+                                    <span>Realtime</span>
+                                    {!REALTIME_MODELS_ENABLED && (
+                                      <span className="text-[10px] opacity-75">(Soon)</span>
+                                    )}
+                                  </div>
+                                </button>
                               </div>
                             </div>
-
-                            {selectedVoice === "default" || !selectedVoice ? (
-                              <div>
-                                <div className="flex items-center gap-2 mb-2">
-                                  <Volume2 size={14} className="text-blue-500" />
-                                  <span className="text-[13px] text-gray-800">Default AI Voice</span>
-                                </div>
-                                <p className="text-gray-600 text-[12px] leading-relaxed">
-                                  Using the standard AI voice for this brdge. This voice is designed to be clear and natural sounding.
-                                </p>
-                              </div>
-                            ) : (
-                              <div>
-                                <div className="flex items-center gap-2 mb-2">
-                                  <Radio size={14} className={selectedVoiceBrdgeId === params.brdgeId ? "text-blue-500" : "text-amber-500"} />
-                                  <span className="text-[13px] text-gray-800">
-                                    {allVoices.find(v => v.id === selectedVoice)?.name || 'Custom Voice'}
-                                  </span>
-                                </div>
-                                {selectedVoiceBrdgeId !== params.brdgeId && (
-                                  <div className="bg-amber-50 border border-amber-100 rounded-md px-2 py-1 mb-2 text-[11px] text-gray-700">
-                                    From: {allVoices.find(v => v.id === selectedVoice)?.brdge_name || 'Another Project'}
-                                  </div>
-                                )}
-                                <p className="text-gray-600 text-[12px] leading-relaxed">
-                                  Using {selectedVoiceBrdgeId === params.brdgeId ? 'your' : 'a'} custom voice clone. This personalized voice will be used when the AI speaks.
-                                </p>
-                                <div className="text-[10px] text-gray-500 mt-2">
-                                  Created: {allVoices.find(v => v.id === selectedVoice)?.created_at
-                                    ? new Date(allVoices.find(v => v.id === selectedVoice)!.created_at).toLocaleDateString()
-                                    : 'Unknown'}
-                                </div>
-                              </div>
-                            )}
+                            <div className="text-[10px] text-gray-500 mt-1">
+                              {modelMode === 'standard'
+                                ? 'Traditional STT → LLM → TTS pipeline with voice cloning support'
+                                : !REALTIME_MODELS_ENABLED
+                                  ? 'Live conversation mode with reduced latency (coming soon)'
+                                  : 'Live conversation mode with reduced latency (limited voice options)'
+                              }
+                            </div>
                           </div>
 
-                          {/* Create New Voice / Custom Voices section */}
-                          <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-[13px] font-medium text-gray-800">Custom Voices</h3>
-                            <motion.button
-                              whileHover={{ scale: 1.02 }}
-                              whileTap={{ scale: 0.98 }}
-                              onClick={() => setIsCreatingVoice(true)}
-                              className={`
+                          {/* Standard Mode Configuration */}
+                          {modelMode === 'standard' && (
+                            <div className="space-y-6">
+                              {/* LLM Model Selection */}
+                              <div>
+                                <label className="block text-gray-600 text-[12px] font-medium mb-2">Language Model</label>
+                                <select
+                                  value={standardModel}
+                                  onChange={(e) => {
+                                    const newModel = e.target.value as 'gpt-4.1' | 'gemini-2.0-flash' | 'gemini-2.5-pro' | 'gemini-2.5-flash';
+                                    setStandardModel(newModel);
+                                    updateModelConfig({
+                                      mode: 'standard',
+                                      standard_model: newModel,
+                                      realtime_model: realtimeModel,
+                                      voice_id: selectedVoice === 'default' ? null : selectedVoice
+                                    });
+                                  }}
+                                  className="w-full px-3 py-2.5 rounded-lg font-satoshi text-[13px] text-gray-800 bg-white border border-gray-300 appearance-none transition-all duration-300 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 hover:border-blue-300"
+                                >
+                                  <option value="gpt-4.1">GPT-4.1 (Recommended)</option>
+                                  <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                                  <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                                  <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                                </select>
+                                <div className="text-[10px] text-gray-500 mt-1">
+                                  {standardModel === 'gpt-4.1'
+                                    ? 'OpenAI\'s latest model with excellent reasoning and conversation abilities'
+                                    : 'Google\'s fast and efficient model with multimodal capabilities'
+                                  }
+                                </div>
+                              </div>
+
+                              {/* Voice Selection for Standard Mode */}
+                              <div>
+                                <VoiceSelector
+                                  voices={allVoices}
+                                  selectedVoice={selectedVoice}
+                                  selectedVoiceBrdgeId={selectedVoiceBrdgeId} // Add this prop
+                                  defaultVoiceId="default"
+                                  currentBrdgeId={params.brdgeId}
+                                  onSelectVoice={async (voiceId, fromBrdgeId) => {
+                                    // Update the brdge's voice_id first - this is the only necessary step
+                                    if (params.brdgeId && params.apiBaseUrl) {
+                                      try {
+                                        // If default voice is selected, set voice_id to null
+                                        const voice_id = voiceId === "default" ? null : voiceId;
+
+                                        // Log what we're about to do
+                                        console.log(`Updating voice_id for brdge ${params.brdgeId} to:`, voice_id);
+
+                                        // Update the brdge's voice_id in the database
+                                        const updateResponse = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/update-voice`, {
+                                          method: 'POST',
+                                          headers: {
+                                            'Content-Type': 'application/json',
+                                            // Use authToken prop instead of localStorage
+                                            ...(authToken ? {
+                                              'Authorization': `Bearer ${authToken}`
+                                            } : {})
+                                          },
+                                          body: JSON.stringify({ voice_id }),
+                                          credentials: 'omit'
+                                        });
+
+                                        // Log the full response for debugging
+                                        const responseData = await updateResponse.json();
+                                        console.log('Update voice response:', responseData);
+
+                                        if (!updateResponse.ok) {
+                                          console.error('Failed to update brdge voice_id:', updateResponse.status, updateResponse.statusText);
+                                        } else {
+                                          console.log('Successfully updated brdge voice_id to:', voice_id);
+
+                                          // No need to call voice/activate, just update UI state directly
+                                          if (voiceId === "default") {
+                                            // If default voice selected, update local state
+                                            setSavedVoices(prev => prev.map(v => ({
+                                              ...v,
+                                              status: 'inactive'
+                                            })));
+                                            setSelectedVoice("default");
+                                            setSelectedVoiceBrdgeId(null);
+                                          } else {
+                                            // If custom voice selected, update UI state to show it as selected
+                                            setSelectedVoice(voiceId);
+                                            setSelectedVoiceBrdgeId(fromBrdgeId as string);
+
+                                            // Update the "status" field in the savedVoices array to show the correct one as active
+                                            // This is just UI state, not affecting the backend
+                                            setSavedVoices(prev => prev.map(v => ({
+                                              ...v,
+                                              status: v.id === voiceId ? 'active' : 'inactive'
+                                            })));
+                                          }
+
+                                          // Refresh the brdge data after updating voice_id
+                                          const brdgeResponse = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}`);
+                                          if (brdgeResponse.ok) {
+                                            const brdgeData = await brdgeResponse.json();
+                                            console.log('Refreshed brdge data:', brdgeData);
+                                            console.log('Brdge voice_id after update:', brdgeData.voice_id);
+                                            setBrdge(brdgeData);
+                                          }
+
+                                          // Refresh the voice list to update UI
+                                          if (params.brdgeId) {
+                                            const voicesResponse = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/voices`);
+                                            if (voicesResponse.ok) {
+                                              const voicesData = await voicesResponse.json();
+                                              if (voicesData.voices) {
+                                                setSavedVoices(voicesData.voices);
+                                              }
+                                            }
+                                          }
+                                        }
+                                      } catch (error) {
+                                        console.error('Error updating brdge voice_id:', error);
+                                      }
+                                    }
+                                  }}
+                                  isLoading={isLoadingUserVoices}
+                                />
+                              </div>
+
+                              {/* Voice information card */}
+                              <div className="bg-white rounded-lg p-4 border border-gray-200 mb-6 shadow-sm">
+                                <div className="flex items-center justify-between mb-3">
+                                  <h3 className="text-gray-800 text-[13px] font-medium">Current Voice</h3>
+                                  <div className={`px-2 py-0.5 rounded-md border text-[10px]
+                                  ${selectedVoice === "default" || !selectedVoice
+                                      ? "bg-gray-100 border-gray-200 text-gray-600"
+                                      : selectedVoiceBrdgeId === params.brdgeId
+                                        ? "bg-blue-50 border-blue-200 text-blue-600"
+                                        : "bg-amber-50 border-amber-200 text-amber-600"
+                                    }`}
+                                  >
+                                    {selectedVoice === "default" || !selectedVoice
+                                      ? "Default"
+                                      : selectedVoiceBrdgeId === params.brdgeId
+                                        ? "Custom"
+                                        : "From Other Project"
+                                    }
+                                  </div>
+                                </div>
+
+                                {selectedVoice === "default" || !selectedVoice ? (
+                                  <div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Volume2 size={14} className="text-blue-500" />
+                                      <span className="text-[13px] text-gray-800">Default AI Voice</span>
+                                    </div>
+                                    <p className="text-gray-600 text-[12px] leading-relaxed">
+                                      Using the standard AI voice for this brdge. This voice is designed to be clear and natural sounding.
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Radio size={14} className={selectedVoiceBrdgeId === params.brdgeId ? "text-blue-500" : "text-amber-500"} />
+                                      <span className="text-[13px] text-gray-800">
+                                        {allVoices.find(v => v.id === selectedVoice)?.name || 'Custom Voice'}
+                                      </span>
+                                    </div>
+                                    {selectedVoiceBrdgeId !== params.brdgeId && (
+                                      <div className="bg-amber-50 border border-amber-100 rounded-md px-2 py-1 mb-2 text-[11px] text-gray-700">
+                                        From: {allVoices.find(v => v.id === selectedVoice)?.brdge_name || 'Another Project'}
+                                      </div>
+                                    )}
+                                    <p className="text-gray-600 text-[12px] leading-relaxed">
+                                      Using {selectedVoiceBrdgeId === params.brdgeId ? 'your' : 'a'} custom voice clone. This personalized voice will be used when the AI speaks.
+                                    </p>
+                                    <div className="text-[10px] text-gray-500 mt-2">
+                                      Created: {allVoices.find(v => v.id === selectedVoice)?.created_at
+                                        ? new Date(allVoices.find(v => v.id === selectedVoice)!.created_at).toLocaleDateString()
+                                        : 'Unknown'}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Create New Voice / Custom Voices section */}
+                              <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-[13px] font-medium text-gray-800">Custom Voices</h3>
+                                <motion.button
+                                  whileHover={{ scale: 1.02 }}
+                                  whileTap={{ scale: 0.98 }}
+                                  onClick={() => setIsCreatingVoice(true)}
+                                  className={`
                                   group flex items-center gap-1.5
                                   px-3 py-1.5 rounded-lg
                                   bg-blue-500 text-white
@@ -4548,104 +4738,104 @@ export default function Playground({
                                   hover:shadow
                                   ${isCreatingVoice ? 'opacity-50 pointer-events-none' : ''}
                                 `}
-                            >
-                              <Plus size={12} className="group-hover:rotate-90 transition-transform duration-300" />
-                              <span className="text-[11px] font-satoshi">Create New Voice</span>
-                            </motion.button>
-                          </div>
-
-                          {isCreatingVoice ? (
-                            // Voice Creation Section - Using existing recording UI with better styling
-                            <div className="space-y-4 bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-                              <div className="flex items-center justify-between mb-2">
-                                <h4 className="text-[13px] text-gray-800 font-medium">Create Voice Clone</h4>
-                                <button
-                                  onClick={() => setIsCreatingVoice(false)}
-                                  className="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700"
                                 >
-                                  <X size={14} />
-                                </button>
+                                  <Plus size={12} className="group-hover:rotate-90 transition-transform duration-300" />
+                                  <span className="text-[11px] font-satoshi">Create New Voice</span>
+                                </motion.button>
                               </div>
 
-                              <div className="space-y-3">
-                                <h5 className="text-[12px] text-blue-600">Record a short sample of your voice:</h5>
-                                <ul className="space-y-2">
-                                  {[
-                                    'Record 10-20 seconds of clear speech',
-                                    'Speak naturally at your normal pace',
-                                    'Avoid background noise and echoes'
-                                  ].map((text, i) => (
-                                    <li key={i} className="flex items-start gap-2">
-                                      <span className="text-blue-500 mt-1 text-[10px]">•</span>
-                                      <span className="font-satoshi text-[12px] text-gray-700">{text}</span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
+                              {isCreatingVoice ? (
+                                // Voice Creation Section - Using existing recording UI with better styling
+                                <div className="space-y-4 bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <h4 className="text-[13px] text-gray-800 font-medium">Create Voice Clone</h4>
+                                    <button
+                                      onClick={() => setIsCreatingVoice(false)}
+                                      className="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+                                    >
+                                      <X size={14} />
+                                    </button>
+                                  </div>
 
-                              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                                <h5 className="text-[12px] text-gray-800 mb-2">Sample text to read:</h5>
-                                <p className="text-[12px] text-gray-600 leading-relaxed italic">
-                                  &ldquo;In just a few quick steps my voice based AI assistant will be integrated into my content.
-                                  This way you can speak to others without being there... how cool is that?&rdquo;
-                                </p>
-                              </div>
+                                  <div className="space-y-3">
+                                    <h5 className="text-[12px] text-blue-600">Record a short sample of your voice:</h5>
+                                    <ul className="space-y-2">
+                                      {[
+                                        'Record 10-20 seconds of clear speech',
+                                        'Speak naturally at your normal pace',
+                                        'Avoid background noise and echoes'
+                                      ].map((text, i) => (
+                                        <li key={i} className="flex items-start gap-2">
+                                          <span className="text-blue-500 mt-1 text-[10px]">•</span>
+                                          <span className="font-satoshi text-[12px] text-gray-700">{text}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
 
-                              <div className="space-y-3 pt-2">
-                                <input
-                                  type="text"
-                                  value={voiceName}
-                                  onChange={(e) => setVoiceName(e.target.value)}
-                                  placeholder="Enter voice name"
-                                  className="w-full bg-white border border-gray-300 rounded-lg
+                                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                                    <h5 className="text-[12px] text-gray-800 mb-2">Sample text to read:</h5>
+                                    <p className="text-[12px] text-gray-600 leading-relaxed italic">
+                                      &ldquo;In just a few quick steps my voice based AI assistant will be integrated into my content.
+                                      This way you can speak to others without being there... how cool is that?&rdquo;
+                                    </p>
+                                  </div>
+
+                                  <div className="space-y-3 pt-2">
+                                    <input
+                                      type="text"
+                                      value={voiceName}
+                                      onChange={(e) => setVoiceName(e.target.value)}
+                                      placeholder="Enter voice name"
+                                      className="w-full bg-white border border-gray-300 rounded-lg
                                     px-3 py-2.5 text-[13px] text-gray-800
                                     transition-all duration-300
                                     focus:ring-1 focus:ring-blue-400 
                                     focus:border-blue-400
                                     hover:border-blue-300"
-                                />
+                                    />
 
-                                <button
-                                  onClick={isRecording ? stopRecording : startRecording}
-                                  className={`
+                                    <button
+                                      onClick={isRecording ? stopRecording : startRecording}
+                                      className={`
                                       w-full px-4 py-2.5 rounded-lg text-[13px] font-medium
                                       transition-all duration-300
                                       flex items-center justify-center gap-2
                                       ${isRecording
-                                      ? 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'
-                                      : 'bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200'}
+                                          ? 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'
+                                          : 'bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200'}
                                       shadow-sm hover:shadow
                                     `}
-                                >
-                                  <span className={`
+                                    >
+                                      <span className={`
                                       w-1.5 h-1.5 rounded-full 
                                       ${isRecording
-                                      ? 'bg-red-500 animate-[pulse_1s_ease-in-out_infinite]'
-                                      : 'bg-blue-500'
-                                    }
+                                          ? 'bg-red-500 animate-[pulse_1s_ease-in-out_infinite]'
+                                          : 'bg-blue-500'
+                                        }
                                     `} />
-                                  {isRecording ? (
-                                    <>Recording... {formatTime(recordingTime)}</>
-                                  ) : (
-                                    'Start Recording'
-                                  )}
-                                </button>
-                              </div>
-
-                              {/* Recording Preview */}
-                              {currentRecording && (
-                                <div className="space-y-2">
-                                  <div className="bg-white rounded-lg p-2 border border-gray-200">
-                                    <audio
-                                      src={URL.createObjectURL(currentRecording)}
-                                      controls
-                                      className="w-full h-8"
-                                    />
+                                      {isRecording ? (
+                                        <>Recording... {formatTime(recordingTime)}</>
+                                      ) : (
+                                        'Start Recording'
+                                      )}
+                                    </button>
                                   </div>
-                                  <button
-                                    onClick={handleCloneVoice}
-                                    disabled={!voiceName || isCloning}
-                                    className={`
+
+                                  {/* Recording Preview */}
+                                  {currentRecording && (
+                                    <div className="space-y-2">
+                                      <div className="bg-white rounded-lg p-2 border border-gray-200">
+                                        <audio
+                                          src={URL.createObjectURL(currentRecording)}
+                                          controls
+                                          className="w-full h-8"
+                                        />
+                                      </div>
+                                      <button
+                                        onClick={handleCloneVoice}
+                                        disabled={!voiceName || isCloning}
+                                        className={`
                                         w-full px-4 py-2.5 rounded-lg text-[13px] font-medium
                                         transition-all duration-300
                                         transform hover:-translate-y-0.5
@@ -4655,139 +4845,220 @@ export default function Playground({
                                         disabled:opacity-50 disabled:cursor-not-allowed
                                         disabled:hover:transform-none
                                       `}
-                                  >
-                                    {isCloning ? (
-                                      <div className="flex items-center justify-center gap-2">
-                                        <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                        Creating Voice Clone...
-                                      </div>
-                                    ) : (
-                                      'Create Voice Clone'
-                                    )}
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            // Voice List Section - show as cards with better UI
-                            <div className="space-y-2">
-                              {savedVoices.length === 0 ? (
-                                <div className="text-center py-10 px-4 bg-white rounded-lg border border-gray-200 shadow-sm">
-                                  <div className="mb-3 opacity-50">
-                                    <Volume2 size={24} className="mx-auto text-gray-400" />
-                                  </div>
-                                  <div className="text-gray-800 text-[13px]">No custom voices yet</div>
-                                  <div className="mt-1 text-[12px] text-gray-500">
-                                    Create a custom voice to make your AI sound more like you
-                                  </div>
+                                      >
+                                        {isCloning ? (
+                                          <div className="flex items-center justify-center gap-2">
+                                            <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                            Creating Voice Clone...
+                                          </div>
+                                        ) : (
+                                          'Create Voice Clone'
+                                        )}
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
                               ) : (
-                                <div className="grid grid-cols-1 gap-3">
-                                  {savedVoices.map((voice) => (
-                                    <motion.div
-                                      key={voice.id}
-                                      layout
-                                      className={`
+                                // Voice List Section - show as cards with better UI
+                                <div className="space-y-2">
+                                  {savedVoices.length === 0 ? (
+                                    <div className="text-center py-10 px-4 bg-white rounded-lg border border-gray-200 shadow-sm">
+                                      <div className="mb-3 opacity-50">
+                                        <Volume2 size={24} className="mx-auto text-gray-400" />
+                                      </div>
+                                      <div className="text-gray-800 text-[13px]">No custom voices yet</div>
+                                      <div className="mt-1 text-[12px] text-gray-500">
+                                        Create a custom voice to make your AI sound more like you
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="grid grid-cols-1 gap-3">
+                                      {savedVoices.map((voice) => (
+                                        <motion.div
+                                          key={voice.id}
+                                          layout
+                                          className={`
                                           relative p-4 rounded-lg
                                           transition-all duration-300
                                           ${selectedVoice === voice.id
-                                          ? 'bg-blue-50 border border-blue-200 shadow-sm'
-                                          : 'bg-white border border-gray-200 hover:border-blue-300'}
+                                              ? 'bg-blue-50 border border-blue-200 shadow-sm'
+                                              : 'bg-white border border-gray-200 hover:border-blue-300'}
                                           group cursor-pointer
                                         `}
-                                      onClick={() => {
-                                        // Simply select this voice when clicked - no separate activate button needed
-                                        if (selectedVoice !== voice.id) {
-                                          // Same logic as in the VoiceSelector's onSelectVoice handler
-                                          setSelectedVoice(voice.id);
-                                          setSelectedVoiceBrdgeId(params.brdgeId);
+                                          onClick={() => {
+                                            // Simply select this voice when clicked - no separate activate button needed
+                                            if (selectedVoice !== voice.id) {
+                                              // Same logic as in the VoiceSelector's onSelectVoice handler
+                                              setSelectedVoice(voice.id);
+                                              setSelectedVoiceBrdgeId(params.brdgeId);
 
-                                          // Save the voice ID to the brdge via API call
-                                          if (params.brdgeId && params.apiBaseUrl) {
-                                            // Call the endpoint to update the brdge's voice_id
-                                            fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/update-voice`, {
-                                              method: 'POST',
-                                              headers: {
-                                                'Content-Type': 'application/json',
-                                                // Use authToken prop instead of localStorage
-                                                ...(authToken ? {
-                                                  'Authorization': `Bearer ${authToken}`
-                                                } : {})
-                                              },
-                                              body: JSON.stringify({ voice_id: voice.id }),
-                                              credentials: 'omit'
-                                            })
-                                              .then(response => {
-                                                if (!response.ok) {
-                                                  console.error('Failed to update brdge voice_id:', response.status, response.statusText);
-                                                  throw new Error('Failed to update voice');
-                                                }
+                                              // Save the voice ID to the brdge via API call
+                                              if (params.brdgeId && params.apiBaseUrl) {
+                                                // Call the endpoint to update the brdge's voice_id
+                                                fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/update-voice`, {
+                                                  method: 'POST',
+                                                  headers: {
+                                                    'Content-Type': 'application/json',
+                                                    // Use authToken prop instead of localStorage
+                                                    ...(authToken ? {
+                                                      'Authorization': `Bearer ${authToken}`
+                                                    } : {})
+                                                  },
+                                                  body: JSON.stringify({ voice_id: voice.id }),
+                                                  credentials: 'omit'
+                                                })
+                                                  .then(response => {
+                                                    if (!response.ok) {
+                                                      console.error('Failed to update brdge voice_id:', response.status, response.statusText);
+                                                      throw new Error('Failed to update voice');
+                                                    }
 
-                                                // After successfully updating voice in database, update local state
-                                                // No need to call activate, just update UI directly
-                                                setSavedVoices(prev => prev.map(v => ({
-                                                  ...v,
-                                                  status: v.id === voice.id ? 'active' : 'inactive'
-                                                })));
-                                                console.log('Successfully updated voice selection');
+                                                    // After successfully updating voice in database, update local state
+                                                    // No need to call activate, just update UI directly
+                                                    setSavedVoices(prev => prev.map(v => ({
+                                                      ...v,
+                                                      status: v.id === voice.id ? 'active' : 'inactive'
+                                                    })));
+                                                    console.log('Successfully updated voice selection');
 
-                                                // Refresh voice list
-                                                return fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/voices`);
-                                              })
-                                              .then(response => {
-                                                if (response && response.ok) {
-                                                  return response.json();
-                                                }
-                                              })
-                                              .then(data => {
-                                                if (data && data.voices) {
-                                                  setSavedVoices(data.voices);
-                                                }
-                                              })
-                                              .catch(error => console.error('Error updating brdge voice:', error));
-                                          }
-                                        }
-                                      }}
-                                    >
-                                      <div className="flex items-center gap-3">
-                                        <div className={`
+                                                    // Refresh voice list
+                                                    return fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/voices`);
+                                                  })
+                                                  .then(response => {
+                                                    if (response && response.ok) {
+                                                      return response.json();
+                                                    }
+                                                  })
+                                                  .then(data => {
+                                                    if (data && data.voices) {
+                                                      setSavedVoices(data.voices);
+                                                    }
+                                                  })
+                                                  .catch(error => console.error('Error updating brdge voice:', error));
+                                              }
+                                            }
+                                          }}
+                                        >
+                                          <div className="flex items-center gap-3">
+                                            <div className={`
                                             p-2.5 rounded-full 
                                             ${selectedVoice === voice.id
-                                            ? 'bg-blue-100 text-blue-600'
-                                            : 'bg-gray-100 text-gray-500'}
+                                                ? 'bg-blue-100 text-blue-600'
+                                                : 'bg-gray-100 text-gray-500'}
                                             transition-all duration-300
                                           `}>
-                                          <Volume2 size={14} />
-                                        </div>
+                                              <Volume2 size={14} />
+                                            </div>
 
-                                        <div className="flex-1 min-w-0">
-                                          <div className="flex items-center gap-2">
-                                            <h4 className={`
+                                            <div className="flex-1 min-w-0">
+                                              <div className="flex items-center gap-2">
+                                                <h4 className={`
                                                 text-[14px] truncate
                                                 ${selectedVoice === voice.id ? 'text-blue-600' : 'text-gray-800'}
                                               `}>
-                                              {voice.name}
-                                            </h4>
-                                            {selectedVoice === voice.id && (
-                                              <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
-                                                Active
-                                              </span>
-                                            )}
+                                                  {voice.name}
+                                                </h4>
+                                                {selectedVoice === voice.id && (
+                                                  <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
+                                                    Active
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <p className="text-[11px] text-gray-500 mt-0.5">
+                                                Created {new Date(voice.created_at).toLocaleDateString()}
+                                              </p>
+                                            </div>
                                           </div>
-                                          <p className="text-[11px] text-gray-500 mt-0.5">
-                                            Created {new Date(voice.created_at).toLocaleDateString()}
-                                          </p>
-                                        </div>
-                                      </div>
-                                    </motion.div>
-                                  ))}
+                                        </motion.div>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
                               )}
+                            </div>
+                          )}
+
+                          {/* Realtime Mode Configuration */}
+                          {modelMode === 'realtime' && (
+                            <div className="space-y-6">
+                              {/* Realtime Model Selection */}
+                              <div>
+                                <label className="block text-gray-600 text-[12px] font-medium mb-2">Realtime Model</label>
+                                <select
+                                  value={realtimeModel}
+                                  onChange={(e) => {
+                                    const newModel = e.target.value as 'gemini-2.0-flash-live-001';
+                                    setRealtimeModel(newModel);
+                                    updateModelConfig({
+                                      mode: 'realtime',
+                                      standard_model: standardModel,
+                                      realtime_model: newModel,
+                                      voice_id: selectedVoice === 'default' ? null : selectedVoice
+                                    });
+                                  }}
+                                  className="w-full px-3 py-2.5 rounded-lg font-satoshi text-[13px] text-gray-800 bg-white border border-gray-300 appearance-none transition-all duration-300 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 hover:border-blue-300"
+                                >
+                                  <option value="gemini-2.0-flash-live-001">Gemini 2.0 Flash Live</option>
+                                </select>
+                                <div className="text-[10px] text-gray-500 mt-1">
+                                  Google's live conversation model with ultra-low latency
+                                </div>
+                              </div>
+
+                              {/* Limited Voice Selection for Realtime */}
+                              <div>
+                                <label className="block text-gray-600 text-[12px] font-medium mb-2">Voice (Limited Options)</label>
+                                <select
+                                  value={selectedVoice || 'default'}
+                                  onChange={(e) => {
+                                    const voiceId = e.target.value;
+                                    setSelectedVoice(voiceId === 'default' ? 'default' : voiceId);
+                                    if (params.brdgeId && params.apiBaseUrl) {
+                                      updateModelConfig({
+                                        mode: 'realtime',
+                                        standard_model: standardModel,
+                                        realtime_model: realtimeModel,
+                                        voice_id: voiceId === 'default' ? null : voiceId
+                                      });
+                                    }
+                                  }}
+                                  className="w-full px-3 py-2.5 rounded-lg font-satoshi text-[13px] text-gray-800 bg-white border border-gray-300 appearance-none transition-all duration-300 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 hover:border-blue-300"
+                                >
+                                  <option value="default">Default Realtime Voice</option>
+                                </select>
+                                <div className="text-[10px] text-gray-500 mt-1">
+                                  Realtime mode uses optimized voices for low latency. Custom voice cloning not available in this mode.
+                                </div>
+                              </div>
+
+                              {/* Realtime Features Info */}
+                              <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                                <h3 className="text-blue-800 text-[13px] font-medium mb-2">Realtime Mode Features</h3>
+                                <ul className="space-y-1 text-[12px] text-blue-700">
+                                  <li className="flex items-center gap-2">
+                                    <span className="w-1 h-1 bg-blue-500 rounded-full"></span>
+                                    Ultra-low latency conversation
+                                  </li>
+                                  <li className="flex items-center gap-2">
+                                    <span className="w-1 h-1 bg-blue-500 rounded-full"></span>
+                                    Live video and audio streaming support
+                                  </li>
+                                  <li className="flex items-center gap-2">
+                                    <span className="w-1 h-1 bg-blue-500 rounded-full"></span>
+                                    Real-time context awareness
+                                  </li>
+                                  <li className="flex items-center gap-2">
+                                    <span className="w-1 h-1 bg-orange-500 rounded-full"></span>
+                                    Limited voice customization options
+                                  </li>
+                                </ul>
+                              </div>
                             </div>
                           )}
                         </div>
                       </div>
                     )}
+
                     {activeTab === 'share' && (
                       <div className={`
                           h-full pt-0 overflow-y-auto
