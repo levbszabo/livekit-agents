@@ -25,6 +25,7 @@ import { MobileVideoPlayer } from './mobile/MobileVideoPlayer';
 import { MobileProgressBar } from './mobile/MobileProgressBar';
 import { MessageSquare, ClipboardList, User, Radio, Share2, Square, Send, Mic, MicOff, Plus, Edit2, Trash2, ChevronRight, Save, Info, Lock, Globe, Copy, Check, ExternalLink, Volume2, VolumeX, X, Loader2, MessageCircle, Link } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { PersonalizationManager } from './PersonalizationManager';
 
 // Our EngagementOpportunity interface definition
 interface EngagementQuizItem {
@@ -1869,6 +1870,18 @@ export default function PlaygroundMobile({
                                             <p className="text-[13px] text-gray-500 text-center py-2">Enable public access to get link</p>
                                         )}
                                     </div>
+
+                                    {/* Personalization Section - Only show when bridge is shareable */}
+                                    {brdge?.shareable && params.brdgeId && params.agentType === 'edit' && (
+                                        <div className="mt-4">
+                                            <PersonalizationManager
+                                                brdgeId={params.brdgeId}
+                                                apiBaseUrl={params.apiBaseUrl || ''}
+                                                authToken={authToken}
+                                                shareableLink={shareableLink}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="h-20"></div> {/* Add padding at the bottom */}
                             </div>

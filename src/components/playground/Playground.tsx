@@ -25,6 +25,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import styled, { keyframes } from 'styled-components';
 import PlaygroundProgressBar from '../player/PlaygroundProgressBar';
 import dotBridge from '../../assets/dot-bridge.png';
+import { PersonalizationManager } from './PersonalizationManager';
 
 export interface PlaygroundProps {
   logo?: ReactNode;
@@ -5070,40 +5071,34 @@ export default function Playground({
                           <div className="h-[1px] flex-1 mx-4 bg-gradient-to-r from-transparent via-blue-200/30 to-transparent" />
                         </div>
 
-                        <div className="mb-6 pb-12 border-b border-gray-200">
-                          {/* Public/Private Toggle Section */}
-                          <section className="relative bg-white border border-gray-200 hover:border-blue-300 transition-all duration-300 rounded-lg overflow-hidden group p-4 my-4">
+                        <div className="mb-4">
+                          {/* Combined Public Access & Share Link Section */}
+                          <section className="relative bg-white border border-gray-200 hover:border-blue-300 transition-all duration-300 rounded-lg overflow-hidden group p-3 my-3">
                             {/* Section Header */}
                             <div className="flex items-center mb-2 relative z-10">
                               <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-1.5"></div>
-                              <h3 className="font-medium text-gray-800 text-[13px]">Public Access</h3>
+                              <h3 className="font-medium text-gray-800 text-[13px]">Public Access & Sharing</h3>
                               <div className="h-[1px] flex-1 ml-2 mr-1 bg-gradient-to-r from-transparent via-blue-200/30 to-transparent"></div>
                             </div>
 
-                            {/* Toggle control */}
-                            <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 transition-all duration-300 relative z-10 shadow-sm">
-                              <div className="flex flex-col">
+                            {/* Compact Toggle and Link Display */}
+                            <div className="space-y-2">
+                              {/* Toggle Row */}
+                              <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                   {brdge?.shareable ? (
                                     <>
-                                      <Globe size={18} className="text-blue-500" />
-                                      <h3 className="text-[14px] font-medium text-blue-600">Public</h3>
+                                      <Globe size={14} className="text-blue-500" />
+                                      <span className="text-[12px] text-gray-700">Public</span>
                                     </>
                                   ) : (
                                     <>
-                                      <Lock size={18} className="text-gray-600" />
-                                      <h3 className="text-[14px] font-medium text-gray-700">Private</h3>
+                                      <Lock size={14} className="text-gray-600" />
+                                      <span className="text-[12px] text-gray-700">Private</span>
                                     </>
                                   )}
                                 </div>
-                                <p className="text-[12px] text-gray-600 mt-1">
-                                  {brdge?.shareable
-                                    ? "Anyone with the link can view this bridge"
-                                    : "Only you can view this bridge"}
-                                </p>
-                              </div>
 
-                              <div className="flex items-center">
                                 <label className="relative inline-flex items-center cursor-pointer">
                                   <input
                                     type="checkbox"
@@ -5112,104 +5107,69 @@ export default function Playground({
                                     className="sr-only peer"
                                   />
                                   <div className={`
-                                      w-11 h-6 rounded-full
+                                      w-9 h-5 rounded-full
                                       after:content-[''] after:absolute after:top-[2px] after:left-[2px]
-                                      after:bg-white after:rounded-full after:h-5 after:w-5
+                                      after:bg-white after:rounded-full after:h-4 after:w-4
                                       after:transition-all peer-checked:after:translate-x-full
                                       ${brdge?.shareable
-                                      ? 'bg-blue-500/30 border-blue-500/50 after:shadow-[0_0_8px_rgba(59,130,246,0.4)]'
+                                      ? 'bg-blue-500/30 border-blue-500/50'
                                       : 'bg-gray-200 border-gray-300'}
                                     border transition-all duration-300
                                   `}></div>
                                 </label>
                               </div>
-                            </div>
-                          </section>
 
-                          {/* Share Link Section */}
-                          <section className="relative bg-white border border-gray-200 hover:border-blue-300 transition-all duration-300 rounded-lg overflow-hidden group p-4 my-4">
-                            {/* Section Header */}
-                            <div className="flex items-center mb-2 relative z-10">
-                              <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-1.5"></div>
-                              <h3 className="font-medium text-gray-800 text-[13px]">Share Link</h3>
-                              <div className="h-[1px] flex-1 ml-2 mr-1 bg-gradient-to-r from-transparent via-blue-200/30 to-transparent"></div>
-                            </div>
-
-                            {/* Link display and copy button */}
-                            <div className={`
-                                relative p-4 bg-white rounded-lg
-                                border transition-all duration-300 z-10 shadow-sm
-                                ${brdge?.shareable
-                                ? 'border-gray-200 hover:border-blue-300'
-                                : 'border-gray-200 opacity-50'}
-                              `}>
-                              {brdge?.shareable ? (
-                                <div className="flex flex-col space-y-3">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                      <Link size={15} className="text-blue-500" />
-                                      <span className="text-[13px] text-gray-800">Shareable Link</span>
-                                    </div>
-                                    <a
-                                      href={shareableLink}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-700 transition-colors"
-                                    >
-                                      <span>Open</span>
-                                      <ExternalLink size={11} />
-                                    </a>
-                                  </div>
-
-                                  <div className="flex items-center gap-2">
-                                    <div className="flex-1 px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-[13px] text-gray-800 truncate">
+                              {/* Collapsible Link Section */}
+                              {brdge?.shareable && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: 'auto', opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.2 }}
+                                  className="overflow-hidden"
+                                >
+                                  <div className="flex items-center gap-2 pt-2">
+                                    <div className="flex-1 px-2.5 py-1.5 bg-gray-50 border border-gray-300 rounded text-[11px] text-gray-800 truncate">
                                       {shareableLink}
                                     </div>
                                     <button
                                       onClick={copyLinkToClipboard}
                                       className={`
-                                          p-2 rounded-lg transition-all duration-300
+                                          p-1.5 rounded transition-all duration-300
                                           ${isCopied
                                           ? 'bg-green-50 text-green-600 border border-green-200'
                                           : 'bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200'}
                                         `}
                                     >
-                                      {isCopied ? <Check size={18} /> : <Copy size={18} />}
+                                      {isCopied ? <Check size={14} /> : <Copy size={14} />}
                                     </button>
+                                    <a
+                                      href={shareableLink}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="p-1.5 rounded bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200 transition-all"
+                                    >
+                                      <ExternalLink size={14} />
+                                    </a>
                                   </div>
-
-                                  <div className="text-[11px] text-gray-600">
-                                    {isCopied ? (
-                                      <span className="text-green-600">✓ Link copied to clipboard!</span>
-                                    ) : (
-                                      "Share this link with anyone you want to give access to your bridge"
-                                    )}
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="flex flex-col items-center justify-center py-4">
-                                  <Lock size={24} className="text-gray-400 mb-2" />
-                                  <p className="text-[13px] text-gray-600 text-center">
-                                    Enable public access to get a shareable link
-                                  </p>
-                                </div>
+                                  {isCopied && (
+                                    <p className="text-[10px] text-green-600 mt-1">✓ Link copied!</p>
+                                  )}
+                                </motion.div>
                               )}
                             </div>
                           </section>
 
-                          {/* Privacy Information */}
-                          <section className="relative bg-white border border-gray-200 hover:border-blue-300 transition-all duration-300 rounded-lg overflow-hidden group p-4 my-4">
-                            <div className="flex items-start gap-2">
-                              <Info size={14} className="text-blue-600 mt-0.5" />
-                              <div>
-                                <h4 className="text-[12px] font-medium text-gray-800 mb-1">Privacy Information</h4>
-                                <p className="text-[11px] text-gray-600 leading-relaxed">
-                                  When shared publicly, anyone with the link can view and interact with your bridge.
-                                  You can disable public access at any time by toggling the switch above.
-                                </p>
-                              </div>
-                            </div>
-                          </section>
+                          {/* Personalization Section - Only show in edit mode and when bridge is shareable */}
+                          {isEditMode && brdge?.shareable && params.brdgeId && (
+                            <PersonalizationManager
+                              brdgeId={params.brdgeId}
+                              apiBaseUrl={params.apiBaseUrl || ''}
+                              authToken={authToken}
+                              shareableLink={shareableLink}
+                            />
+                          )}
+
                         </div>
                       </div>
                     )}

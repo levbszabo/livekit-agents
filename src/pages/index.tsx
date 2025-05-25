@@ -61,7 +61,7 @@ export function HomeInner() {
   const { config } = useConfig();
   const { toastMessage, setToastMessage } = useToast();
   const [isMobile, setIsMobile] = useState(false);
-  const [urlParams, setUrlParams] = useState<{ brdgeId: string | null; agentType?: 'edit' | 'view'; userId?: string }>({ brdgeId: null, agentType: 'edit' });
+  const [urlParams, setUrlParams] = useState<{ brdgeId: string | null; agentType?: 'edit' | 'view'; userId?: string; personalizationId?: string }>({ brdgeId: null, agentType: 'edit' });
   const [authToken, setAuthTokenState] = useState<string | null>(null);
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [showRotationPrompt, setShowRotationPrompt] = useState(false);
@@ -73,11 +73,13 @@ export function HomeInner() {
       const brdgeIdParam = searchParams.get('brdgeId');
       const userIdParam = searchParams.get('userId');
       const agentTypeParam = searchParams.get('agentType') as 'edit' | 'view'; // Read agentType
+      const personalizationIdParam = searchParams.get('id'); // Get personalization ID from 'id' parameter
 
       setUrlParams({
         brdgeId: brdgeIdParam,
         userId: userIdParam || undefined,
-        agentType: agentTypeParam || 'edit' // Default to edit if not specified
+        agentType: agentTypeParam || 'edit', // Default to edit if not specified
+        personalizationId: personalizationIdParam || undefined
       });
 
       // Function to check if device is mobile
@@ -156,7 +158,7 @@ export function HomeInner() {
     async (c: boolean, mode: ConnectionMode) => {
       if (c) {
         if (typeof urlParams.brdgeId === 'string') { // Use urlParams.brdgeId
-          connect(mode, urlParams.brdgeId, urlParams.userId);
+          connect(mode, urlParams.brdgeId, urlParams.userId, urlParams.personalizationId);
         } else {
           connect(mode);
         }
@@ -164,7 +166,7 @@ export function HomeInner() {
         disconnect();
       }
     },
-    [connect, disconnect, urlParams.brdgeId, urlParams.userId] // Use urlParams values
+    [connect, disconnect, urlParams.brdgeId, urlParams.userId, urlParams.personalizationId] // Use urlParams values
   );
 
   const showPG = useMemo(() => {
