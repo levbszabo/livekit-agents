@@ -60,7 +60,7 @@ export const PersonalizationManager: React.FC<PersonalizationManagerProps> = ({
     const [selectedRecords, setSelectedRecords] = useState<Set<string>>(new Set());
     const [bulkDeleteConfirmModal, setBulkDeleteConfirmModal] = useState<{ recordIds: string[]; recordCount: number } | null>(null);
     const [isBulkDeleting, setIsBulkDeleting] = useState(false);
-    const [deleteTemplateConfirmModal, setDeleteTemplateConfirmModal] = useState<PersonalizationTemplate | null>(null); // Added this line
+    const [deleteTemplateConfirmModal, setDeleteTemplateConfirmModal] = useState<PersonalizationTemplate | null>(null);
 
     // New template creation state
     const [newTemplateName, setNewTemplateName] = useState('');
@@ -87,12 +87,7 @@ export const PersonalizationManager: React.FC<PersonalizationManagerProps> = ({
         recordCount: number;
     }>({ show: false, templateName: '', recordCount: 0 });
 
-    // Fetch templates on mount
-    useEffect(() => {
-        fetchTemplates();
-    }, [brdgeId]);
-
-    const fetchTemplates = async () => {
+    const fetchTemplates = useCallback(async () => {
         try {
             setIsLoading(true);
             const response = await fetch(`${apiBaseUrl}/brdges/${brdgeId}/personalization/templates`, {
@@ -110,7 +105,12 @@ export const PersonalizationManager: React.FC<PersonalizationManagerProps> = ({
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [apiBaseUrl, authToken, brdgeId]);
+
+    // Fetch templates on mount
+    useEffect(() => {
+        fetchTemplates();
+    }, [fetchTemplates]);
 
     const fetchRecords = async (templateId: string) => {
         try {
@@ -2064,8 +2064,8 @@ export const PersonalizationManager: React.FC<PersonalizationManagerProps> = ({
                             </div>
 
                             <p className="text-sm text-gray-600 mb-4">
-                                Are you sure you want to delete the template
-                                <strong className="text-red-700">{deleteTemplateConfirmModal.name}</strong>?
+                                Are you sure you want to delete the template &ldquo;
+                                <strong className="text-red-700">{deleteTemplateConfirmModal.name}&rdquo;</strong>?
                                 This will also remove all {deleteTemplateConfirmModal.record_count || 0} associated records.
                             </p>
 
