@@ -1833,7 +1833,7 @@ export const PersonalizationManager: React.FC<PersonalizationManagerProps> = ({
                                                         Template Created Successfully! 🎉
                                                     </div>
                                                     <div className="text-sm text-green-700">
-                                                        Created "{showSuccessMessage.templateName}" with {showSuccessMessage.recordCount} personalized records.
+                                                        Created &ldquo;{showSuccessMessage.templateName}&rdquo; with {showSuccessMessage.recordCount} personalized records.
                                                         Your personalization links are ready to use!
                                                     </div>
                                                 </div>
