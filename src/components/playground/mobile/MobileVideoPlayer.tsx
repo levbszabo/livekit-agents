@@ -92,7 +92,7 @@ export const MobileVideoPlayer: React.FC<MobileVideoPlayerProps> = ({
             setIsLoading(true);
             onVideoReady(false);
         }
-    }, [videoUrl, onVideoReady]);
+    }, [videoUrl, onVideoReady, videoRef]);
 
     return (
         <div className="relative w-full h-full bg-black" onClick={handleVideoClick}>

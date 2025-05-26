@@ -648,7 +648,7 @@ const VideoPlayer = ({
       videoRef.current.src = videoUrl;
       videoRef.current.load(); // Force reload with new URL
     }
-  }, [videoUrl]);
+  }, [videoUrl, videoRef]);
 
   // Add a cleanup effect for when the component unmounts
   useEffect(() => {
@@ -5002,7 +5002,7 @@ export default function Playground({
                                   <option value="gemini-2.0-flash-live-001">Gemini 2.0 Flash Live</option>
                                 </select>
                                 <div className="text-[10px] text-gray-500 mt-1">
-                                  Google's live conversation model with ultra-low latency
+                                  Google&apos;s live conversation model with ultra-low latency
                                 </div>
                               </div>
 

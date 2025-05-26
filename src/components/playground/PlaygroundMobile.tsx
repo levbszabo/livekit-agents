@@ -1802,7 +1802,7 @@ export default function PlaygroundMobile({
                                                 <option value="gemini-2.0-flash-live-001">Gemini 2.0 Flash Live</option>
                                             </select>
                                             <div className="text-xs text-gray-500 mt-1">
-                                                Google's live conversation model with ultra-low latency
+                                                Google&apos;s live conversation model with ultra-low latency
                                             </div>
                                         </div>
 

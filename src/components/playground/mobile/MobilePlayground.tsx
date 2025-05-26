@@ -804,7 +804,7 @@ const VideoPlayer = ({
                 videoRef.current.load();
             }
         }
-    }, [videoUrl]);
+    }, [videoUrl, videoRef]);
 
     return (
         <div className="relative w-full h-full bg-black flex items-center justify-center"
