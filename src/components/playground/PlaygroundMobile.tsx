@@ -25,6 +25,7 @@ import { MobileVideoPlayer } from './mobile/MobileVideoPlayer';
 import { MobileProgressBar } from './mobile/MobileProgressBar';
 import { MessageSquare, ClipboardList, User, Radio, Share2, Square, Send, Mic, MicOff, Plus, Edit2, Trash2, ChevronRight, Save, Info, Lock, Globe, Copy, Check, ExternalLink, Volume2, VolumeX, X, Loader2, MessageCircle, Link } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { PersonalizationManager } from './PersonalizationManager';
 
 // Our EngagementOpportunity interface definition
 interface EngagementQuizItem {
@@ -212,7 +213,7 @@ export default function PlaygroundMobile({
     const [engagementOpportunities, setEngagementOpportunities] = useState<EngagementOpportunity[]>([]);
 
     // Add MobileTab state for navigation
-    const [activeMobileTab, setActiveMobileTab] = useState<'chat' | 'engagement' | 'teaching-persona' | 'voice-clone' | 'share'>('chat');
+    const [activeMobileTab, setActiveMobileTab] = useState<'chat' | 'engagement' | 'teaching-persona' | 'models' | 'share'>('chat');
 
     // Track if we've already connected to avoid multiple connection attempts
     const hasConnected = useRef(false);
@@ -242,6 +243,14 @@ export default function PlaygroundMobile({
     const [saveSuccess, setSaveSuccess] = useState(false); // For persona save
     const [phrasesText, setPhrasesText] = useState(''); // For persona phrases
     const [selectedEngagementType, setSelectedEngagementType] = useState<string | null>(null); // For filtering engagements
+
+    // State for model configuration
+    const [modelMode, setModelMode] = useState<'standard' | 'realtime'>('standard');
+    const [standardModel, setStandardModel] = useState<'gpt-4.1' | 'gemini-2.0-flash' | 'gemini-2.5-pro' | 'gemini-2.5-flash'>('gpt-4.1');
+    const [realtimeModel, setRealtimeModel] = useState<'gemini-2.0-flash-live-001'>('gemini-2.0-flash-live-001');
+
+    // Feature gates
+    const REALTIME_MODELS_ENABLED = false; // Set to false to disable realtime models
 
     // Add initialization state
     const [isInitializing, setIsInitializing] = useState(true);
@@ -740,6 +749,69 @@ export default function PlaygroundMobile({
     useEffect(() => {
         fetchAgentConfig();
     }, [fetchAgentConfig]);
+
+    // Fetch Model Configuration
+    const fetchModelConfig = useCallback(async () => {
+        if (!params.brdgeId || !params.apiBaseUrl) return;
+        try {
+            const headers: HeadersInit = {};
+            if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+            const response = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/model-config`, { headers });
+            if (response.ok) {
+                const data = await response.json();
+                // Force standard mode if realtime is disabled
+                const fetchedMode = data.mode || 'standard';
+                const finalMode = REALTIME_MODELS_ENABLED ? fetchedMode : 'standard';
+                setModelMode(finalMode);
+                setStandardModel(data.standard_model || 'gpt-4.1');
+                setRealtimeModel(data.realtime_model || 'gemini-2.0-flash-live-001');
+
+                // If we forced to standard mode, update the backend
+                if (!REALTIME_MODELS_ENABLED && fetchedMode === 'realtime') {
+                    updateModelConfig({
+                        mode: 'standard',
+                        standard_model: data.standard_model || 'gpt-4.1',
+                        realtime_model: data.realtime_model || 'gemini-2.0-flash-live-001',
+                        voice_id: data.voice_id
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching model config:', error);
+        }
+    }, [params.brdgeId, params.apiBaseUrl, authToken]);
+
+    useEffect(() => {
+        fetchModelConfig();
+    }, [fetchModelConfig]);
+
+    // Update model configuration
+    const updateModelConfig = useCallback(async (config: any) => {
+        if (!params.brdgeId || !params.apiBaseUrl) return;
+
+        try {
+            const headers: HeadersInit = {
+                'Content-Type': 'application/json',
+            };
+            if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+            const response = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/model-config`, {
+                method: 'PUT',
+                headers,
+                credentials: 'omit',
+                body: JSON.stringify(config)
+            });
+
+            if (response.ok) {
+                console.log('Model configuration updated successfully');
+                fetchModelConfig(); // Refresh config
+            } else {
+                console.error('Failed to update model configuration');
+            }
+        } catch (error) {
+            console.error('Error updating model config:', error);
+        }
+    }, [params.brdgeId, params.apiBaseUrl, authToken, fetchModelConfig]);
 
     // Fetch Brdge Data (includes shareable status and voice_id)
     const fetchBrdge = useCallback(async () => {
@@ -1582,16 +1654,183 @@ export default function PlaygroundMobile({
                                 <div className="h-20"></div> {/* Add padding at the bottom */}
                             </div>
 
-                            {/* Voice Tab Content */}
-                            <div className={`absolute inset-0 transition-opacity duration-300 overflow-y-auto p-4 ${activeMobileTab === 'voice-clone' ? 'opacity-100 z-30' : 'opacity-0 z-0 pointer-events-none'}`}>
+                            {/* Models Tab Content */}
+                            <div className={`absolute inset-0 transition-opacity duration-300 overflow-y-auto p-4 ${activeMobileTab === 'models' ? 'opacity-100 z-30' : 'opacity-0 z-0 pointer-events-none'}`}>
                                 <div className="flex items-center justify-between mb-4">
-                                    <h2 className="text-lg font-semibold text-gray-800">Voice</h2>
-                                    {/* Add Create Voice button later if needed */}
+                                    <h2 className="text-lg font-semibold text-gray-800">AI Model Configuration</h2>
                                 </div>
-                                <div className="space-y-4">
-                                    <VoiceSelector voices={savedVoices} selectedVoice={selectedVoice} onSelect={handleSelectVoice} />
-                                    {/* TODO: Add voice creation UI here when isCreatingVoice is true */}
+
+                                {/* Mode Selection Toggle */}
+                                <div className="mb-6">
+                                    <label className="block text-gray-600 text-sm font-medium mb-3">AI Mode</label>
+                                    <div className="bg-gray-100 p-1 rounded-lg">
+                                        <div className="grid grid-cols-2 gap-1">
+                                            <button
+                                                onClick={() => {
+                                                    setModelMode('standard');
+                                                    updateModelConfig({
+                                                        mode: 'standard',
+                                                        standard_model: standardModel,
+                                                        realtime_model: realtimeModel,
+                                                        voice_id: selectedVoice === 'default' ? null : selectedVoice
+                                                    });
+                                                }}
+                                                className={`
+                                                    px-3 py-2 rounded-md text-sm font-medium transition-all duration-200
+                                                    ${modelMode === 'standard'
+                                                        ? 'bg-white text-blue-600 shadow-sm border border-blue-200'
+                                                        : 'text-gray-600 hover:text-gray-700'}
+                                                `}
+                                            >
+                                                Standard
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    if (REALTIME_MODELS_ENABLED) {
+                                                        setModelMode('realtime');
+                                                        updateModelConfig({
+                                                            mode: 'realtime',
+                                                            standard_model: standardModel,
+                                                            realtime_model: realtimeModel,
+                                                            voice_id: selectedVoice === 'default' ? null : selectedVoice
+                                                        });
+                                                    }
+                                                }}
+                                                disabled={!REALTIME_MODELS_ENABLED}
+                                                className={`
+                                                    px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 relative
+                                                    ${!REALTIME_MODELS_ENABLED
+                                                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
+                                                        : modelMode === 'realtime'
+                                                            ? 'bg-white text-blue-600 shadow-sm border border-blue-200'
+                                                            : 'text-gray-600 hover:text-gray-700'}
+                                                `}
+                                            >
+                                                <div className="flex items-center gap-1.5">
+                                                    {!REALTIME_MODELS_ENABLED && (
+                                                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                            <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                                                        </svg>
+                                                    )}
+                                                    <span>Realtime</span>
+                                                    {!REALTIME_MODELS_ENABLED && (
+                                                        <span className="text-[10px] opacity-75">(Soon)</span>
+                                                    )}
+                                                </div>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="text-xs text-gray-500 mt-2">
+                                        {modelMode === 'standard'
+                                            ? 'Traditional STT → LLM → TTS pipeline with voice cloning'
+                                            : !REALTIME_MODELS_ENABLED
+                                                ? 'Live conversation mode with reduced latency (coming soon)'
+                                                : 'Live conversation mode with reduced latency'
+                                        }
+                                    </div>
                                 </div>
+
+                                {/* Standard Mode */}
+                                {modelMode === 'standard' && (
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-gray-600 text-sm font-medium mb-2">Language Model</label>
+                                            <select
+                                                value={standardModel}
+                                                onChange={(e) => {
+                                                    const newModel = e.target.value as 'gpt-4.1' | 'gemini-2.0-flash' | 'gemini-2.5-pro' | 'gemini-2.5-flash';
+                                                    setStandardModel(newModel);
+                                                    updateModelConfig({
+                                                        mode: modelMode,
+                                                        standard_model: newModel,
+                                                        realtime_model: realtimeModel,
+                                                        voice_id: selectedVoice === 'default' ? null : selectedVoice
+                                                    });
+                                                }}
+                                                className="w-full px-3 py-3 rounded-lg text-sm text-gray-800 bg-white border border-gray-300 focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                                            >
+                                                <option value="gpt-4.1">GPT-4.1 (Recommended)</option>
+                                                <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                                                <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                                                <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                                            </select>
+                                            <div className="text-xs text-gray-500 mt-1">
+                                                {standardModel === 'gpt-4.1'
+                                                    ? 'OpenAI\'s latest model with excellent reasoning'
+                                                    : 'Google\'s fast model with multimodal capabilities'
+                                                }
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-gray-600 text-sm font-medium mb-2">Voice Selection</label>
+                                            <select
+                                                value={selectedVoice || 'default'}
+                                                onChange={(e) => handleSelectVoice(e.target.value)}
+                                                className="w-full px-3 py-3 rounded-lg text-sm text-gray-800 bg-white border border-gray-300 focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                                            >
+                                                <option value="default">Default AI Voice</option>
+                                                {savedVoices.map((voice) => (
+                                                    <option key={voice.id} value={voice.id}>
+                                                        {voice.name} {voice.status === 'active' ? '(Active)' : ''}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Realtime Mode */}
+                                {modelMode === 'realtime' && (
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-gray-600 text-sm font-medium mb-2">Realtime Model</label>
+                                            <select
+                                                value={realtimeModel}
+                                                onChange={(e) => {
+                                                    const newModel = e.target.value as 'gemini-2.0-flash-live-001';
+                                                    setRealtimeModel(newModel);
+                                                    updateModelConfig({
+                                                        mode: modelMode,
+                                                        standard_model: standardModel,
+                                                        realtime_model: newModel,
+                                                        voice_id: selectedVoice === 'default' ? null : selectedVoice
+                                                    });
+                                                }}
+                                                className="w-full px-3 py-3 rounded-lg text-sm text-gray-800 bg-white border border-gray-300 focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                                            >
+                                                <option value="gemini-2.0-flash-live-001">Gemini 2.0 Flash Live</option>
+                                            </select>
+                                            <div className="text-xs text-gray-500 mt-1">
+                                                Google's live conversation model with ultra-low latency
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-gray-600 text-sm font-medium mb-2">Voice (Limited Options)</label>
+                                            <select
+                                                value={selectedVoice || 'default'}
+                                                className="w-full px-3 py-3 rounded-lg text-sm text-gray-800 bg-white border border-gray-300"
+                                                disabled
+                                            >
+                                                <option value="default">Default Realtime Voice</option>
+                                            </select>
+                                            <div className="text-xs text-gray-500 mt-1">
+                                                Custom voice cloning not available in realtime mode
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                                            <h3 className="text-blue-800 text-sm font-medium mb-2">Realtime Features</h3>
+                                            <ul className="space-y-1 text-xs text-blue-700">
+                                                <li>• Ultra-low latency conversation</li>
+                                                <li>• Live video and audio streaming</li>
+                                                <li>• Real-time context awareness</li>
+                                                <li>• Limited voice customization</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                )}
                                 <div className="h-20"></div> {/* Add padding at the bottom */}
                             </div>
 
@@ -1631,6 +1870,18 @@ export default function PlaygroundMobile({
                                             <p className="text-[13px] text-gray-500 text-center py-2">Enable public access to get link</p>
                                         )}
                                     </div>
+
+                                    {/* Personalization Section - Only show when bridge is shareable */}
+                                    {brdge?.shareable && params.brdgeId && params.agentType === 'edit' && (
+                                        <div className="mt-4">
+                                            <PersonalizationManager
+                                                brdgeId={params.brdgeId}
+                                                apiBaseUrl={params.apiBaseUrl || ''}
+                                                authToken={authToken}
+                                                shareableLink={shareableLink}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="h-20"></div> {/* Add padding at the bottom */}
                             </div>
@@ -1682,15 +1933,15 @@ export default function PlaygroundMobile({
                             </button>
                             <button
                                 className={`relative flex flex-col items-center justify-center px-3 py-1 
-                                ${activeMobileTab === 'voice-clone' ? 'text-blue-600' : 'text-gray-500'}`}
-                                onClick={() => setActiveMobileTab('voice-clone')}
+                                ${activeMobileTab === 'models' ? 'text-blue-600' : 'text-gray-500'}`}
+                                onClick={() => setActiveMobileTab('models')}
                             >
-                                {activeMobileTab === 'voice-clone' && (
+                                {activeMobileTab === 'models' && (
                                     <div className="absolute -top-[1px] left-1/2 -translate-x-1/2 w-6 h-[2px] rounded-full 
                                     bg-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.5)]" />
                                 )}
                                 <Radio size={18} className="mb-1" />
-                                <div className="text-xs">Voice</div>
+                                <div className="text-xs">Models</div>
                             </button>
                             <button
                                 className={`relative flex flex-col items-center justify-center px-3 py-1 

@@ -27,18 +27,25 @@ export default async function handleToken(
 
     const roomName = `room-${generateRandomAlphanumeric(4)}-${generateRandomAlphanumeric(4)}`;
 
-    // Get brdge_id and userId from query params
+    // Get brdge_id, userId and personalizationId from query params
     const brdgeId = req.query.brdge_id as string;
     const userId = req.query.user_id as string;
+    const personalizationId = req.query.personalization_id as string;
 
-    // Include userId in the identity if available
+    // Include userId and personalizationId in the identity if available
     let identity;
     if (brdgeId) {
-      if (userId) {
+      if (userId && personalizationId) {
+        // Format: brdge-BRDGE_ID-USER_ID-PERSONALIZATION_ID
+        identity = `brdge-${brdgeId}-${userId}-${personalizationId}`;
+      } else if (userId) {
         // Format: brdge-BRDGE_ID-USER_ID
         identity = `brdge-${brdgeId}-${userId}`;
+      } else if (personalizationId) {
+        // Format: brdge-BRDGE_ID-anon_RANDOM-PERSONALIZATION_ID
+        identity = `brdge-${brdgeId}-anon_${generateRandomAlphanumeric(4)}-${personalizationId}`;
       } else {
-        // Fallback to previous format with random ID if no userId
+        // Fallback to previous format with random ID if no userId or personalizationId
         identity = `brdge-${brdgeId}-${generateRandomAlphanumeric(4)}`;
       }
     } else {
