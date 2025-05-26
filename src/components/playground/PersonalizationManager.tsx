@@ -1154,7 +1154,7 @@ export const PersonalizationManager: React.FC<PersonalizationManagerProps> = ({
                                                                             Review AI-Generated Field Descriptions
                                                                         </label>
                                                                         <p className="text-xs text-gray-500 mt-1">
-                                                                            The AI has analyzed your CSV and created smart descriptions. You can edit them or keep as-is.
+                                                                            The AI has analyzed your CSV and created smart descriptions. You can edit them, remove unwanted fields, or keep as-is.
                                                                         </p>
                                                                     </div>
                                                                     <div className="text-xs text-blue-600 font-medium">
@@ -1164,7 +1164,7 @@ export const PersonalizationManager: React.FC<PersonalizationManagerProps> = ({
 
                                                                 <div className="space-y-4">
                                                                     {newColumns.map((column, index) => (
-                                                                        <div key={index} className="bg-white rounded-xl p-5 border border-gray-200 hover:border-blue-200 transition-colors">
+                                                                        <div key={index} className="bg-white rounded-xl p-5 border border-gray-200 hover:border-blue-200 transition-colors relative group">
                                                                             <div className="flex items-start gap-4">
                                                                                 <div className="flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full text-blue-600 font-medium text-sm">
                                                                                     {index + 1}
@@ -1216,10 +1216,31 @@ export const PersonalizationManager: React.FC<PersonalizationManagerProps> = ({
                                                                                         </div>
                                                                                     </div>
                                                                                 </div>
+
+                                                                                {/* Remove Column Button */}
+                                                                                <button
+                                                                                    onClick={() => removeColumn(index)}
+                                                                                    className="absolute top-3 right-3 p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 
+                                                                                        opacity-0 group-hover:opacity-100 transition-all duration-200 
+                                                                                        focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-red-200"
+                                                                                    title="Remove this field from template"
+                                                                                >
+                                                                                    <X size={16} />
+                                                                                </button>
                                                                             </div>
                                                                         </div>
                                                                     ))}
                                                                 </div>
+
+                                                                {/* Show warning if no columns selected */}
+                                                                {newColumns.length === 0 && (
+                                                                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
+                                                                        <div className="text-amber-800 text-sm font-medium mb-1">No fields selected</div>
+                                                                        <div className="text-amber-700 text-xs">
+                                                                            You need at least one field to create a template. Please upload a different CSV or go back to manual creation.
+                                                                        </div>
+                                                                    </div>
+                                                                )}
                                                             </div>
 
                                                             <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
@@ -1752,72 +1773,89 @@ export const PersonalizationManager: React.FC<PersonalizationManagerProps> = ({
                                                     )}
                                                 </div>
                                                 <div className="border border-gray-200 rounded-lg overflow-hidden">
-                                                    <table className="w-full text-sm">
-                                                        <thead className="bg-gray-50 border-b border-gray-200">
-                                                            <tr>
-                                                                <th className="text-left px-4 py-2 font-medium text-gray-700 w-12">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={records.length > 0 && selectedRecords.size === records.length}
-                                                                        onChange={toggleSelectAll}
-                                                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                                    />
-                                                                </th>
-                                                                {selectedTemplate.columns.map(column => (
-                                                                    <th key={column.name} className="text-left px-4 py-2 font-medium text-gray-700">
-                                                                        {column.name}
-                                                                    </th>
-                                                                ))}
-                                                                <th className="text-left px-4 py-2 font-medium text-gray-700">Link</th>
-                                                                <th className="text-right px-4 py-2 font-medium text-gray-700">Actions</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-gray-200">
-                                                            {records.map(record => (
-                                                                <tr key={record.unique_id} className="hover:bg-gray-50">
-                                                                    <td className="px-4 py-2">
+                                                    <div className="overflow-x-auto">
+                                                        <table className="w-full text-sm min-w-max">
+                                                            <thead className="bg-gray-50 border-b border-gray-200">
+                                                                <tr>
+                                                                    <th className="text-left px-4 py-2 font-medium text-gray-700 w-12 sticky left-0 bg-gray-50 z-10">
                                                                         <input
                                                                             type="checkbox"
-                                                                            checked={selectedRecords.has(record.id)}
-                                                                            onChange={() => toggleRecordSelection(record.id)}
+                                                                            checked={records.length > 0 && selectedRecords.size === records.length}
+                                                                            onChange={toggleSelectAll}
                                                                             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                                                         />
-                                                                    </td>
+                                                                    </th>
                                                                     {selectedTemplate.columns.map(column => (
-                                                                        <td key={column.name} className="px-4 py-2 text-gray-800">
-                                                                            {record.data[column.name] || '-'}
-                                                                        </td>
+                                                                        <th key={column.name} className="text-left px-4 py-2 font-medium text-gray-700 min-w-[120px] whitespace-nowrap">
+                                                                            {column.name}
+                                                                        </th>
                                                                     ))}
-                                                                    <td className="px-4 py-2">
-                                                                        <button
-                                                                            onClick={() => copyPersonalizedLink(record.unique_id)}
-                                                                            className="text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                                                                        >
-                                                                            {copiedLinks.has(record.unique_id) ? (
-                                                                                <>
-                                                                                    <Check size={12} />
-                                                                                    <span className="text-xs">Copied!</span>
-                                                                                </>
-                                                                            ) : (
-                                                                                <>
-                                                                                    <Copy size={12} />
-                                                                                    <span className="text-xs">Copy Link</span>
-                                                                                </>
-                                                                            )}
-                                                                        </button>
-                                                                    </td>
-                                                                    <td className="px-4 py-2 text-right">
-                                                                        <button
-                                                                            onClick={() => handleDeleteClick(record.id, record.data)}
-                                                                            className="text-red-600 hover:text-red-700 p-1"
-                                                                        >
-                                                                            <Trash2 size={14} />
-                                                                        </button>
-                                                                    </td>
+                                                                    <th className="text-left px-4 py-2 font-medium text-gray-700 min-w-[100px] whitespace-nowrap">Link</th>
+                                                                    <th className="text-right px-4 py-2 font-medium text-gray-700 w-20 sticky right-0 bg-gray-50 z-10">Actions</th>
                                                                 </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
+                                                            </thead>
+                                                            <tbody className="divide-y divide-gray-200">
+                                                                {records.map(record => (
+                                                                    <tr key={record.unique_id} className="hover:bg-gray-50">
+                                                                        <td className="px-4 py-2 sticky left-0 bg-white hover:bg-gray-50 z-10">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={selectedRecords.has(record.id)}
+                                                                                onChange={() => toggleRecordSelection(record.id)}
+                                                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                                            />
+                                                                        </td>
+                                                                        {selectedTemplate.columns.map(column => (
+                                                                            <td key={column.name} className="px-4 py-2 text-gray-800 min-w-[120px] max-w-[200px] truncate" title={record.data[column.name] || '-'}>
+                                                                                {record.data[column.name] || '-'}
+                                                                            </td>
+                                                                        ))}
+                                                                        <td className="px-4 py-2 min-w-[100px]">
+                                                                            <button
+                                                                                onClick={() => copyPersonalizedLink(record.unique_id)}
+                                                                                className="text-blue-600 hover:text-blue-700 flex items-center gap-1 whitespace-nowrap"
+                                                                            >
+                                                                                {copiedLinks.has(record.unique_id) ? (
+                                                                                    <>
+                                                                                        <Check size={12} />
+                                                                                        <span className="text-xs">Copied!</span>
+                                                                                    </>
+                                                                                ) : (
+                                                                                    <>
+                                                                                        <Copy size={12} />
+                                                                                        <span className="text-xs">Copy Link</span>
+                                                                                    </>
+                                                                                )}
+                                                                            </button>
+                                                                        </td>
+                                                                        <td className="px-4 py-2 text-right sticky right-0 bg-white hover:bg-gray-50 z-10">
+                                                                            <button
+                                                                                onClick={() => handleDeleteClick(record.id, record.data)}
+                                                                                className="text-red-600 hover:text-red-700 p-1"
+                                                                            >
+                                                                                <Trash2 size={14} />
+                                                                            </button>
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+
+                                                    {/* Horizontal scroll indicator */}
+                                                    {selectedTemplate.columns.length > 4 && (
+                                                        <div className="bg-blue-50 border-t border-blue-200 px-4 py-2 text-center">
+                                                            <div className="text-xs text-blue-600 flex items-center justify-center gap-1">
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16l-4-4m0 0l4-4m-4 4h18" />
+                                                                </svg>
+                                                                Scroll horizontally to see all {selectedTemplate.columns.length} columns
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                                                                </svg>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         )}
