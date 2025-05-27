@@ -188,31 +188,21 @@ export function HomeInner() {
 
   // Add global styles to prevent scrolling and bouncing effects
   useEffect(() => {
-    // Prevent scrolling on the body
-    document.body.style.overflow = 'hidden';
-    document.body.style.position = 'fixed';
-    document.body.style.width = '100%';
-    document.body.style.height = '100%';
+    // Only prevent scrolling for standalone playground, not embeds
+    if (!urlParams.isEmbed) {
+      // Prevent scrolling on the body
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.height = '100%';
+      document.body.style.overscrollBehavior = 'none';
 
-    // Prevent iOS overscroll/bounce effect
-    document.documentElement.style.overflow = 'hidden';
-    document.documentElement.style.position = 'fixed';
-    document.documentElement.style.width = '100%';
-    document.documentElement.style.height = '100%';
-
-    // Extra prevention for embeds
-    if (urlParams.isEmbed) {
-      // Prevent parent scrolling when embedded
-      document.body.style.touchAction = 'none';
-      document.documentElement.style.touchAction = 'none';
-
-      // Prevent Safari bounce
-      const preventBounce = (e: TouchEvent) => {
-        if (e.touches.length > 1) return; // Allow multi-touch gestures
-        e.preventDefault();
-      };
-
-      document.addEventListener('touchmove', preventBounce, { passive: false });
+      // Prevent iOS overscroll/bounce effect
+      document.documentElement.style.overflow = 'hidden';
+      document.documentElement.style.position = 'fixed';
+      document.documentElement.style.width = '100%';
+      document.documentElement.style.height = '100%';
+      document.documentElement.style.overscrollBehavior = 'none';
 
       // Cleanup
       return () => {
@@ -220,27 +210,14 @@ export function HomeInner() {
         document.body.style.position = '';
         document.body.style.width = '';
         document.body.style.height = '';
-        document.body.style.touchAction = '';
+        document.body.style.overscrollBehavior = '';
         document.documentElement.style.overflow = '';
         document.documentElement.style.position = '';
         document.documentElement.style.width = '';
         document.documentElement.style.height = '';
-        document.documentElement.style.touchAction = '';
-        document.removeEventListener('touchmove', preventBounce);
+        document.documentElement.style.overscrollBehavior = '';
       };
     }
-
-    // Cleanup
-    return () => {
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.width = '';
-      document.body.style.height = '';
-      document.documentElement.style.overflow = '';
-      document.documentElement.style.position = '';
-      document.documentElement.style.width = '';
-      document.documentElement.style.height = '';
-    };
   }, [urlParams.isEmbed]);
 
   return (
@@ -255,6 +232,8 @@ export function HomeInner() {
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="format-detection" content="telephone=no" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="msapplication-tap-highlight" content="no" />
         <meta
           property="og:image"
           content="https://livekit.io/images/og/agents-playground.png"
