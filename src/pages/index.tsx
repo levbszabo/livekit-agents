@@ -61,7 +61,7 @@ export function HomeInner() {
   const { config } = useConfig();
   const { toastMessage, setToastMessage } = useToast();
   const [isMobile, setIsMobile] = useState(false);
-  const [urlParams, setUrlParams] = useState<{ brdgeId: string | null; agentType?: 'edit' | 'view'; userId?: string; personalizationId?: string }>({ brdgeId: null, agentType: 'edit' });
+  const [urlParams, setUrlParams] = useState<{ brdgeId: string | null; agentType?: 'edit' | 'view'; userId?: string; personalizationId?: string; isEmbed?: boolean }>({ brdgeId: null, agentType: 'edit' });
   const [authToken, setAuthTokenState] = useState<string | null>(null);
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [showRotationPrompt, setShowRotationPrompt] = useState(false);
@@ -74,12 +74,14 @@ export function HomeInner() {
       const userIdParam = searchParams.get('userId');
       const agentTypeParam = searchParams.get('agentType') as 'edit' | 'view'; // Read agentType
       const personalizationIdParam = searchParams.get('id'); // Get personalization ID from 'id' parameter
+      const isEmbed = searchParams.get('embed') === '1'; // Check if in embed mode
 
       setUrlParams({
         brdgeId: brdgeIdParam,
         userId: userIdParam || undefined,
         agentType: agentTypeParam || 'edit', // Default to edit if not specified
-        personalizationId: personalizationIdParam || undefined
+        personalizationId: personalizationIdParam || undefined,
+        isEmbed: isEmbed || false
       });
 
       // Function to check if device is mobile
@@ -193,6 +195,36 @@ export function HomeInner() {
     document.documentElement.style.width = '100%';
     document.documentElement.style.height = '100%';
 
+    // Extra prevention for embeds
+    if (urlParams.isEmbed) {
+      // Prevent parent scrolling when embedded
+      document.body.style.touchAction = 'none';
+      document.documentElement.style.touchAction = 'none';
+
+      // Prevent Safari bounce
+      const preventBounce = (e: TouchEvent) => {
+        if (e.touches.length > 1) return; // Allow multi-touch gestures
+        e.preventDefault();
+      };
+
+      document.addEventListener('touchmove', preventBounce, { passive: false });
+
+      // Cleanup
+      return () => {
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.width = '';
+        document.body.style.height = '';
+        document.body.style.touchAction = '';
+        document.documentElement.style.overflow = '';
+        document.documentElement.style.position = '';
+        document.documentElement.style.width = '';
+        document.documentElement.style.height = '';
+        document.documentElement.style.touchAction = '';
+        document.removeEventListener('touchmove', preventBounce);
+      };
+    }
+
     // Cleanup
     return () => {
       document.body.style.overflow = '';
@@ -204,7 +236,7 @@ export function HomeInner() {
       document.documentElement.style.width = '';
       document.documentElement.style.height = '';
     };
-  }, []);
+  }, [urlParams.isEmbed]);
 
   return (
     <>

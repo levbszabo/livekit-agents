@@ -3592,6 +3592,64 @@ export default function Playground({
     // Re-run when activation state or connection state changes
   }, [hasAudioBeenActivated, room, roomState]);
 
+  // Add these state variables near the top with other state declarations (around line 800)
+  const [lastActivityTime, setLastActivityTime] = useState(Date.now());
+  const idleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
+  // Add this effect right after the existing useEffect hooks (around line 1200)
+  // Idle timeout effect - disconnect after 5 minutes of inactivity
+  useEffect(() => {
+    const resetIdleTimer = () => {
+      setLastActivityTime(Date.now());
+
+      // Clear existing timeout
+      if (idleTimeoutRef.current) {
+        clearTimeout(idleTimeoutRef.current);
+      }
+
+      // Only set timeout if we're connected
+      if (roomState === ConnectionState.Connected) {
+        idleTimeoutRef.current = setTimeout(() => {
+          console.log("Disconnecting due to 5 minute idle timeout");
+          onConnect(false);
+        }, IDLE_TIMEOUT_MS);
+      }
+    };
+
+    // Reset timer on connection
+    if (roomState === ConnectionState.Connected) {
+      resetIdleTimer();
+    }
+
+    // Activity event listeners
+    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+
+    activityEvents.forEach(event => {
+      document.addEventListener(event, resetIdleTimer, { passive: true });
+    });
+
+    // Cleanup function
+    return () => {
+      if (idleTimeoutRef.current) {
+        clearTimeout(idleTimeoutRef.current);
+      }
+
+      activityEvents.forEach(event => {
+        document.removeEventListener(event, resetIdleTimer);
+      });
+    };
+  }, [roomState, onConnect, IDLE_TIMEOUT_MS]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (idleTimeoutRef.current) {
+        clearTimeout(idleTimeoutRef.current);
+      }
+    };
+  }, []);
+
   return (
     <div ref={playgroundContainerRef} className="h-screen flex flex-col bg-[#F5EFE0] relative overflow-hidden"> {/* <<< Added ref */}
       {/* Header */}

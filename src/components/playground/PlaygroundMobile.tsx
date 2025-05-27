@@ -274,6 +274,64 @@ export default function PlaygroundMobile({
     // State for UI feedback on quiz option click
     const [clickedOption, setClickedOption] = useState<string | null>(null);
 
+    // Add these state variables after the existing state declarations (around line 150)
+    const [lastActivityTime, setLastActivityTime] = useState(Date.now());
+    const idleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
+    // Add this effect after the existing useEffect hooks (around line 400)
+    // Idle timeout effect - disconnect after 5 minutes of inactivity  
+    useEffect(() => {
+        const resetIdleTimer = () => {
+            setLastActivityTime(Date.now());
+
+            // Clear existing timeout
+            if (idleTimeoutRef.current) {
+                clearTimeout(idleTimeoutRef.current);
+            }
+
+            // Only set timeout if we're connected
+            if (roomState === ConnectionState.Connected) {
+                idleTimeoutRef.current = setTimeout(() => {
+                    console.log("Mobile: Disconnecting due to 5 minute idle timeout");
+                    onConnect(false);
+                }, IDLE_TIMEOUT_MS);
+            }
+        };
+
+        // Reset timer on connection
+        if (roomState === ConnectionState.Connected) {
+            resetIdleTimer();
+        }
+
+        // Activity event listeners for mobile
+        const activityEvents = ['touchstart', 'touchmove', 'touchend', 'click', 'scroll', 'keypress'];
+
+        activityEvents.forEach(event => {
+            document.addEventListener(event, resetIdleTimer, { passive: true });
+        });
+
+        // Cleanup function
+        return () => {
+            if (idleTimeoutRef.current) {
+                clearTimeout(idleTimeoutRef.current);
+            }
+
+            activityEvents.forEach(event => {
+                document.removeEventListener(event, resetIdleTimer);
+            });
+        };
+    }, [roomState, onConnect, IDLE_TIMEOUT_MS]);
+
+    // Cleanup timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (idleTimeoutRef.current) {
+                clearTimeout(idleTimeoutRef.current);
+            }
+        };
+    }, []);
+
     // Add handleInterruptAgent function
     const handleInterruptAgent = useCallback(() => {
         if (roomState !== ConnectionState.Connected || !dataChannel) {
