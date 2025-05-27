@@ -368,6 +368,11 @@ export default function PlaygroundMobile({
 
     // Scroll to bottom function for chat
     const scrollToBottom = useCallback(() => {
+        // Skip auto-scrolling in embed mode to prevent Safari scroll issues
+        if (typeof window !== 'undefined' && (window as any).__IS_EMBED__) {
+            return;
+        }
+
         if (messagesEndRef.current) {
             messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
         }

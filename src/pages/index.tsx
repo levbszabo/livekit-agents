@@ -84,6 +84,11 @@ export function HomeInner() {
         isEmbed: isEmbed || false
       });
 
+      // Pass embed status to child components via context or props
+      if (typeof window !== 'undefined' && isEmbed) {
+        (window as any).__IS_EMBED__ = true;
+      }
+
       // Function to check if device is mobile
       const checkMobile = () => {
         const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
