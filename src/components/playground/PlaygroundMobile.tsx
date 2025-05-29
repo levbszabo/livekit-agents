@@ -246,7 +246,7 @@ export default function PlaygroundMobile({
 
     // State for model configuration
     const [modelMode, setModelMode] = useState<'standard' | 'realtime'>('standard');
-    const [standardModel, setStandardModel] = useState<'gpt-4.1' | 'gemini-2.0-flash' | 'gemini-2.5-pro' | 'gemini-2.5-flash'>('gpt-4.1');
+    const [standardModel, setStandardModel] = useState<'gpt-4.1' | 'gemini-2.0-flash' | 'gemini-2.5-flash'>('gpt-4.1');
     const [realtimeModel, setRealtimeModel] = useState<'gemini-2.0-flash-live-001'>('gemini-2.0-flash-live-001');
 
     // Feature gates
@@ -293,7 +293,7 @@ export default function PlaygroundMobile({
             // Only set timeout if we're connected
             if (roomState === ConnectionState.Connected) {
                 idleTimeoutRef.current = setTimeout(() => {
-                    console.log("Mobile: Disconnecting due to 5 minute idle timeout");
+                    // console.log("Mobile: Disconnecting due to 5 minute idle timeout");
                     onConnect(false);
                 }, IDLE_TIMEOUT_MS);
             }
@@ -432,22 +432,22 @@ export default function PlaygroundMobile({
         if (!params.brdgeId || !params.apiBaseUrl) return;
 
         try {
-            console.log('Fetching agent config...');
+            // console.log('Fetching agent config...');
             const response = await fetch(`${params.apiBaseUrl}/brdges/${params.brdgeId}/agent-config`);
             if (!response.ok) {
-                console.warn('Failed to fetch agent config');
+                // console.warn('Failed to fetch agent config');
                 return;
             }
 
             const data = await response.json();
-            console.log('Received agent config:', data);
+            // console.log('Received agent config:', data);
 
             if (data.engagement_opportunities) {
-                console.log('Setting engagement opportunities from agent config:', data.engagement_opportunities);
-                console.log('Number of opportunities:', data.engagement_opportunities.length);
+                // console.log('Setting engagement opportunities from agent config:', data.engagement_opportunities);
+                // console.log('Number of opportunities:', data.engagement_opportunities.length);
                 setEngagementOpportunities(data.engagement_opportunities);
             } else {
-                console.log('No engagement opportunities found in agent config');
+                // console.log('No engagement opportunities found in agent config');
                 setEngagementOpportunities([]);
             }
         } catch (error) {
@@ -495,7 +495,7 @@ export default function PlaygroundMobile({
         }
 
         if (!message.trim()) {
-            console.warn("Attempted to send empty message");
+            // console.warn("Attempted to send empty message");
             return;
         }
 
@@ -510,7 +510,7 @@ export default function PlaygroundMobile({
 
         try {
             await sendChatMessage(message); // Use sendChatMessage from useChat
-            console.log("Chat message sent:", message);
+            // console.log("Chat message sent:", message);
         } catch (error) {
             console.error("Error sending chat message:", error);
             // Error handling for failed sends might need a different approach
@@ -523,7 +523,7 @@ export default function PlaygroundMobile({
     useEffect(() => {
         // Only connect if we have a brdgeId and haven't connected yet
         if (params.brdgeId && !hasConnected.current) {
-            console.log("Initial connection to LiveKit with brdgeId:", params.brdgeId);
+            // console.log("Initial connection to LiveKit with brdgeId:", params.brdgeId);
             hasConnected.current = true;
             // Let parent component handle the connection
             onConnect(true);
@@ -532,16 +532,16 @@ export default function PlaygroundMobile({
 
     // Log connection state changes
     useEffect(() => {
-        console.log('LiveKit connection state:', roomState);
+        // console.log('LiveKit connection state:', roomState);
 
         if (roomState === ConnectionState.Connected) {
-            console.log('Successfully connected to LiveKit room');
+            // console.log('Successfully connected to LiveKit room');
         } else if (roomState === ConnectionState.Disconnected) {
-            console.log('Disconnected from LiveKit room');
+            // console.log('Disconnected from LiveKit room');
         } else if (roomState === ConnectionState.Connecting) {
-            console.log('Connecting to LiveKit room...');
+            // console.log('Connecting to LiveKit room...');
         } else if (roomState === ConnectionState.Reconnecting) {
-            console.log('Reconnecting to LiveKit room...');
+            // console.log('Reconnecting to LiveKit room...');
         }
     }, [roomState]);
 
@@ -566,7 +566,7 @@ export default function PlaygroundMobile({
         if (seconds > 0 && seconds <= videoRef.current.duration) {
             videoRef.current.currentTime = seconds;
             setCurrentTime(seconds);
-            console.log(`Seeking to timestamp: ${timestamp} (${seconds}s)`);
+            // console.log(`Seeking to timestamp: ${timestamp} (${seconds}s)`);
         }
     }, [videoRef]);
 
@@ -579,7 +579,7 @@ export default function PlaygroundMobile({
             isMounted.current = false;
             // Only disconnect if we previously connected
             if (hasConnected.current) {
-                console.log("Disconnecting from LiveKit on unmount");
+                // console.log("Disconnecting from LiveKit on unmount");
                 onConnect(false);
             }
         };
@@ -592,23 +592,23 @@ export default function PlaygroundMobile({
             return; // Don't register if not connected or no participant
         }
 
-        console.log("Registering mobile RPC methods");
+        // console.log("Registering mobile RPC methods");
 
         const playerControlRpcHandler = async (data: RpcInvocationData) => {
             try {
-                console.log(`Received mobile player control from agent: ${data.payload}`);
+                // console.log(`Received mobile player control from agent: ${data.payload}`);
                 const command = JSON.parse(data.payload);
 
                 if (videoRef.current) {
                     if (command.action === 'pause') {
                         videoRef.current.pause();
                         setIsPlaying(false); // Update mobile state
-                        console.log("Mobile video paused via RPC");
+                        // console.log("Mobile video paused via RPC");
                         return JSON.stringify({ success: true, action: 'pause' });
                     } else if (command.action === 'play') {
                         await videoRef.current.play(); // Use await for play()
                         setIsPlaying(true); // Update mobile state
-                        console.log("Mobile video resumed via RPC");
+                        // console.log("Mobile video resumed via RPC");
                         return JSON.stringify({ success: true, action: 'play' });
                     }
                 }
@@ -628,7 +628,7 @@ export default function PlaygroundMobile({
         // Updated RPC method for triggering link popup (now uses setActivePopupData)
         const linkPopupRpcHandler = async (data: RpcInvocationData) => {
             try {
-                console.log(`Mobile: Received triggerLinkPopup from agent: ${data.payload}`);
+                // console.log(`Mobile: Received triggerLinkPopup from agent: ${data.payload}`);
                 const command = JSON.parse(data.payload);
 
                 if (command.action === 'show_link' && command.url) {
@@ -637,7 +637,7 @@ export default function PlaygroundMobile({
                         url: command.url,
                         message: command.message || null,
                     });
-                    console.log("Mobile: Agent triggered link popup:", command);
+                    // console.log("Mobile: Agent triggered link popup:", command);
                     return JSON.stringify({ success: true, action: 'show_link' });
                 }
 
@@ -656,7 +656,7 @@ export default function PlaygroundMobile({
         // Register new RPC method for displaying multiple choice quiz
         const quizPopupRpcHandler = async (data: RpcInvocationData) => {
             try {
-                console.log(`Mobile: Received displayMultipleChoiceQuiz from agent: ${data.payload}`);
+                // console.log(`Mobile: Received displayMultipleChoiceQuiz from agent: ${data.payload}`);
                 const command = JSON.parse(data.payload);
 
                 if (command.action === 'show_multiple_choice_quiz' && command.quiz_id && command.question && command.options) {
@@ -667,7 +667,7 @@ export default function PlaygroundMobile({
                         options: command.options,
                         message: command.message || null,
                     });
-                    console.log("Mobile: Agent triggered quiz popup:", command);
+                    // console.log("Mobile: Agent triggered quiz popup:", command);
                     return JSON.stringify({ success: true, action: 'displayMultipleChoiceQuiz' });
                 }
                 return JSON.stringify({ success: false, error: 'Invalid quiz display command' });
@@ -690,7 +690,7 @@ export default function PlaygroundMobile({
                     localParticipant.unregisterRpcMethod('controlVideoPlayer');
                     localParticipant.unregisterRpcMethod('triggerLinkPopup');
                     localParticipant.unregisterRpcMethod('displayMultipleChoiceQuiz'); // Unregister new RPC method
-                    console.log("Unregistered mobile RPC methods");
+                    // console.log("Unregistered mobile RPC methods");
                 }
             } catch (error) {
                 console.error("Error unregistering mobile RPC methods:", error);
@@ -738,17 +738,17 @@ export default function PlaygroundMobile({
     }, [roomState, sendVideoTimestamp]); // Dependencies for useCallback
 
     const handlePlay = useCallback(() => {
-        console.log("Mobile video play event triggered");
+        // console.log("Mobile video play event triggered");
         sendTimestamp(); // Send initial timestamp on play
     }, [sendTimestamp]);
 
     const handleStop = useCallback(() => {
         // No timestamp action needed on stop/pause/end based on Playground.tsx logic
-        console.log("Mobile video stop/pause/ended event triggered");
+        // console.log("Mobile video stop/pause/ended event triggered");
     }, []);
 
     const handleSeeked = useCallback(() => {
-        console.log("Mobile video seeked event triggered");
+        // console.log("Mobile video seeked event triggered");
         sendTimestamp(); // Send timestamp immediately after seek
     }, [sendTimestamp]);
 
@@ -757,11 +757,11 @@ export default function PlaygroundMobile({
 
         // Only attach listeners if video element exists, room is connected, AND video is ready
         if (!video || roomState !== ConnectionState.Connected || !isVideoReadyForListeners) {
-            console.log(`Mobile listeners check failed: Video ${video ? 'exists' : 'missing'}, State: ${roomState}, Ready: ${isVideoReadyForListeners}. Not attaching.`);
+            // console.log(`Mobile listeners check failed: Video ${video ? 'exists' : 'missing'}, State: ${roomState}, Ready: ${isVideoReadyForListeners}. Not attaching.`);
             return;
         }
 
-        console.log("Mobile listeners: Attaching video event listeners.");
+        // console.log("Mobile listeners: Attaching video event listeners.");
 
         // Define local handlers referencing the stable useCallback versions
         const onPlay = () => handlePlay();
@@ -777,11 +777,11 @@ export default function PlaygroundMobile({
         video.addEventListener("seeked", onSeeked);
         video.addEventListener("timeupdate", onTimeUpdate); // Add timeupdate listener
 
-        console.log("Mobile listeners: Event listeners attached.");
+        // console.log("Mobile listeners: Event listeners attached.");
 
         // Cleanup function
         return () => {
-            console.log("Mobile listeners cleanup: Removing video event listeners.");
+            // console.log("Mobile listeners cleanup: Removing video event listeners.");
             if (video) {
                 video.removeEventListener("play", onPlay);
                 video.removeEventListener("pause", onPause);
@@ -866,7 +866,7 @@ export default function PlaygroundMobile({
             });
 
             if (response.ok) {
-                console.log('Model configuration updated successfully');
+                // console.log('Model configuration updated successfully');
                 fetchModelConfig(); // Refresh config
             } else {
                 console.error('Failed to update model configuration');
@@ -955,7 +955,7 @@ export default function PlaygroundMobile({
 
     const updateAgentConfigBackend = async (newConfig: any) => {
         if (!params.brdgeId || !params.apiBaseUrl) return;
-        console.log('Updating config on backend:', newConfig);
+        // console.log('Updating config on backend:', newConfig);
         setIsSaving(true); // Indicate saving starts
         try {
             const response = await fetch(
@@ -970,7 +970,7 @@ export default function PlaygroundMobile({
                 }
             );
             if (response.ok) {
-                console.log('Backend config updated successfully.');
+                // console.log('Backend config updated successfully.');
                 setSaveSuccess(true);
                 setTimeout(() => setSaveSuccess(false), 2000);
             } else {
@@ -1262,9 +1262,9 @@ export default function PlaygroundMobile({
     useEffect(() => {
         const activateAudioIfNeeded = () => {
             if (!hasAudioBeenActivated && room && roomState === ConnectionState.Connected) {
-                console.log("Mobile: Attempting to activate audio due to user interaction...");
+                // console.log("Mobile: Attempting to activate audio due to user interaction...");
                 room.startAudio().then(() => {
-                    console.log("Mobile: Audio activated successfully via user interaction.");
+                    // console.log("Mobile: Audio activated successfully via user interaction.");
                     setHasAudioBeenActivated(true);
                     // Remove listeners once activated
                     if (mobileContainerRef.current) {
@@ -1281,19 +1281,19 @@ export default function PlaygroundMobile({
         const container = mobileContainerRef.current;
         // Only add listeners if audio isn't activated and the room is connected
         if (container && !hasAudioBeenActivated && roomState === ConnectionState.Connected) {
-            console.log("Mobile: Attaching audio activation listeners.");
+            // console.log("Mobile: Attaching audio activation listeners.");
             container.addEventListener('pointerdown', activateAudioIfNeeded, { once: false, capture: true });
             container.addEventListener('keydown', activateAudioIfNeeded, { once: false, capture: true });
 
             // Cleanup function to remove listeners
             return () => {
-                console.log("Mobile: Cleaning up audio activation listeners.");
+                // console.log("Mobile: Cleaning up audio activation listeners.");
                 container.removeEventListener('pointerdown', activateAudioIfNeeded, { capture: true });
                 container.removeEventListener('keydown', activateAudioIfNeeded, { capture: true });
             };
         } else if (hasAudioBeenActivated && container) {
             // Ensure listeners are removed if audio gets activated by other means perhaps
-            console.log("Mobile: Audio already activated, ensuring listeners are removed.");
+            // console.log("Mobile: Audio already activated, ensuring listeners are removed.");
             container.removeEventListener('pointerdown', activateAudioIfNeeded, { capture: true });
             container.removeEventListener('keydown', activateAudioIfNeeded, { capture: true });
         }
@@ -1496,7 +1496,7 @@ export default function PlaygroundMobile({
                                                                 };
                                                                 const encodedPayload = new TextEncoder().encode(JSON.stringify(answerPayload));
                                                                 sendQuizAnswer(encodedPayload, { reliable: true }); // topic is implicitly handled by useDataChannel("quiz_answer")
-                                                                console.log('Mobile: Sent quiz answer:', answerPayload);
+                                                                // console.log('Mobile: Sent quiz answer:', answerPayload);
                                                             }
                                                             setActivePopupData(null);
                                                             setClickedOption(null);
@@ -1801,7 +1801,7 @@ export default function PlaygroundMobile({
                                             <select
                                                 value={standardModel}
                                                 onChange={(e) => {
-                                                    const newModel = e.target.value as 'gpt-4.1' | 'gemini-2.0-flash' | 'gemini-2.5-pro' | 'gemini-2.5-flash';
+                                                    const newModel = e.target.value as 'gpt-4.1' | 'gemini-2.0-flash' | 'gemini-2.5-flash';
                                                     setStandardModel(newModel);
                                                     updateModelConfig({
                                                         mode: modelMode,
@@ -1814,7 +1814,6 @@ export default function PlaygroundMobile({
                                             >
                                                 <option value="gpt-4.1">GPT-4.1 (Recommended)</option>
                                                 <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                                                <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
                                                 <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                                             </select>
                                             <div className="text-xs text-gray-500 mt-1">

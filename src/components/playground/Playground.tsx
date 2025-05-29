@@ -2753,7 +2753,7 @@ export default function Playground({
 
   // Add state for model configuration
   const [modelMode, setModelMode] = useState<'standard' | 'realtime'>('standard');
-  const [standardModel, setStandardModel] = useState<'gpt-4.1' | 'gemini-2.0-flash' | 'gemini-2.5-pro' | 'gemini-2.5-flash'>('gpt-4.1');
+  const [standardModel, setStandardModel] = useState<'gpt-4.1' | 'gemini-2.0-flash' | 'gemini-2.5-flash'>('gpt-4.1');
   const [realtimeModel, setRealtimeModel] = useState<'gemini-2.0-flash-live-001'>('gemini-2.0-flash-live-001');
 
   // Feature gates
@@ -4608,7 +4608,7 @@ export default function Playground({
                                 <select
                                   value={standardModel}
                                   onChange={(e) => {
-                                    const newModel = e.target.value as 'gpt-4.1' | 'gemini-2.0-flash' | 'gemini-2.5-pro' | 'gemini-2.5-flash';
+                                    const newModel = e.target.value as 'gpt-4.1' | 'gemini-2.0-flash' | 'gemini-2.5-flash';
                                     setStandardModel(newModel);
                                     updateModelConfig({
                                       mode: 'standard',
@@ -4621,7 +4621,6 @@ export default function Playground({
                                 >
                                   <option value="gpt-4.1">GPT-4.1 (Recommended)</option>
                                   <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                                  <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
                                   <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                                 </select>
                                 <div className="text-[10px] text-gray-500 mt-1">
