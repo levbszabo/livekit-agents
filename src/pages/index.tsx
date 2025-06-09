@@ -76,6 +76,14 @@ export function HomeInner() {
       const personalizationIdParam = searchParams.get('id'); // Get personalization ID from 'id' parameter
       const isEmbed = searchParams.get('embed') === '1'; // Check if in embed mode
 
+      console.log('🔄 Playground: URL params extracted:', {
+        brdgeId: brdgeIdParam,
+        userId: userIdParam,
+        agentType: agentTypeParam,
+        personalizationId: personalizationIdParam,
+        isEmbed: isEmbed
+      });
+
       setUrlParams({
         brdgeId: brdgeIdParam,
         userId: userIdParam || undefined,
@@ -165,11 +173,19 @@ export function HomeInner() {
     async (c: boolean, mode: ConnectionMode) => {
       if (c) {
         if (typeof urlParams.brdgeId === 'string') { // Use urlParams.brdgeId
+          console.log('🚀 Playground: Connecting with params:', {
+            mode: mode,
+            brdgeId: urlParams.brdgeId,
+            userId: urlParams.userId,
+            personalizationId: urlParams.personalizationId
+          });
           connect(mode, urlParams.brdgeId, urlParams.userId, urlParams.personalizationId);
         } else {
+          console.log('🚀 Playground: Connecting without brdgeId (mode only)');
           connect(mode);
         }
       } else {
+        console.log('🔌 Playground: Disconnecting');
         disconnect();
       }
     },

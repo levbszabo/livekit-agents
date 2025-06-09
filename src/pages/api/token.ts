@@ -32,25 +32,34 @@ export default async function handleToken(
     const userId = req.query.user_id as string;
     const personalizationId = req.query.personalization_id as string;
 
+    console.log('🎫 Token: Received params:', { brdgeId, userId, personalizationId });
+
     // Include userId and personalizationId in the identity if available
     let identity;
     if (brdgeId) {
       if (userId && personalizationId) {
         // Format: brdge-BRDGE_ID-USER_ID-PERSONALIZATION_ID
         identity = `brdge-${brdgeId}-${userId}-${personalizationId}`;
+        console.log('🎫 Token: Using format with userId and personalizationId');
       } else if (userId) {
         // Format: brdge-BRDGE_ID-USER_ID
         identity = `brdge-${brdgeId}-${userId}`;
+        console.log('🎫 Token: Using format with userId only');
       } else if (personalizationId) {
         // Format: brdge-BRDGE_ID-anon_RANDOM-PERSONALIZATION_ID
         identity = `brdge-${brdgeId}-anon_${generateRandomAlphanumeric(4)}-${personalizationId}`;
+        console.log('🎫 Token: Using format with personalizationId only');
       } else {
         // Fallback to previous format with random ID if no userId or personalizationId
         identity = `brdge-${brdgeId}-${generateRandomAlphanumeric(4)}`;
+        console.log('🎫 Token: Using fallback format');
       }
     } else {
       identity = `brdge-${generateRandomAlphanumeric(4)}`;
+      console.log('🎫 Token: Using basic format (no brdgeId)');
     }
+
+    console.log('🎫 Token: Generated identity:', identity);
 
     const grant: VideoGrant = {
       room: roomName,
