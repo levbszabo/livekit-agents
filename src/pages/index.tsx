@@ -159,7 +159,7 @@ export function HomeInner() {
         // Send acknowledgment back to parent
         if (event.source && typeof event.source.postMessage === 'function') {
           try {
-            event.source.postMessage(
+            (event.source as Window).postMessage(
               { type: 'AUTH_TOKEN_ACK', received: true },
               event.origin
             );
