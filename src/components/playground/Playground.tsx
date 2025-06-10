@@ -1677,6 +1677,18 @@ export default function Playground({
   brdgeId,
   authToken // Changed from token to authToken
 }: PlaygroundProps) {
+
+  // Add logging when authToken prop changes
+  useEffect(() => {
+    console.log("🎮 Playground: AuthToken prop changed:", {
+      hasToken: !!authToken,
+      tokenLength: authToken?.length || 0,
+      tokenPreview: authToken ? authToken.substring(0, 20) + '...' : 'null',
+      brdgeId,
+      userId
+    });
+  }, [authToken, brdgeId, userId]);
+
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
   const [selectedVoice, setSelectedVoice] = useState<string | null>(null);
   const [selectedVoiceBrdgeId, setSelectedVoiceBrdgeId] = useState<string | null>(null);

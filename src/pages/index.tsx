@@ -134,16 +134,18 @@ export function HomeInner() {
 
     const handleMessage = (event: MessageEvent) => {
       // Log all incoming messages for debugging
-      console.log("Message received:", {
+      console.log("🔍 Message received:", {
         origin: event.origin,
         type: event.data?.type,
-        hasToken: !!event.data?.token
+        hasToken: !!event.data?.token,
+        tokenLength: event.data?.token?.length || 0
       });
 
       // TEMPORARY: For testing, accept messages from any origin
       // WARNING: This is not secure for production!
       if (event.data && event.data.type === 'AUTH_TOKEN' && typeof event.data.token === 'string') {
-        console.log('AUTH_TOKEN received from:', event.origin);
+        console.log('✅ AUTH_TOKEN received from:', event.origin);
+        console.log('🔑 Token preview:', event.data.token.substring(0, 20) + '...');
 
         // Update React state
         setAuthTokenState(event.data.token);
@@ -152,22 +154,46 @@ export function HomeInner() {
         setAuthToken(event.data.token);
 
         // Verify token was set
-        console.log("Token set in state and API module");
+        console.log("✅ Token set in state and API module");
+
+        // Send acknowledgment back to parent
+        if (event.source && typeof event.source.postMessage === 'function') {
+          try {
+            event.source.postMessage(
+              { type: 'AUTH_TOKEN_ACK', received: true },
+              event.origin
+            );
+            console.log("📨 Sent AUTH_TOKEN_ACK back to parent");
+          } catch (error) {
+            console.error("Failed to send acknowledgment:", error);
+          }
+        }
+      } else {
+        console.log("❌ Invalid or missing AUTH_TOKEN in message:", event.data);
       }
     };
 
     window.addEventListener('message', handleMessage);
 
     // Log to confirm listener is active
-    console.log("PostMessage listener active");
+    console.log("👂 PostMessage listener active");
 
     // Cleanup: remove the listener when the component unmounts
     return () => {
-      console.log("Removing postMessage listener");
+      console.log("🧹 Removing postMessage listener");
       window.removeEventListener('message', handleMessage);
       setAuthToken(null);
     };
   }, []); // Empty dependency array means this effect runs once on mount
+
+  // Add logging when authToken state changes
+  useEffect(() => {
+    console.log("🔄 AuthToken state changed:", {
+      hasToken: !!authToken,
+      tokenLength: authToken?.length || 0,
+      tokenPreview: authToken ? authToken.substring(0, 20) + '...' : 'null'
+    });
+  }, [authToken]);
 
   const handleConnect = useCallback(
     async (c: boolean, mode: ConnectionMode) => {
@@ -353,19 +379,28 @@ export function HomeInner() {
                 authToken={authToken || undefined}
                 userId={urlParams?.userId}
               />
-            ) : (
-              <Playground
-                themeColors={themeColors}
-                onConnect={(c) => {
-                  const m = process.env.NEXT_PUBLIC_LIVEKIT_URL ? "env" : mode;
-                  handleConnect(c, m);
-                }}
-                agentType={urlParams?.agentType}
-                userId={urlParams?.userId}
-                brdgeId={urlParams.brdgeId}
-                authToken={authToken}
-              />
-            )}
+            ) : (() => {
+              console.log("🎮 Passing to Playground:", {
+                authToken: authToken ? authToken.substring(0, 20) + '...' : 'null',
+                hasToken: !!authToken,
+                brdgeId: urlParams.brdgeId,
+                userId: urlParams?.userId,
+                agentType: urlParams?.agentType
+              });
+              return (
+                <Playground
+                  themeColors={themeColors}
+                  onConnect={(c) => {
+                    const m = process.env.NEXT_PUBLIC_LIVEKIT_URL ? "env" : mode;
+                    handleConnect(c, m);
+                  }}
+                  agentType={urlParams?.agentType}
+                  userId={urlParams?.userId}
+                  brdgeId={urlParams.brdgeId}
+                  authToken={authToken}
+                />
+              );
+            })()}
             <RoomAudioRenderer />
           </LiveKitRoom>
         ) : (
