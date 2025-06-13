@@ -2768,8 +2768,6 @@ export default function Playground({
   const [standardModel, setStandardModel] = useState<'gpt-4.1' | 'gemini-2.0-flash' | 'gemini-2.5-flash'>('gpt-4.1');
   const [realtimeModel, setRealtimeModel] = useState<'gemini-2.0-flash-live-001'>('gemini-2.0-flash-live-001');
 
-  // Feature gates
-  const REALTIME_MODELS_ENABLED = false; // Set to false to disable realtime models
   const [modelConfig, setModelConfig] = useState<any>(null);
 
   // Function to load teaching persona from script
@@ -2918,6 +2916,10 @@ export default function Playground({
 
   // Fix the type issue with params.agentType comparison - use strict equality and type check
   const isEditMode = agentType === 'edit' || params.agentType === 'edit';
+
+  // Feature gates - Allow realtime models to run, but only allow editing in edit mode
+  const REALTIME_MODELS_ENABLED = true; // Always allow realtime models to run
+  const REALTIME_MODELS_EDITABLE = isEditMode; // Only allow editing in edit mode
 
   // Add this function to handle engagement updates
   const handleUpdateEngagement = (updatedEngagement: EngagementOpportunity) => {
@@ -3500,15 +3502,14 @@ export default function Playground({
       if (response.ok) {
         const data = await response.json();
         setModelConfig(data);
-        // Force standard mode if realtime is disabled
+        // Always use the fetched mode - don't force changes in view mode
         const fetchedMode = data.mode || 'standard';
-        const finalMode = REALTIME_MODELS_ENABLED ? fetchedMode : 'standard';
-        setModelMode(finalMode);
+        setModelMode(fetchedMode);
         setStandardModel(data.standard_model || 'gpt-4.1');
         setRealtimeModel(data.realtime_model || 'gemini-2.0-flash-live-001');
 
-        // If we forced to standard mode, update the backend
-        if (!REALTIME_MODELS_ENABLED && fetchedMode === 'realtime') {
+        // Never force mode changes - let view mode use whatever was configured
+        if (false) { // Disabled: Don't force mode changes
           updateModelConfig({
             mode: 'standard',
             standard_model: data.standard_model || 'gpt-4.1',
@@ -4567,7 +4568,7 @@ export default function Playground({
                                 </button>
                                 <button
                                   onClick={() => {
-                                    if (REALTIME_MODELS_ENABLED) {
+                                    if (REALTIME_MODELS_EDITABLE) {
                                       setModelMode('realtime');
                                       updateModelConfig({
                                         mode: 'realtime',
@@ -4577,25 +4578,25 @@ export default function Playground({
                                       });
                                     }
                                   }}
-                                  disabled={!REALTIME_MODELS_ENABLED}
+                                  disabled={!REALTIME_MODELS_EDITABLE}
                                   className={`
-                                    px-3 py-2 rounded-md text-[12px] font-medium transition-all duration-200 relative
-                                    ${!REALTIME_MODELS_ENABLED
+                    px-3 py-2 rounded-md text-[12px] font-medium transition-all duration-200 relative
+                    ${!REALTIME_MODELS_EDITABLE
                                       ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
                                       : modelMode === 'realtime'
                                         ? 'bg-white text-blue-600 shadow-sm border border-blue-200'
                                         : 'text-gray-600 hover:text-gray-700'}
-                                  `}
+                  `}
                                 >
                                   <div className="flex items-center gap-1.5">
-                                    {!REALTIME_MODELS_ENABLED && (
+                                    {!REALTIME_MODELS_EDITABLE && (
                                       <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                                         <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
                                       </svg>
                                     )}
                                     <span>Realtime</span>
-                                    {!REALTIME_MODELS_ENABLED && (
-                                      <span className="text-[10px] opacity-75">(Soon)</span>
+                                    {!REALTIME_MODELS_EDITABLE && (
+                                      <span className="text-[10px] opacity-75">(View Only)</span>
                                     )}
                                   </div>
                                 </button>
@@ -4604,8 +4605,8 @@ export default function Playground({
                             <div className="text-[10px] text-gray-500 mt-1">
                               {modelMode === 'standard'
                                 ? 'Traditional STT → LLM → TTS pipeline with voice cloning support'
-                                : !REALTIME_MODELS_ENABLED
-                                  ? 'Live conversation mode with reduced latency (coming soon)'
+                                : !REALTIME_MODELS_EDITABLE
+                                  ? 'Live conversation mode with reduced latency (view only)'
                                   : 'Live conversation mode with reduced latency (limited voice options)'
                               }
                             </div>
