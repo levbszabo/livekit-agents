@@ -8,30 +8,51 @@
 
 <!--END_BANNER_IMAGE-->
 
-# LiveKit Agents Playground
+# DotBridge Research Framework - LiveKit Agents Playground
 
-<!--BEGIN_DESCRIPTION-->
-The Agent Playground is designed for quickly prototyping with server side agents built with [LiveKit Agents Framework](https://github.com/livekit/agents). Easily tap into LiveKit WebRTC sessions and process or generate audio, video, and data streams.
-  The playground includes components to fully interact with any LiveKit agent, through video, audio and chat.
-<!--END_DESCRIPTION-->
+**Interactive playground for real-time AI agents built with the DotBridge research framework**
 
-## Docs and references
+## Overview
 
-Docs for how to get started with LiveKit agents at [https://docs.livekit.io/agents](https://docs.livekit.io/agents)
+This is the LiveKit Agents Playground component of the [DotBridge Research Framework](https://github.com/levbszabo/brdge-v1), designed for prototyping and testing real-time AI agents that utilize structured knowledge graphs extracted from multimodal content.
 
-The repo containing the (server side) agent implementations (including example agents): [https://github.com/livekit/agents](https://github.com/livekit/agents)
+The playground provides a complete interface for interacting with DotBridge agents through video, audio, and chat, demonstrating the research framework's capabilities in real-time conversational AI.
 
-## Try out a live version
+## Part of DotBridge Research Framework
 
-You can try out the agents playground at [https://livekit-agent-playground.vercel.app](https://livekit-agent-playground.vercel.app).
-This will connect you to our example agent, KITT, which is based off of the [minimal-assistant](https://github.com/livekit/agents/blob/main/examples/voice-pipeline-agent/minimal_assistant.py).
+This playground works in conjunction with the main DotBridge system:
 
-## Setting up the playground locally
+- **Main Repository**: [https://github.com/levbszabo/brdge-v1](https://github.com/levbszabo/brdge-v1)
+- **Research Framework**: Multipass knowledge extraction and structured knowledge graph construction
+- **Agent System**: Real-time AI agents powered by extracted knowledge graphs
+
+## Architecture Integration
+
+This playground serves as **Service #4** in the complete DotBridge system:
+
+1. **Service 1**: React Frontend (`brdge-v1/frontend`)
+2. **Service 2**: Flask Backend (`brdge-v1/backend`)
+3. **Service 3**: LiveKit Agent Backend (`brdge-v1/backend/agent_realtime.py`)
+4. **Service 4**: Next.js Playground (this repository) - Connects to LiveKit backend
+
+## Docs and References
+
+- **DotBridge Documentation**: [Main Repository README](https://github.com/levbszabo/brdge-v1)
+- **LiveKit Agents Framework**: [https://docs.livekit.io/agents](https://docs.livekit.io/agents)
+- **Creator Portfolio**: [https://journeymanai.io](https://journeymanai.io)
+
+## Try the DotBridge Demo
+
+Experience the complete DotBridge research framework at the main repository's demo, which integrates all components including this playground.
+
+## Setting up the Playground Locally
+
+**Prerequisites**: Ensure you have the main DotBridge repository set up first - [Setup Instructions](https://github.com/levbszabo/brdge-v1#getting-started)
 
 1. Install dependencies
 
 ```bash
-  npm install
+npm install
 ```
 
 2. Copy and rename the `.env.example` file to `.env.local` and fill in the necessary environment variables.
@@ -45,39 +66,44 @@ NEXT_PUBLIC_LIVEKIT_URL=wss://<Your Cloud URL>
 3. Run the development server:
 
 ```bash
-  npm run dev
+npm run dev
 ```
 
 4. Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-5. If you haven't done so yet, start your agent (with the same project variables as in step 2.)
-6. Connect to a room and see your agent connecting to the playground
+
+5. Ensure the DotBridge LiveKit agent is running (`python3 agent_realtime.py dev` in the main repository's backend)
+
+6. Connect to a room and interact with your DotBridge agent
 
 ## Features
 
-- Render video, audio and chat from your agent
-- Send video, audio, or text to your agent
-- Configurable settings panel to work with your agent
+- **Real-time Agent Interaction**: Chat, voice, and video with knowledge graph-powered AI agents
+- **Multimodal Communication**: Send video, audio, or text to DotBridge agents
+- **Research Interface**: Configurable settings panel for testing different agent configurations
+- **Knowledge Graph Integration**: Agents powered by structured knowledge extracted from content
+
+## Research Applications
+
+This playground demonstrates:
+- **Real-time conversational AI** with structured knowledge
+- **Multimodal interaction patterns** for research
+- **Agent response systems** utilizing knowledge graphs
+- **Production deployment** of research frameworks
 
 ## Notes
 
-- This playground is currently work in progress. There are known layout/responsive bugs and some features are under tested.
-- The playground was tested against the kitt example in `https://github.com/livekit/agents`.
-- Feel free to ask questions, request features in our [community slack](https://livekit.io/join-slack).
+- This playground is part of the DotBridge research framework for multimodal AI
+- Designed specifically for testing agents built with the DotBridge knowledge extraction pipeline
+- Works best when integrated with the complete DotBridge system
 
-## Known issues
+## Contributing
 
-- Layout can break on smaller screens.
-- Mobile device sizes not supported currently
+Contributions to the DotBridge research framework are welcome! Please see the [main repository](https://github.com/levbszabo/brdge-v1) for contribution guidelines.
 
-<!--BEGIN_REPO_NAV-->
-<br/><table>
-<thead><tr><th colspan="2">LiveKit Ecosystem</th></tr></thead>
-<tbody>
-<tr><td>Realtime SDKs</td><td><a href="https://github.com/livekit/components-js">React Components</a> · <a href="https://github.com/livekit/client-sdk-js">Browser</a> · <a href="https://github.com/livekit/components-swift">Swift Components</a> · <a href="https://github.com/livekit/client-sdk-swift">iOS/macOS/visionOS</a> · <a href="https://github.com/livekit/client-sdk-android">Android</a> · <a href="https://github.com/livekit/client-sdk-flutter">Flutter</a> · <a href="https://github.com/livekit/client-sdk-react-native">React Native</a> · <a href="https://github.com/livekit/rust-sdks">Rust</a> · <a href="https://github.com/livekit/node-sdks">Node.js</a> · <a href="https://github.com/livekit/python-sdks">Python</a> · <a href="https://github.com/livekit/client-sdk-unity-web">Unity (web)</a> · <a href="https://github.com/livekit/client-sdk-unity">Unity (beta)</a></td></tr><tr></tr>
-<tr><td>Server APIs</td><td><a href="https://github.com/livekit/node-sdks">Node.js</a> · <a href="https://github.com/livekit/server-sdk-go">Golang</a> · <a href="https://github.com/livekit/server-sdk-ruby">Ruby</a> · <a href="https://github.com/livekit/server-sdk-kotlin">Java/Kotlin</a> · <a href="https://github.com/livekit/python-sdks">Python</a> · <a href="https://github.com/livekit/rust-sdks">Rust</a> · <a href="https://github.com/agence104/livekit-server-sdk-php">PHP (community)</a></td></tr><tr></tr>
-<tr><td>Agents Frameworks</td><td><a href="https://github.com/livekit/agents">Python</a> · <b>Playground</b></td></tr><tr></tr>
-<tr><td>Services</td><td><a href="https://github.com/livekit/livekit">LiveKit server</a> · <a href="https://github.com/livekit/egress">Egress</a> · <a href="https://github.com/livekit/ingress">Ingress</a> · <a href="https://github.com/livekit/sip">SIP</a></td></tr><tr></tr>
-<tr><td>Resources</td><td><a href="https://docs.livekit.io">Docs</a> · <a href="https://github.com/livekit-examples">Example apps</a> · <a href="https://livekit.io/cloud">Cloud</a> · <a href="https://docs.livekit.io/home/self-hosting/deployment">Self-hosting</a> · <a href="https://github.com/livekit/livekit-cli">CLI</a></td></tr>
-</tbody>
-</table>
-<!--END_REPO_NAV-->
+## License
+
+This project is part of the DotBridge Research Framework and is licensed under the MIT License - see the [LICENSE](https://github.com/levbszabo/brdge-v1/blob/main/LICENSE) file in the main repository for details.
+
+---
+
+**Part of the DotBridge Research Framework** - [Main Repository](https://github.com/levbszabo/brdge-v1) | [Creator Portfolio](https://journeymanai.io)
